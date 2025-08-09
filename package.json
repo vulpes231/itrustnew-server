@@ -1,0 +1,16 @@
+{
+	"name": "migration",
+	"module": "index.js",
+	"devDependencies": {
+		"bun-types": "latest"
+	},
+	"peerDependencies": {
+		"typescript": "^5.0.0"
+	},
+	"dependencies": {
+		"csv-parser": "^3.2.0",
+		"mongodb": "^6.18.0",
+		"mysql2": "^3.14.3",
+		"sql-ddl-to-json-schema": "^6.0.0"
+	}
+}
