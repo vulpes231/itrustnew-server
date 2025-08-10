@@ -170,3 +170,10 @@ dist
 
 # IntelliJ based IDEs
 .idea
+
+
+#backup
+backup-current.sql
+convert.js
+replace.js
+migrate.js
