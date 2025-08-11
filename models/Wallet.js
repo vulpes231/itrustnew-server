@@ -20,6 +20,15 @@ const walletSchema = new Schema(
 		updated: {
 			type: String,
 		},
+		dailyProfit: {
+			type: Number,
+		},
+		dailyProfitPercent: {
+			type: String,
+		},
 	},
 	{ timestamps: true }
 );
+
+const Wallet = mongoose.model("Wallet", walletSchema);
+module.exports = Wallet;

@@ -3,7 +3,7 @@ require("dotenv").config();
 
 const uri = process.env.DATABASE_URI;
 
-async function migrateUserSchema() {
+async function migrateWalletSettings() {
 	const client = new MongoClient(uri);
 
 	try {
@@ -11,69 +11,54 @@ async function migrateUserSchema() {
 		console.log("Connected to MongoDB");
 
 		const db = client.db("itrust_migrated");
-		const usersCollection = db.collection("users");
+		const oldCollection = db.collection("settings"); // Replace with actual collection name
+		const newCollection = db.collection("walletsettings"); // New collection name
 
-		// Get all users
-		const users = await usersCollection.find({}).toArray();
+		// Get sample documents (2 as requested)
+		const docs = await oldCollection.find().toArray();
+		console.log(`Migrating ${docs.length} documents`);
 
-		console.log(`Found ${users.length} users to migrate`);
-
-		// Process each user
-		for (const user of users) {
-			const updateDoc = {
-				$set: {
-					firstName: user.first_name,
-					lastName: user.last_name,
-					zipCode: user.zipcode,
-					employment: user.employed,
-					accountStatus: user.status,
-					kycStatus: user.kyc,
-					idNumber: user.id_number,
-					idType: user.id_type,
-					idFront: user.front_id,
-					idBack: user.back_id,
-					emailVerified: !!user.email_verified_at,
-					banned: !!user.blocked_at,
-					twoFaActivated: !!user.two_fa_activated_at,
-					countryId: user.country_id, // Keep as reference
-					stateId: user.state_id, // Keep as reference
-					currencyId: user.currency_id, // Keep as reference
-					// Other fields
-					username: user.username,
-					password: user.password,
-					email: user.email,
-					phone: user.phone,
-					address: user.address,
-					avatar: user.avatar || null,
-					city: user.city || null,
-					ssn: user.ssn || null,
-					dob: user.dob,
-					nationality: user.nationality,
-					experience: user.experience,
+		for (const doc of docs) {
+			const transformedDoc = {
+				cryptoWallets: {
+					btc: doc.btc_wallet,
+					eth: doc.eth_wallet,
+					trc: doc.trc_wallet,
+					erc: doc.erc_wallet,
+					note: doc.wallet_note,
 				},
-				$unset: {
-					first_name: "",
-					last_name: "",
-					zipcode: "",
-					employed: "",
-					status: "",
-					kyc: "",
-					id_number: "",
-					id_type: "",
-					front_id: "",
-					back_id: "",
-					email_verified_at: "",
-					blocked_at: "",
-					two_fa_activated_at: "",
-					country_id: "",
-					state_id: "",
-					currency_id: "",
+				bankDetails: {
+					name: doc.bank_name,
+					accountName: doc.bank_account_name,
+					accountNumber: doc.bank_account_number,
+					routingNumber: doc.bank_routing_number,
+					reference: doc.bank_reference,
+					address: doc.bank_address,
+				},
+				depositLimits: {
+					bank: {
+						min: doc.min_cash_bank_deposit,
+						max: doc.max_cash_bank_deposit,
+					},
+					crypto: {
+						min: doc.min_cash_crypto_deposit,
+						max: doc.max_cash_crypto_deposit,
+					},
+				},
+				withdrawalLimits: {
+					bank: {
+						min: doc.min_cash_bank_withdrawal,
+						max: doc.max_cash_bank_withdrawal,
+					},
+					crypto: {
+						min: doc.min_cash_crypto_withdrawal,
+						max: doc.max_cash_crypto_withdrawal,
+					},
 				},
 			};
 
-			await usersCollection.updateOne({ _id: user._id }, updateDoc);
-
-			console.log(`Migrated user ${user.username}`);
+			await newCollection.insertOne(transformedDoc);
+			console.log(`Migrated document ${doc._id}`);
 		}
 
 		console.log("Migration completed successfully");
@@ -84,4 +69,4 @@ async function migrateUserSchema() {
 	}
 }
 
-migrateUserSchema();
+migrateWalletSettings();
