@@ -3,7 +3,7 @@ require("dotenv").config();
 
 const uri = process.env.DATABASE_URI;
 
-async function migrateWalletSettings() {
+async function migrateSavingsAccounts() {
 	const client = new MongoClient(uri);
 
 	try {
@@ -11,57 +11,63 @@ async function migrateWalletSettings() {
 		console.log("Connected to MongoDB");
 
 		const db = client.db("itrust_migrated");
-		const oldCollection = db.collection("settings"); // Replace with actual collection name
-		const newCollection = db.collection("walletsettings"); // New collection name
+		const oldCollection = db.collection("savings_accounts");
+		const newCollection = db.collection("savingsaccount");
 
-		// Get sample documents (2 as requested)
 		const docs = await oldCollection.find().toArray();
-		console.log(`Migrating ${docs.length} documents`);
+		console.log(`Migrating ${docs.length} savings accounts`);
+
+		const operations = [];
 
 		for (const doc of docs) {
-			const transformedDoc = {
-				cryptoWallets: {
-					btc: doc.btc_wallet,
-					eth: doc.eth_wallet,
-					trc: doc.trc_wallet,
-					erc: doc.erc_wallet,
-					note: doc.wallet_note,
-				},
-				bankDetails: {
-					name: doc.bank_name,
-					accountName: doc.bank_account_name,
-					accountNumber: doc.bank_account_number,
-					routingNumber: doc.bank_routing_number,
-					reference: doc.bank_reference,
-					address: doc.bank_address,
-				},
-				depositLimits: {
-					bank: {
-						min: doc.min_cash_bank_deposit,
-						max: doc.max_cash_bank_deposit,
-					},
-					crypto: {
-						min: doc.min_cash_crypto_deposit,
-						max: doc.max_cash_crypto_deposit,
-					},
-				},
-				withdrawalLimits: {
-					bank: {
-						min: doc.min_cash_bank_withdrawal,
-						max: doc.max_cash_bank_withdrawal,
-					},
-					crypto: {
-						min: doc.min_cash_crypto_withdrawal,
-						max: doc.max_cash_crypto_withdrawal,
-					},
-				},
-			};
+			// Parse country_id array (stored as JSON string)
+			const countryIds = JSON.parse(doc.country_id || "[]");
 
-			await newCollection.insertOne(transformedDoc);
-			console.log(`Migrated document ${doc._id}`);
+			operations.push({
+				insertOne: {
+					document: {
+						name: doc.name,
+						title: doc.title,
+						note: doc.note,
+						interestRate: doc.rate, // Renamed from 'rate'
+						contributionLimits: {
+							min: doc.min_contribution,
+							max: doc.max_contribution,
+						},
+						withdrawalLimits: {
+							min: doc.min_cashout,
+							max: doc.max_cashout,
+						},
+						eligibleCountries: countryIds, // Array of country IDs
+						status: doc.status,
+						// Let Mongoose handle timestamps automatically
+					},
+				},
+			});
 		}
 
-		console.log("Migration completed successfully");
+		if (operations.length > 0) {
+			// Insert into new collection
+			await newCollection.bulkWrite(operations, { ordered: false });
+
+			// Verify counts match
+			const oldCount = await oldCollection.countDocuments();
+			const newCount = await newCollection.countDocuments();
+
+			if (oldCount === newCount) {
+				// Only drop old collection if migration succeeded
+				await oldCollection.drop();
+				console.log(
+					`Successfully migrated ${newCount} documents and dropped old collection`
+				);
+			} else {
+				console.warn(
+					`Count mismatch! Old: ${oldCount} | New: ${newCount} - Old collection preserved`
+				);
+			}
+		}
+
+		console.log("Migration completed");
 	} catch (error) {
 		console.error("Migration error:", error);
 	} finally {
@@ -69,4 +75,4 @@ async function migrateWalletSettings() {
 	}
 }
 
-migrateWalletSettings();
+migrateSavingsAccounts();
