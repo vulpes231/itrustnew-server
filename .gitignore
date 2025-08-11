@@ -177,5 +177,5 @@ backup-current.sql
 convert.js
 replace.js
 migrate.js
-bactchrename.js
+batchrename.js
 rename.js
