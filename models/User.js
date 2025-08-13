@@ -95,7 +95,7 @@ const userSchema = new Schema(
 			kycStatus: {
 				type: String,
 				enum: ["not verified", "pending", "approved", "failed"],
-				default: "pending",
+				default: "not verified",
 			},
 		},
 		accountStatus: {

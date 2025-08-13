@@ -14,14 +14,14 @@ const {
 // Initialize cron jobs
 initWalletGrowthCronJobs();
 
-if (process.env.NODE_ENV === "development") {
-	app.use("/test-crons", devRouter);
-}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 connectDB();
+
+if (process.env.NODE_ENV === "development") {
+	app.use("/test-crons", devRouter);
+}
 
 // Middleware
 app.use(cors(corsOptions));
