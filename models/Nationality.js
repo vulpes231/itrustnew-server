@@ -7,10 +7,6 @@ const nationalitySchema = new Schema(
 			type: String,
 			required: true,
 		},
-
-		oldId: {
-			type: String,
-		},
 	},
 	{
 		timestamps: true,

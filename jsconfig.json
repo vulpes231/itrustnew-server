@@ -1,10 +1,9 @@
 {
 	"compilerOptions": {
 		"lib": ["ESNext"],
-		"module": "commonjs",
+		"module": "CommonJS",
 		"target": "esnext",
 		"moduleResolution": "node",
-		"moduleDetection": "force",
 		"allowImportingTsExtensions": true,
 		"noEmit": true,
 		"composite": true,
@@ -15,8 +14,6 @@
 		"allowSyntheticDefaultImports": true,
 		"forceConsistentCasingInFileNames": true,
 		"allowJs": true,
-		"types": [
-			"bun-types" // add Bun global
-		]
+		"types": ["bun-types"]
 	}
 }

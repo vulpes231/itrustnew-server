@@ -11,9 +11,6 @@ const stateSchema = new Schema(
 			type: String,
 			required: true,
 		},
-		oldId: {
-			type: String,
-		},
 		status: {
 			type: String,
 			enum: ["active", "inactive"],

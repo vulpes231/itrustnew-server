@@ -11,9 +11,6 @@ const countrySchema = new Schema(
 			type: String,
 			required: true,
 		},
-		oldId: {
-			type: String,
-		},
 		status: {
 			type: String,
 			default: "active",
