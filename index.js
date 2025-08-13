@@ -5,6 +5,18 @@ const { connectDB, corsOptions } = require("./configs/settings.js");
 const { errorLogger, reqLogger } = require("./middlewares/loggers.js");
 const { mongoose } = require("mongoose");
 require("dotenv").config();
+const {
+	initWalletGrowthCronJobs,
+	shutdownCronJobs,
+	devRouter,
+} = require("./jobs/jobs");
+
+// Initialize cron jobs
+initWalletGrowthCronJobs();
+
+if (process.env.NODE_ENV === "development") {
+	app.use("/test-crons", devRouter);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,23 +48,51 @@ app.use(errorLogger);
 const shutdown = async (signal) => {
 	console.log(`\nReceived ${signal}, shutting down gracefully...`);
 
+	// Track if we've already started shutting down
+	if (global.isShuttingDown) return;
+	global.isShuttingDown = true;
+
+	const shutdownTimeout = setTimeout(() => {
+		console.error("Shutdown timeout forced");
+		process.exit(1);
+	}, 15000); // 15 second timeout
+
 	try {
-		// Close HTTP server
+		// 1. Stop accepting new connections
 		if (server) {
-			await new Promise((resolve) => server.close(resolve));
-			console.log("HTTP server closed");
+			console.log("Closing HTTP server...");
+			await new Promise((resolve) => {
+				server.close((err) => {
+					if (err) console.error("HTTP server close error:", err);
+					resolve();
+				});
+				// Force close connections after 8 seconds
+				setTimeout(() => server.closeAllConnections(), 8000);
+			});
+			console.log("✅ HTTP server closed");
 		}
 
-		// Close MongoDB connection
+		// 2. Stop cron jobs
+		console.log("Stopping cron jobs...");
+		await shutdownCronJobs();
+		console.log("✅ Cron jobs stopped");
+
+		// 3. Close MongoDB connection
 		if (mongoose.connection.readyState === 1) {
+			console.log("Closing MongoDB connection...");
 			await mongoose.disconnect();
-			console.log("MongoDB connection closed");
+			console.log("✅ MongoDB connection closed");
 		}
 
-		console.log("Shutdown complete");
+		// 4. Close other resources (redis, etc.) if any
+		// await redisClient.quit();
+
+		console.log("🛑 Shutdown complete");
+		clearTimeout(shutdownTimeout);
 		process.exit(0);
 	} catch (err) {
-		console.error("Error during shutdown:", err);
+		console.error("❌ Shutdown error:", err);
+		clearTimeout(shutdownTimeout);
 		process.exit(1);
 	}
 };

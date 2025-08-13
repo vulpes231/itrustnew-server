@@ -7,18 +7,15 @@ const walletSchema = new Schema(
 		name: {
 			type: String,
 		},
-		balance: {
+		totalBalance: {
+			type: Number,
+		},
+		availableBalance: {
 			type: Number,
 		},
 		userId: {
 			type: Schema.Types.ObjectId,
 			ref: "User",
-		},
-		created: {
-			type: String,
-		},
-		updated: {
-			type: String,
 		},
 		dailyProfit: {
 			type: Number,

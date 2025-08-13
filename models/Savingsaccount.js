@@ -10,6 +10,7 @@ const savingsAccountSchema = new Schema(
 			unique: true,
 			trim: true,
 		},
+		balance: { type: Number, default: 0 },
 		title: {
 			type: String,
 			required: true,
@@ -61,7 +62,6 @@ const savingsAccountSchema = new Schema(
 		},
 		analytics: {
 			totalReturn: { type: Number, default: 0 },
-			balance: { type: Number, default: 0 },
 			dailyChange: { type: Number, default: 0 },
 		},
 	},
