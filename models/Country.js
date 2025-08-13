@@ -14,6 +14,11 @@ const countrySchema = new Schema(
 		oldId: {
 			type: String,
 		},
+		status: {
+			type: String,
+			default: "active",
+			enum: ["active", "inactive"],
+		},
 	},
 	{
 		timestamps: true,

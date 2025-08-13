@@ -179,3 +179,5 @@ replace.js
 migrate.js
 batchrename.js
 rename.js
+test.js
+scripts/
