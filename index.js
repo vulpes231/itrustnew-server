@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { connectDB, corsOptions } = require("./configs/settings.js");
+const { errorLogger, reqLogger } = require("./middlewares/loggers.js");
 const { mongoose } = require("mongoose");
 require("dotenv").config();
 
@@ -15,6 +16,7 @@ app.use(cors(corsOptions));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
+app.use(reqLogger);
 
 // routers
 const rootRouter = require("./routes/root");
@@ -28,6 +30,8 @@ mongoose.connection.once("connected", () => {
 		console.log(`Server started on http://localhost:${PORT}`)
 	);
 });
+
+app.use(errorLogger);
 
 const shutdown = async (signal) => {
 	console.log(`\nReceived ${signal}, shutting down gracefully...`);
