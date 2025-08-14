@@ -28,6 +28,9 @@ const userSchema = new Schema(
 				required: true,
 				unique: true,
 			},
+			refreshToken: {
+				type: String,
+			},
 		},
 		contactInfo: {
 			phone: {

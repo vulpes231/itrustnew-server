@@ -31,10 +31,14 @@ app.use(cookieParser());
 app.use(reqLogger);
 
 // routers
-const rootRouter = require("./routes/root");
+const rootRoute = require("./routes/root");
+const userRegisterRoute = require("./routes/user/register.js");
+const userLoginRoute = require("./routes/user/login.js");
 
 // routes
-app.use("/", rootRouter);
+app.use("/", rootRoute);
+app.use("/register", userRegisterRoute);
+app.use("/login", userLoginRoute);
 
 let server;
 mongoose.connection.once("connected", () => {

@@ -6,6 +6,8 @@ const {
 } = require("../locationService");
 
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+require("dotenv").config();
 const { getUserById } = require("./userService");
 
 async function registerService(userData) {
@@ -108,7 +110,84 @@ async function registerService(userData) {
 	}
 }
 
-async function loginService(loginData) {}
-async function logoutService(userId) {}
+async function loginService(loginData) {
+	const { email, password } = loginData;
+	if (!email || !password) {
+		throw new Error("Email and password required!");
+	}
+	try {
+		const user = await User.findOne({ email });
+		if (!user) {
+			throw new Error("User does not exist!");
+		}
+
+		const verifyPassword = await bcrypt.compare(
+			password,
+			user.credentials.password
+		);
+		if (!verifyPassword) {
+			throw new Error("Invalid email or password!");
+		}
+
+		const accessToken = jwt.sign(
+			{
+				username: user.credentials.username,
+				userId: user._id,
+			},
+			process.env.ACCESS_TOKEN_SECRET,
+			{ expiresIn: "1d" }
+		);
+		const refreshToken = jwt.sign(
+			{
+				username: user.credentials.username,
+				userId: user._id,
+			},
+			process.env.REFRESH_TOKEN_SECRET,
+			{ expiresIn: "4d" }
+		);
+
+		user.credentials.refreshToken = refreshToken;
+		await user.save();
+
+		const userInfo = {
+			credentials: {
+				username: username,
+				email: email,
+			},
+			identityVerification: {
+				kycStatus: user.identityVerification.kycStatus,
+			},
+			accountStatus: {
+				status: user.accountStatus.status,
+				banned: user.accountStatus.banned,
+				emailVerified: user.accountStatus.emailVerified,
+				twoFaActivated: user.accountStatus.twoFaActivated,
+			},
+		};
+
+		return { accessToken, refreshToken, userInfo };
+	} catch (error) {
+		console.log("Failed to login user. Try again", error.message);
+		throw new Error(error.message);
+	}
+}
+
+async function logoutService(userId) {
+	if (!userId) {
+		throw new Error("ID is required!");
+	}
+	try {
+		const user = await User.findById(userId);
+		if (!user) {
+			throw new Error("User not found!");
+		}
+		user.credentials.refreshToken = null;
+		await user.save();
+		return true;
+	} catch (error) {
+		console.log("Failed to logout user. Try again", error.message);
+		throw new Error(error.message);
+	}
+}
 
 module.exports = { registerService, loginService, logoutService };
