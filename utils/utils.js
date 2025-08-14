@@ -9,4 +9,16 @@ const getClientIp = (req) => {
 	return ip.includes("::") ? ip.split(":").pop() : ip;
 };
 
-module.exports = { getClientIp };
+function generateOtp(length = 6) {
+	const numbers = "0123456789"; // Include 0 as well
+	let otp = "";
+
+	for (let i = 0; i < length; i++) {
+		const randomIndex = Math.floor(Math.random() * numbers.length);
+		otp += numbers[randomIndex];
+	}
+
+	return otp;
+}
+
+module.exports = { getClientIp, generateOtp };
