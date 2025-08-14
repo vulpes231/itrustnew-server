@@ -12,6 +12,9 @@ async function getCountries() {
 }
 
 async function getCountryById(countryId) {
+	if (!countryId) {
+		throw new Error("Country ID required!");
+	}
 	try {
 		const country = await Country.findById(countryId);
 		if (!country) {
@@ -33,6 +36,9 @@ async function getStates() {
 }
 
 async function getStateById(stateId) {
+	if (!stateId) {
+		throw new Error("State ID required!");
+	}
 	try {
 		const state = await State.findById(stateId);
 		if (!state) {
@@ -54,6 +60,9 @@ async function getNationalities() {
 }
 
 async function getNationById(nationId) {
+	if (!nationId) {
+		throw new Error("Nationality ID required!");
+	}
 	try {
 		const nation = await Nationality.findById(nationId);
 		if (!nation) {
