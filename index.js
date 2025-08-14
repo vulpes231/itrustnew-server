@@ -10,6 +10,7 @@ const {
 	shutdownCronJobs,
 	devRouter,
 } = require("./jobs/jobs");
+const { verifyJWT } = require("./middlewares/verifyJWT.js");
 
 // Initialize cron jobs
 initWalletGrowthCronJobs();
@@ -38,6 +39,7 @@ const userRegisterRoute = require("./routes/user/register.js");
 const userLoginRoute = require("./routes/user/login.js");
 const userVerificationRoute = require("./routes/user/verification.js");
 const mailRoute = require("./routes/mail.js");
+const userProfileRoute = require("./routes/user/user.js");
 
 // routes
 app.use("/", rootRoute);
@@ -47,6 +49,9 @@ app.use("/register", userRegisterRoute);
 app.use("/login", userLoginRoute);
 app.use("/verify", userVerificationRoute);
 app.use("/mail", mailRoute);
+
+app.use(verifyJWT);
+app.use("/user", userProfileRoute);
 
 let server;
 mongoose.connection.once("connected", () => {

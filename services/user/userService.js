@@ -1,6 +1,11 @@
 const User = require("../../models/User");
 const Usersetting = require("../../models/Usersetting");
 const bcrypt = require("bcryptjs");
+const {
+	getNationById,
+	getCountryById,
+	getStateById,
+} = require("../locationService");
 
 async function getUserById(userId) {
 	if (!userId) throw new Error("Bad request!");
@@ -15,19 +20,18 @@ async function getUserById(userId) {
 	}
 }
 
-async function updateUserProfile(userData) {
+async function updateUserProfile(userId, userData) {
 	const {
-		userId,
 		firstName,
 		lastName,
-		nationality,
+		nationalityId,
 		dob,
 		email,
 		phone,
 		street,
 		city,
-		state,
-		country,
+		stateId,
+		countryId,
 		zipCode,
 	} = userData;
 	try {
@@ -35,38 +39,47 @@ async function updateUserProfile(userData) {
 		if (!user) {
 			throw new Error("user not found");
 		}
+
+		const nation = await getNationById(nationalityId);
+		const country = await getCountryById(countryId);
+		const state = await getStateById(stateId);
+
 		if (firstName) {
-			user.beneficiary.firstName = firstName;
+			user.name.firstName = firstName;
 		}
 		if (lastName) {
-			user.beneficiary.lastName = lastName;
+			user.name.lastName = lastName;
 		}
-		if (nationality) {
-			user.beneficiary.nationality = nationality;
+		if (nationalityId) {
+			user.locationDetails.nationality.id = nation._id;
+			user.locationDetails.nationality.name = nation.name;
 		}
 		if (dob) {
-			user.beneficiary.dob = dob;
+			user.personalDetails.dob = dob;
 		}
 		if (email) {
-			user.beneficiary.contact.email = email;
+			user.credentials.email = email;
 		}
 		if (phone) {
-			user.beneficiary.contact.phone = phone;
+			user.contactInfo.phone = phone;
 		}
 		if (street) {
-			user.beneficiary.address.street = street;
+			user.contactInfo.address.street = street;
 		}
 		if (city) {
-			user.beneficiary.address.city = city;
+			user.contactInfo.address.city = city;
 		}
 		if (state) {
-			user.beneficiary.address.state = state;
+			user.locationDetails.state.stateId = state._id;
+			user.locationDetails.state.name = state.name;
 		}
 		if (country) {
-			user.beneficiary.address.country = country;
+			user.locationDetails.country.countryId = country._id;
+			user.locationDetails.country.name = country.name;
+			user.locationDetails.country.phoneCode = country.phoneCode;
 		}
 		if (zipCode) {
-			user.beneficiary.address.zipCode = zipCode;
+			user.contactInfo.address.zipCode = zipCode;
 		}
 		await user.save();
 		return user;
@@ -76,8 +89,9 @@ async function updateUserProfile(userData) {
 	}
 }
 
-async function updatePassword(userData) {
-	const { userId, password, newPassword } = userData;
+async function updatePassword(userId, userData) {
+	const { password, newPassword } = userData;
+	if (!userId || !password || !newPassword) throw new Error("Bad request!");
 	try {
 		const user = await User.findById(userId);
 		if (!user) throw new Error("Invalid credentials!");
@@ -97,9 +111,8 @@ async function updatePassword(userData) {
 	}
 }
 
-async function updateBeneficiary(userData) {
+async function updateBeneficiary(userId, userData) {
 	const {
-		userId,
 		firstName,
 		lastName,
 		nationality,
@@ -159,6 +172,7 @@ async function updateBeneficiary(userData) {
 }
 
 async function updateTwoFactorAuth(userId) {
+	if (!userId) throw new Error("Bad request!");
 	try {
 		const user = await User.findById(userId);
 		if (!user) {
@@ -175,7 +189,9 @@ async function updateTwoFactorAuth(userId) {
 	}
 }
 
-async function submitDocuments(userId) {
+async function submitDocuments(verifyData) {
+	const { idFront, idBack, firstName, lastName, idType, idNumber, userId } =
+		verifyData;
 	try {
 		const user = await User.findById(userId);
 		if (!user) {
@@ -192,4 +208,5 @@ module.exports = {
 	updateTwoFactorAuth,
 	updateBeneficiary,
 	updatePassword,
+	updateUserProfile,
 };
