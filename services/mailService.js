@@ -1,8 +1,15 @@
+const User = require("../models/User");
 const { sendMail } = require("../utils/mailer");
 const { generateOtp } = require("../utils/utils");
 
+const bcrypt = require("bcrypt");
+
 async function sendLoginCode(email) {
-	const otp = generateOtp();
+	if (!email) throw new Error("Email required");
+
+	const otp = generateOtp(); // e.g., 6-digit code
+	const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins expiry
+
 	const subject = "Your iTrust Investments Login Verification Code";
 	const message = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e1e1e1;">
@@ -27,16 +34,32 @@ async function sendLoginCode(email) {
     `;
 
 	try {
+		const user = await User.findOne({ email });
+		if (!user) return true;
+
+		const hashedOtp = await bcrypt.hash(otp, 10);
+		user.accountStatus.otp = hashedOtp;
+		user.accountStatus.otpExpires = otpExpires;
+		user.accountStatus.otpAttempts = 0;
+		user.accountStatus.otpBlockedUntil = null;
+
+		await user.save();
 		await sendMail(email, subject, message);
-		return otp;
+		return true;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to send login code.");
+		console.error("OTP send error:", error);
+		throw new Error("Failed to send OTP");
 	}
 }
 
 async function sendMailVerificationCode(email) {
-	const emailCode = generateOtp();
+	if (!email) {
+		throw new Error("Email required!");
+	}
+
+	const otp = generateOtp(); // e.g., 6-digit code
+	const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins expiry
+
 	const subject = "Verify Your Email Address - iTrust Investments";
 	const message = `
     <!DOCTYPE html>
@@ -94,8 +117,18 @@ async function sendMailVerificationCode(email) {
     `;
 
 	try {
+		const user = await User.findOne({ email });
+		if (!user) return true;
+
+		const hashedOtp = await bcrypt.hash(otp, 10);
+		user.accountStatus.otp = hashedOtp;
+		user.accountStatus.otpExpires = otpExpires;
+		user.accountStatus.otpAttempts = 0;
+		user.accountStatus.otpBlockedUntil = null;
+
+		await user.save();
 		await sendMail(email, subject, message);
-		return emailCode;
+		return true;
 	} catch (error) {
 		console.error("Email sending error:", error.message);
 		throw new Error(

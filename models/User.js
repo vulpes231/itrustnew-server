@@ -131,6 +131,16 @@ const userSchema = new Schema(
 			otp: {
 				type: String,
 			},
+			otpExpires: {
+				type: Date,
+			},
+			otpAttempts: {
+				type: Number,
+				default: 0,
+			},
+			otpBlockedUntil: {
+				type: Date,
+			},
 		},
 	},
 	{ timestamps: true }

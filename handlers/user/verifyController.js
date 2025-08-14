@@ -29,6 +29,7 @@ const verifyEmailCode = async (req, res) => {
 		res.status(500).json({ message: error.message });
 	}
 };
+
 const approveAccount = async (req, res) => {};
 
 module.exports = { verifyLoginCode, verifyEmailCode, approveAccount };
