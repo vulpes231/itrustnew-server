@@ -12,6 +12,7 @@ const { getUserById } = require("./userService");
 const { getCurrencyById } = require("../currencyService");
 const Wallet = require("../../models/Wallet");
 const { sendLoginCode } = require("../mailService");
+const Usersetting = require("../../models/Usersetting");
 
 async function registerService(userData) {
 	const {
@@ -131,6 +132,10 @@ async function registerService(userData) {
 		const brokerageWallet = await Wallet.create({
 			name: "brokerage",
 			userId: newUser._id,
+		});
+
+		const userSettings = await Usersetting.create({
+			userId: user._id,
 		});
 
 		const user = await getUserById(newUser._id);

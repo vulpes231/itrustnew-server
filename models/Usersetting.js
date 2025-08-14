@@ -3,7 +3,11 @@ const Schema = mongoose.Schema;
 
 const userSettingSchema = new Schema(
 	{
-		// Lock Statuses
+		userId: {
+			type: Schema.Types.ObjectId,
+			ref: "User",
+			required: true,
+		},
 		locks: {
 			cash: {
 				isLocked: { type: Boolean, default: false },
@@ -22,8 +26,13 @@ const userSettingSchema = new Schema(
 		},
 
 		trading: {
-			mode: { type: String, enum: ["regular", "drip"], default: "regular" },
+			mode: {
+				type: String,
+				enum: ["regular", "drip", "options"],
+				default: "regular",
+			},
 			isDripEnabled: { type: Boolean, default: false },
+			isOptionsEnabled: { type: Boolean, default: false },
 		},
 
 		beneficiary: {

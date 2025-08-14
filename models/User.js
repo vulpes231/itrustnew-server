@@ -128,14 +128,6 @@ const userSchema = new Schema(
 				type: Boolean,
 				default: false,
 			},
-			dripActivated: {
-				type: Boolean,
-				default: false,
-			},
-			optionsActivated: {
-				type: Boolean,
-				default: false,
-			},
 			otp: {
 				type: String,
 			},

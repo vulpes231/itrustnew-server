@@ -36,6 +36,7 @@ const locationRoute = require("./routes/location.js");
 const currencyRoute = require("./routes/currency.js");
 const userRegisterRoute = require("./routes/user/register.js");
 const userLoginRoute = require("./routes/user/login.js");
+const userVerificationRoute = require("./routes/user/verification.js");
 
 // routes
 app.use("/", rootRoute);
@@ -43,6 +44,7 @@ app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
 app.use("/register", userRegisterRoute);
 app.use("/login", userLoginRoute);
+app.use("/verify", userVerificationRoute);
 
 let server;
 mongoose.connection.once("connected", () => {
