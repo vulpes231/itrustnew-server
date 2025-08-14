@@ -62,6 +62,13 @@ const userSchema = new Schema(
 				id: { type: Schema.Types.ObjectId, ref: "Nationality" },
 				name: { type: String },
 			},
+			currency: {
+				id: { type: Schema.Types.ObjectId, ref: "Currency" },
+				name: { type: String },
+				symbol: { type: String },
+				sign: { type: String },
+				rate: { type: String },
+			},
 		},
 		personalDetails: {
 			avatar: {
@@ -116,6 +123,21 @@ const userSchema = new Schema(
 			twoFaActivated: {
 				type: Boolean,
 				default: false,
+			},
+			twoFaVerified: {
+				type: Boolean,
+				default: false,
+			},
+			dripActivated: {
+				type: Boolean,
+				default: false,
+			},
+			optionsActivated: {
+				type: Boolean,
+				default: false,
+			},
+			otp: {
+				type: String,
 			},
 		},
 	},

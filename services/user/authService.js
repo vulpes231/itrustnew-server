@@ -9,6 +9,9 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const { getUserById } = require("./userService");
+const { getCurrencyById } = require("../currencyService");
+const Wallet = require("../../models/Wallet");
+const { sendLoginCode } = require("../mailService");
 
 async function registerService(userData) {
 	const {
@@ -28,6 +31,7 @@ async function registerService(userData) {
 		ssn,
 		experience,
 		employment,
+		currencyId,
 	} = userData;
 
 	if (!firstname || !lastname) {
@@ -36,7 +40,14 @@ async function registerService(userData) {
 	if (!username || !password) {
 		throw new Error("Username and password required!");
 	}
-	if (!email || !phone || !countryId || !stateId || !nationalityId) {
+	if (
+		!email ||
+		!phone ||
+		!countryId ||
+		!stateId ||
+		!nationalityId ||
+		!currencyId
+	) {
 		throw new Error("Contact information required!");
 	}
 
@@ -52,6 +63,7 @@ async function registerService(userData) {
 		const countryInfo = await getCountryById(countryId);
 		const stateInfo = await getStateById(stateId);
 		const nationInfo = await getNationById(nationalityId);
+		const currencyInfo = await getCurrencyById(currencyId);
 
 		const hashPassword = await bcrypt.hash(password, 10);
 
@@ -87,6 +99,14 @@ async function registerService(userData) {
 					id: nationInfo._id,
 					name: nationInfo.name,
 				},
+				currency: {
+					id: currencyInfo._id,
+					name: currencyInfo.name,
+					symbol: currencyInfo.symbol,
+					sign: currencyInfo.sign,
+					rate: currencyInfo.rate,
+					fees: currencyInfo.fees,
+				},
 			},
 			personalDetails: {
 				dob: dob,
@@ -99,10 +119,28 @@ async function registerService(userData) {
 		};
 
 		const newUser = await User.create(userInfo);
+
+		const cashWallet = await Wallet.create({
+			name: "cash",
+			userId: newUser._id,
+		});
+		const investWallet = await Wallet.create({
+			name: "automated investing",
+			userId: newUser._id,
+		});
+		const brokerageWallet = await Wallet.create({
+			name: "brokerage",
+			userId: newUser._id,
+		});
+
 		const user = await getUserById(newUser._id);
 		return {
 			username: user.credentials.username,
 			email: user.credentials.email,
+			totalBalance:
+				cashWallet.totalBalance +
+				investWallet.totalBalance +
+				brokerageWallet.totalBalance,
 		};
 	} catch (error) {
 		console.log("Failed to register user. Try again", error.message);
@@ -129,43 +167,70 @@ async function loginService(loginData) {
 			throw new Error("Invalid email or password!");
 		}
 
-		const accessToken = jwt.sign(
-			{
-				username: user.credentials.username,
-				userId: user._id,
-			},
-			process.env.ACCESS_TOKEN_SECRET,
-			{ expiresIn: "1d" }
-		);
-		const refreshToken = jwt.sign(
-			{
-				username: user.credentials.username,
-				userId: user._id,
-			},
-			process.env.REFRESH_TOKEN_SECRET,
-			{ expiresIn: "4d" }
-		);
+		if (user.accountStatus.twoFaActivated) {
+			const email = user.credentials.email;
+			const otp = await sendLoginCode(email);
+			user.accountStatus.otp = otp;
+			await user.save();
 
-		user.credentials.refreshToken = refreshToken;
-		await user.save();
+			const userInfo = {
+				credentials: {
+					username: username,
+					email: email,
+				},
+				identityVerification: {
+					kycStatus: user.identityVerification.kycStatus,
+				},
+				accountStatus: {
+					status: user.accountStatus.status,
+					banned: user.accountStatus.banned,
+					emailVerified: user.accountStatus.emailVerified,
+					twoFaActivated: user.accountStatus.twoFaActivated,
+					twoFaVerified: user.accountStatus.twoFaVerified,
+					otp: user.accountStatus.otp,
+				},
+			};
 
-		const userInfo = {
-			credentials: {
-				username: username,
-				email: email,
-			},
-			identityVerification: {
-				kycStatus: user.identityVerification.kycStatus,
-			},
-			accountStatus: {
-				status: user.accountStatus.status,
-				banned: user.accountStatus.banned,
-				emailVerified: user.accountStatus.emailVerified,
-				twoFaActivated: user.accountStatus.twoFaActivated,
-			},
-		};
+			return { userInfo };
+		} else {
+			const accessToken = jwt.sign(
+				{
+					username: user.credentials.username,
+					userId: user._id,
+				},
+				process.env.ACCESS_TOKEN_SECRET,
+				{ expiresIn: "1d" }
+			);
+			const refreshToken = jwt.sign(
+				{
+					username: user.credentials.username,
+					userId: user._id,
+				},
+				process.env.REFRESH_TOKEN_SECRET,
+				{ expiresIn: "4d" }
+			);
 
-		return { accessToken, refreshToken, userInfo };
+			user.credentials.refreshToken = refreshToken;
+			await user.save();
+
+			const userInfo = {
+				credentials: {
+					username: username,
+					email: email,
+				},
+				identityVerification: {
+					kycStatus: user.identityVerification.kycStatus,
+				},
+				accountStatus: {
+					status: user.accountStatus.status,
+					banned: user.accountStatus.banned,
+					emailVerified: user.accountStatus.emailVerified,
+					twoFaActivated: user.accountStatus.twoFaActivated,
+				},
+			};
+
+			return { accessToken, refreshToken, userInfo };
+		}
 	} catch (error) {
 		console.log("Failed to login user. Try again", error.message);
 		throw new Error(error.message);
@@ -182,6 +247,9 @@ async function logoutService(userId) {
 			throw new Error("User not found!");
 		}
 		user.credentials.refreshToken = null;
+		if (user.accountStatus.twoFaActivated) {
+			user.accountStatus.twoFaVerified = false;
+		}
 		await user.save();
 		return true;
 	} catch (error) {

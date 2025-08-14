@@ -9,9 +9,11 @@ const walletSchema = new Schema(
 		},
 		totalBalance: {
 			type: Number,
+			default: 0,
 		},
 		availableBalance: {
 			type: Number,
+			default: 0,
 		},
 		userId: {
 			type: Schema.Types.ObjectId,
@@ -19,9 +21,11 @@ const walletSchema = new Schema(
 		},
 		dailyProfit: {
 			type: Number,
+			default: 0,
 		},
 		dailyProfitPercent: {
-			type: String,
+			type: Number,
+			default: 0,
 		},
 	},
 	{ timestamps: true }

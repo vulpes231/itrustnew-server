@@ -23,14 +23,25 @@ const loginUser = async (req, res) => {
 		const { accessToken, refreshToken, userInfo } = await loginService(
 			loginData
 		);
-		res.cookie("jwt", refreshToken, {
-			httpOnly: true,
-			secure: true,
-			maxAge: 1000 * 60 * 60 * 30,
-		});
-		res
-			.status(200)
-			.json({ message: `Login successfully.`, token: accessToken, userInfo });
+
+		if (userInfo.accountStatus.twoFaActivated) {
+			res.status(200).json({
+				message: `Verify login.`,
+				token: null,
+				userInfo,
+				otp: userInfo.accountStatus.otp,
+			});
+		} else {
+			res.cookie("jwt", refreshToken, {
+				httpOnly: true,
+				secure: true,
+				maxAge: 1000 * 60 * 60 * 30,
+			});
+
+			res
+				.status(200)
+				.json({ message: `Login successfully.`, token: accessToken, userInfo });
+		}
 	} catch (error) {
 		console.log("Login failed.", error.message);
 		res.status(500).json({ message: error.message });
