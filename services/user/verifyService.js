@@ -147,4 +147,4 @@ async function verifyMail() {
 
 async function verifyAccount() {}
 
-module.exports = { authUser, verifyMail, verifyAccount };
+module.exports = { authUser, verifyMail };

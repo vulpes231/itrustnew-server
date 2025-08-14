@@ -32,4 +32,4 @@ const verifyEmailCode = async (req, res) => {
 
 const approveAccount = async (req, res) => {};
 
-module.exports = { verifyLoginCode, verifyEmailCode, approveAccount };
+module.exports = { verifyLoginCode, verifyEmailCode };
