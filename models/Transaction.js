@@ -4,14 +4,18 @@ const Schema = mongoose.Schema;
 const transactionSchema = new Schema(
 	{
 		method: {
-			type: String,
-			required: true,
+			mode: { type: String },
+			network: { type: String },
 		},
 		type: {
 			type: String,
 			required: true,
 		},
-		receivingAccount: {
+		userId: {
+			type: Schema.Types.ObjectId,
+			ref: "User",
+		},
+		account: {
 			type: String,
 			required: true,
 		},
