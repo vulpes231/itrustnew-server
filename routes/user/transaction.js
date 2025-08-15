@@ -9,9 +9,9 @@ const {
 
 const router = Router();
 
-router.router("/").get(getTransactionHistory).put(stopTransaction);
-router.router("/deposit").post(deposit);
-router.router("/withdraw").post(withdraw);
-router.router("/transfer").post(transfer);
+router.route("/").get(getTransactionHistory).put(stopTransaction);
+router.route("/deposit").post(deposit);
+router.route("/withdraw").post(withdraw);
+router.route("/transfer").post(transfer);
 
 module.exports = router;

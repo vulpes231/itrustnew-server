@@ -2,7 +2,7 @@ const User = require("../models/User");
 const { sendMail } = require("../utils/mailer");
 const { generateOtp } = require("../utils/utils");
 
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 
 async function sendLoginCode(email) {
 	if (!email) throw new Error("Email required");
