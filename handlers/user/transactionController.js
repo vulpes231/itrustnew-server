@@ -4,6 +4,7 @@ const {
 	moveFunds,
 	getUserLedger,
 	cancelTransaction,
+	getUserTrnxAnalytics,
 } = require("../../services/user/transactionService");
 
 const deposit = async (req, res) => {
@@ -59,10 +60,21 @@ const stopTransaction = async (req, res) => {
 	}
 };
 
+const getTransactionAnalytics = async (req, res) => {
+	const userId = req.user.userId;
+	try {
+		const trnxAnalytics = await getUserTrnxAnalytics(userId);
+		res.status(200).json({ trnxAnalytics });
+	} catch (error) {
+		res.status(500).json({ message: error.message });
+	}
+};
+
 module.exports = {
 	deposit,
 	withdraw,
 	transfer,
 	getTransactionHistory,
 	stopTransaction,
+	getTransactionAnalytics,
 };

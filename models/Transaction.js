@@ -10,6 +10,7 @@ const transactionSchema = new Schema(
 		type: {
 			type: String,
 			required: true,
+			enum: ["deposit", "withdraw", "transfer"],
 		},
 		userId: {
 			type: Schema.Types.ObjectId,

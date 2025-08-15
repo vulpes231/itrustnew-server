@@ -66,7 +66,7 @@ async function withdrawFunds(userId, trnxData) {
 			amount: amount,
 			account: account,
 			memo: memo || customMemo,
-			type: "withdrawal",
+			type: "withdraw",
 			userId: userId,
 		});
 		return trnx;
@@ -144,10 +144,41 @@ async function cancelTransaction(transactionId) {
 	}
 }
 
+async function getUserTrnxAnalytics(userId) {
+	try {
+		const transactions = await Transaction.find({ userId });
+
+		// Filter deposits/withdrawals (more efficient with single loop)
+		let totalDeposit = 0;
+		let totalWithdrawal = 0;
+
+		transactions.forEach((trnx) => {
+			if (trnx.type === "deposit") totalDeposit += trnx.amount;
+			if (trnx.type === "withdraw") totalWithdrawal += trnx.amount;
+		});
+
+		// Alternative: Using reduce
+		// const totalDeposit = transactions.reduce((sum, trnx) =>
+		//   trnx.type === "deposit" ? sum + trnx.amount : sum, 0);
+		// const totalWithdrawal = transactions.reduce((sum, trnx) =>
+		//   trnx.type === "withdraw" ? sum + trnx.amount : sum, 0);
+
+		return {
+			totalDeposit,
+			totalWithdrawal,
+			netBalance: totalDeposit - totalWithdrawal,
+		};
+	} catch (error) {
+		console.error("Transaction analytics error:", error.message);
+		throw new Error("Failed to fetch transaction analytics");
+	}
+}
+
 module.exports = {
 	cancelTransaction,
 	getUserLedger,
 	addFunds,
 	withdrawFunds,
 	moveFunds,
+	getUserTrnxAnalytics,
 };
