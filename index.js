@@ -37,10 +37,11 @@ const locationRoute = require("./routes/location.js");
 const currencyRoute = require("./routes/currency.js");
 const userRegisterRoute = require("./routes/user/register.js");
 const userLoginRoute = require("./routes/user/login.js");
-const userVerificationRoute = require("./routes/user/verification.js");
+const otpVerificationRoute = require("./routes/user/verification.js");
 const mailRoute = require("./routes/mail.js");
 const userProfileRoute = require("./routes/user/user.js");
-const userWalletRoute = require("./routes/user/wallet.js");
+const walletRoute = require("./routes/user/wallet.js");
+const transactionRoute = require("./routes/user/transaction.js");
 
 // routes
 app.use("/", rootRoute);
@@ -48,12 +49,13 @@ app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
 app.use("/register", userRegisterRoute);
 app.use("/login", userLoginRoute);
-app.use("/verify", userVerificationRoute);
+app.use("/code", otpVerificationRoute);
 app.use("/mail", mailRoute);
 
 app.use(verifyJWT);
 app.use("/user", userProfileRoute);
-app.use("/wallet", userWalletRoute);
+app.use("/wallet", walletRoute);
+app.use("/transaction", transactionRoute);
 
 let server;
 mongoose.connection.once("connected", () => {
