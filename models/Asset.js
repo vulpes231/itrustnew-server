@@ -10,6 +10,11 @@ const assetSchema = new Schema(
 			index: true,
 			uppercase: true,
 		},
+		userId: {
+			type: Schema.Types.ObjectId,
+			required: true,
+			ref: "User",
+		},
 		name: {
 			type: String,
 			required: true,
@@ -29,28 +34,22 @@ const assetSchema = new Schema(
 			previousClose: { type: Number },
 			dayLow: { type: Number },
 			dayHigh: { type: Number },
-			change: { type: Number }, // Absolute change
-			changePercent: { type: Number }, // Percentage change
+			change: { type: Number },
+			changePercent: { type: Number },
 			volume: { type: Number },
 			avgVolume: { type: Number },
 		},
 		historical: {
 			yearLow: { type: Number },
 			yearHigh: { type: Number },
-			movingAvg50: { type: Number },
-			movingAvg200: { type: Number },
 		},
 		fundamentals: {
 			marketCap: { type: Number },
-			eps: { type: Number }, // Earnings Per Share
-			pe: { type: Number }, // Price-to-Earnings
+			eps: { type: Number },
+			pe: { type: Number },
 			dividendYield: { type: Number },
 		},
 		imageUrl: { type: String },
-		externalIds: {
-			finnhub: { type: String },
-			yahoo: { type: String },
-		},
 		isActive: {
 			type: Boolean,
 			default: true,

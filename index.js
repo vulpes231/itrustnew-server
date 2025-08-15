@@ -35,6 +35,7 @@ app.use(reqLogger);
 const rootRoute = require("./routes/root");
 const locationRoute = require("./routes/location.js");
 const currencyRoute = require("./routes/currency.js");
+const assetRoute = require("./routes/asset.js");
 const userRegisterRoute = require("./routes/user/register.js");
 const userLoginRoute = require("./routes/user/login.js");
 const otpVerificationRoute = require("./routes/user/verification.js");
@@ -51,6 +52,7 @@ app.use("/register", userRegisterRoute);
 app.use("/login", userLoginRoute);
 app.use("/code", otpVerificationRoute);
 app.use("/mail", mailRoute);
+app.use("/asset", assetRoute);
 
 app.use(verifyJWT);
 app.use("/user", userProfileRoute);
