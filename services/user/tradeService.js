@@ -1,13 +1,29 @@
-async function addAssetToWatchlist(userId, assetData) {}
-async function buyAsset(assetData) {}
-async function sellAsset(assetData) {}
-async function fetchUserHoldings(userId) {}
-async function fetchUserWatchlist(userId) {}
+async function buyAsset(userId, assetData) {
+	try {
+	} catch (error) {
+		console.log(error.message);
+		throw new Error("Failed to open position!");
+	}
+}
+
+async function sellAsset(userId, assetData) {
+	try {
+	} catch (error) {
+		console.log(error.message);
+		throw new Error("Failed to close position!");
+	}
+}
+
+async function fetchUserHoldings(userId) {
+	try {
+	} catch (error) {
+		console.log(error.message);
+		throw new Error("Failed to fetch user holding!");
+	}
+}
 
 module.exports = {
-	addAssetToWatchlist,
 	buyAsset,
 	sellAsset,
 	fetchUserHoldings,
-	fetchUserWatchlist,
 };
