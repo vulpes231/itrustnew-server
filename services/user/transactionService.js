@@ -157,12 +157,6 @@ async function getUserTrnxAnalytics(userId) {
 			if (trnx.type === "withdraw") totalWithdrawal += trnx.amount;
 		});
 
-		// Alternative: Using reduce
-		// const totalDeposit = transactions.reduce((sum, trnx) =>
-		//   trnx.type === "deposit" ? sum + trnx.amount : sum, 0);
-		// const totalWithdrawal = transactions.reduce((sum, trnx) =>
-		//   trnx.type === "withdraw" ? sum + trnx.amount : sum, 0);
-
 		return {
 			totalDeposit,
 			totalWithdrawal,

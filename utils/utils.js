@@ -21,4 +21,6 @@ function generateOtp(length = 6) {
 	return otp;
 }
 
+function handleApiError(err) {}
+
 module.exports = { getClientIp, generateOtp };
