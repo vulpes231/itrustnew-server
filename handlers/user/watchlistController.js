@@ -17,6 +17,7 @@ const addToWatchlist = async (req, res) => {
 
 const removeFromWatchlist = async (req, res) => {
 	const userId = req.user.userId;
+	const { assetId } = req.body;
 	try {
 		await removeAssetFromWatchlist(userId, assetId);
 		res.status(200).json({ message: "Asset removed from watchlist" });

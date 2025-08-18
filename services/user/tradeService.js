@@ -22,6 +22,8 @@ async function fetchUserHoldings(userId) {
 	}
 }
 
+//ned to do
+
 module.exports = {
 	buyAsset,
 	sellAsset,

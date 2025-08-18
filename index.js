@@ -43,6 +43,7 @@ const mailRoute = require("./routes/mail.js");
 const userProfileRoute = require("./routes/user/user.js");
 const walletRoute = require("./routes/user/wallet.js");
 const transactionRoute = require("./routes/user/transaction.js");
+const watchlistRoute = require("./routes/user/watchlist.js");
 
 // routes
 app.use("/", rootRoute);
@@ -58,6 +59,7 @@ app.use(verifyJWT);
 app.use("/user", userProfileRoute);
 app.use("/wallet", walletRoute);
 app.use("/transaction", transactionRoute);
+app.use("/watchlist", watchlistRoute);
 
 let server;
 mongoose.connection.once("connected", () => {
