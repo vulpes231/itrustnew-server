@@ -44,6 +44,7 @@ const userProfileRoute = require("./routes/user/user.js");
 const walletRoute = require("./routes/user/wallet.js");
 const transactionRoute = require("./routes/user/transaction.js");
 const watchlistRoute = require("./routes/user/watchlist.js");
+const investPlanRoute = require("./routes/user/autoplan.js");
 
 // routes
 app.use("/", rootRoute);
@@ -54,6 +55,7 @@ app.use("/login", userLoginRoute);
 app.use("/code", otpVerificationRoute);
 app.use("/mail", mailRoute);
 app.use("/asset", assetRoute);
+app.use("/plan", investPlanRoute);
 
 app.use(verifyJWT);
 app.use("/user", userProfileRoute);

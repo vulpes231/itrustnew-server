@@ -65,9 +65,11 @@ async function fetchPlans(queryData) {
 		if (sortBy === "winRate") sort["performance.winRate"] = 1;
 		const plans = await Autoplan.find({})
 			.sort(sort)
-			.limit((page - 1) * limit);
-
-		return plans;
+			.skip((page - 1) * limit)
+			.limit(limit);
+		const totalResult = await Autoplan.countDocuments();
+		const totalPage = Math.ceil(total / limit);
+		return { plans, totalResult, totalPage };
 	} catch (error) {
 		console.log(error.message);
 		throw new Error("Failed to fetch auto invest plans!");
