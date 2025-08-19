@@ -1,14 +1,14 @@
 const {
 	buyAsset,
 	sellAsset,
-	fetchUserHoldings,
+	fetchUserTrades,
 } = require("../../services/user/tradeService");
 
 const openPosition = async (req, res) => {
 	const userId = req.user.userId;
 	try {
 		const assetData = req.body;
-		const assetName = await buyAsset(userId, assetData);
+		const { assetName, assetQty } = await buyAsset(userId, assetData);
 		res.status(201).json({ message: `${assetName} position opened` });
 	} catch (error) {
 		res.status(500).json({ message: error.message });
@@ -17,29 +17,49 @@ const openPosition = async (req, res) => {
 
 const closePosition = async (req, res) => {
 	const userId = req.user.userId;
+	const { tradeId } = req.body;
 	try {
-		const assetData = req.body;
-		const assetName = await sellAsset(userId, assetData);
-		res.status(200).json({ message: `${assetName} position closed` });
+		const trade = await sellAsset(userId, tradeId);
+		res
+			.status(200)
+			.json({ message: `${trade.asset.name} position closed succesfully` });
 	} catch (error) {
 		res.status(500).json({ message: error.message });
 	}
 };
 
-const getHoldings = async (req, res) => {
+const getUserTrades = async (req, res) => {
 	const userId = req.user.userId;
+	const limit = Math.min(50, parseInt(req.query.limit) || 15);
+	const page = Math.max(1, parseInt(req.query.page) || 1);
+	const sortBy = req.query.sortBy;
+	const status = req.query.status?.toLowerCase();
+
 	try {
-		const holdings = await fetchUserHoldings(userId);
-		res
-			.status(200)
-			.json({ message: "Holdings fetched successfully", holdings });
+		const { filteredTrades, totalResultCount, totalPageCount, currentPage } =
+			await fetchUserTrades(userId, { page, limit, sortBy, status });
+
+		res.status(200).json({
+			message: "Trades fetched successfully",
+			success: true,
+			data: filteredTrades,
+			pagination: {
+				currentPage,
+				totalResult: totalResultCount,
+				totalPages: totalPageCount,
+			},
+		});
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			message: error.message,
+			success: false,
+		});
 	}
 };
 
 module.exports = {
 	openPosition,
 	closePosition,
-	getHoldings,
+	getUserTrades,
 };

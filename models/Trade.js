@@ -29,8 +29,9 @@ const tradeSchema = new Schema(
 			enum: ["buy", "sell"],
 			required: true,
 		},
-		accountType: {
-			type: String,
+		wallet: {
+			id: { type: Schema.Types.ObjectId, ref: "Wallet" },
+			name: { type: String },
 		},
 		execution: {
 			price: { type: Number, required: true },
@@ -69,11 +70,7 @@ const tradeSchema = new Schema(
 	}
 );
 
-// Indexes for faster querying
-tradeSchema.index({ userId: 1 });
-tradeSchema.index({ assetId: 1 });
-tradeSchema.index({ status: 1 });
-tradeSchema.index({ createdAt: -1 });
+tradeSchema.index({ userId: 1, status: 1, createdAt: -1, assetId: 1 });
 
 const Trade = mongoose.model("Trade", tradeSchema);
 module.exports = Trade;

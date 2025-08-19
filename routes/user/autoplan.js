@@ -9,3 +9,5 @@ const router = Router();
 
 router.route("/").get(getAllPlans).post(createPlan);
 router.route("/:planId").get(getPlan);
+
+module.exports = router;

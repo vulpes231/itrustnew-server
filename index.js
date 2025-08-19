@@ -45,6 +45,7 @@ const walletRoute = require("./routes/user/wallet.js");
 const transactionRoute = require("./routes/user/transaction.js");
 const watchlistRoute = require("./routes/user/watchlist.js");
 const investPlanRoute = require("./routes/user/autoplan.js");
+const tradeRoute = require("./routes/user/trade.js");
 
 // routes
 app.use("/", rootRoute);
@@ -62,6 +63,7 @@ app.use("/user", userProfileRoute);
 app.use("/wallet", walletRoute);
 app.use("/transaction", transactionRoute);
 app.use("/watchlist", watchlistRoute);
+app.use("/trade", tradeRoute);
 
 let server;
 mongoose.connection.once("connected", () => {
