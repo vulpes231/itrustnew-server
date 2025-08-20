@@ -31,13 +31,15 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(reqLogger);
 
-// routers
+// general routes
 const rootRoute = require("./routes/root");
 const locationRoute = require("./routes/location.js");
 const currencyRoute = require("./routes/currency.js");
 const assetRoute = require("./routes/asset.js");
 const userRegisterRoute = require("./routes/user/register.js");
 const userLoginRoute = require("./routes/user/login.js");
+
+//protected routes
 const otpVerificationRoute = require("./routes/user/verification.js");
 const mailRoute = require("./routes/mail.js");
 const userProfileRoute = require("./routes/user/user.js");

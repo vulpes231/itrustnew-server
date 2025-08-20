@@ -3,14 +3,12 @@ const Schema = mongoose.Schema;
 
 const savingsAccountSchema = new Schema(
 	{
-		// Account Identification
 		name: {
 			type: String,
 			required: true,
 			unique: true,
 			trim: true,
 		},
-		balance: { type: Number, default: 0 },
 		title: {
 			type: String,
 			required: true,
@@ -59,10 +57,6 @@ const savingsAccountSchema = new Schema(
 			type: String,
 			enum: ["active", "inactive"],
 			default: "active",
-		},
-		analytics: {
-			totalReturn: { type: Number, default: 0 },
-			dailyChange: { type: Number, default: 0 },
 		},
 	},
 	{

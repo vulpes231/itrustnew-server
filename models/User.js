@@ -142,6 +142,17 @@ const userSchema = new Schema(
 				type: Date,
 			},
 		},
+		savingsAccounts: [
+			{
+				name: { type: String },
+				accountId: { type: Schema.Types.ObjectId, ref: "Savingsaccount" },
+				analytics: {
+					totalReturn: { type: Number, default: 0 },
+					dailyChange: { type: Number, default: 0 },
+					balance: { type: Number, default: 0 },
+				},
+			},
+		],
 	},
 	{ timestamps: true }
 );

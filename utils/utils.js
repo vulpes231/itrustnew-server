@@ -23,4 +23,8 @@ function generateOtp(length = 6) {
 
 function handleApiError(err) {}
 
-module.exports = { getClientIp, generateOtp };
+function throwError(err, msg, code) {
+	console.log(err.message);
+	throw new Error(msg, { statusCode: code });
+}
+module.exports = { getClientIp, generateOtp, throwError };
