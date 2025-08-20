@@ -10,7 +10,7 @@ const transactionSchema = new Schema(
 		type: {
 			type: String,
 			required: true,
-			enum: ["deposit", "withdraw", "transfer"],
+			enum: ["deposit", "withdraw", "transfer", "savings"],
 		},
 		userId: {
 			type: Schema.Types.ObjectId,
@@ -36,8 +36,12 @@ const transactionSchema = new Schema(
 	},
 	{
 		timestamps: true,
+		toJSON: true,
+		virtuals: true,
 	}
 );
+
+transactionSchema.index({ userId: 1, createdAt: -1 });
 
 const Transaction = mongoose.model("Transaction", transactionSchema);
 module.exports = Transaction;
