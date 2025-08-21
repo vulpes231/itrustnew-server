@@ -93,7 +93,8 @@ async function fetchUserSavingsHistory(userId, queryData) {
 		});
 
 		const totalPage = Math.ceil(totalItem / limit);
-		return { savingsHistory, totalItem, totalPage };
+		const currentPage = page;
+		return { savingsHistory, totalItem, totalPage, currentPage };
 	} catch (error) {
 		throwError(error, "Failed to fetch user savings history", 500);
 	}
