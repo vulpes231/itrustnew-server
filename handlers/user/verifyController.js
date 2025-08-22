@@ -9,12 +9,15 @@ const verifyLoginCode = async (req, res) => {
 			secure: true,
 			maxAge: 1000 * 60 * 60 * 30,
 		});
-		res
-			.status(200)
-			.json({ message: "Login authenticated", token: accessToken, userInfo });
+		res.status(200).json({
+			message: "Login authenticated",
+			token: accessToken,
+			data: userInfo,
+			success: true,
+		});
 	} catch (error) {
-		console.log("Failed to verify code.", error.message);
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({ message: error.message, success: false });
 	}
 };
 
@@ -24,9 +27,12 @@ const verifyEmailCode = async (req, res) => {
 	try {
 		const verifyData = { code, userId };
 		await verifyMail(verifyData);
+		res
+			.status(200)
+			.json({ message: "Email verified.", success: true, data: null });
 	} catch (error) {
-		console.log("Failed to verify email.", error.message);
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({ message: error.message, success: false });
 	}
 };
 

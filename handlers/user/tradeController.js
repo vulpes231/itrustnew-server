@@ -9,9 +9,19 @@ const openPosition = async (req, res) => {
 	try {
 		const assetData = req.body;
 		const { assetName, assetQty } = await buyAsset(userId, assetData);
-		res.status(201).json({ message: `${assetName} position opened` });
+		res
+			.status(201)
+			.json({
+				message: `${assetName} position opened`,
+				success: true,
+				data: null,
+			});
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			message: error.message,
+			success: false,
+		});
 	}
 };
 
@@ -20,11 +30,17 @@ const closePosition = async (req, res) => {
 	const { tradeId } = req.body;
 	try {
 		const trade = await sellAsset(userId, tradeId);
-		res
-			.status(200)
-			.json({ message: `${trade.asset.name} position closed succesfully` });
+		res.status(200).json({
+			message: `${trade.asset.name} position closed succesfully`,
+			success: true,
+			data: null,
+		});
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			message: error.message,
+			success: false,
+		});
 	}
 };
 

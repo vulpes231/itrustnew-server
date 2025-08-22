@@ -9,10 +9,16 @@ const registerUser = async (req, res) => {
 	try {
 		const userData = req.body;
 		const { username, email } = await registerService(userData);
-		res.status(201).json({ message: `${username} created successfully.` });
+		res
+			.status(201)
+			.json({
+				message: `${username} created successfully.`,
+				success: true,
+				data: null,
+			});
 	} catch (error) {
-		const statusCode = error.statusCode;
-		res.status(statusCode).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({ message: error.message, success: false });
 	}
 };
 
@@ -38,13 +44,16 @@ const loginUser = async (req, res) => {
 				maxAge: 1000 * 60 * 60 * 30,
 			});
 
-			res
-				.status(200)
-				.json({ message: `Login successfully.`, token: accessToken, userInfo });
+			res.status(200).json({
+				message: `Login successfully.`,
+				token: accessToken,
+				data: userInfo,
+				success: true,
+			});
 		}
 	} catch (error) {
-		const statusCode = error.statusCode;
-		res.status(statusCode).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({ message: error.message, success: false });
 	}
 };
 
@@ -59,10 +68,12 @@ const logoutUser = async (req, res) => {
 				maxAge: 1000 * 60 * 60 * 30,
 			});
 		}
-		res.status(204).json({ message: "Logout successful." });
+		res
+			.status(204)
+			.json({ message: "Logout successful.", success: true, data: null });
 	} catch (error) {
-		const statusCode = error.statusCode;
-		res.status(statusCode).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({ message: error.message, success: false });
 	}
 };
 

@@ -10,10 +10,17 @@ const createPlan = async (req, res) => {
 		const planName = await addNewPlan(planData);
 		res
 			.status(201)
-			.json({ message: `${planName} added successfully`, success: true });
+			.json({
+				message: `${planName} added successfully`,
+				success: true,
+				data: null,
+			});
 	} catch (error) {
-		console.log(error);
-		res.status(500).json({ message: error.message, success: false });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			success: false,
+			message: "Failed to create plan: " + error.message,
+		});
 	}
 };
 
@@ -28,8 +35,11 @@ const getPlan = async (req, res) => {
 			formattedDuration: plan.formattedDuration,
 		});
 	} catch (error) {
-		console.log(error);
-		res.status(500).json({ message: error.message, success: false });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			success: false,
+			message: "Failed to fetch plan: " + error.message,
+		});
 	}
 };
 
@@ -55,7 +65,8 @@ const getAllPlans = async (req, res) => {
 			},
 		});
 	} catch (error) {
-		res.status(500).json({
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
 			success: false,
 			message: "Failed to fetch plans: " + error.message,
 		});
