@@ -11,7 +11,8 @@ const addToWatchlist = async (req, res) => {
 		await addAssetToWatchlist(userId, assetId);
 		res.status(200).json({ message: "Asset added to watchlist" });
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode;
+		res.status(statusCode).json({ message: error.message });
 	}
 };
 
@@ -22,7 +23,8 @@ const removeFromWatchlist = async (req, res) => {
 		await removeAssetFromWatchlist(userId, assetId);
 		res.status(200).json({ message: "Asset removed from watchlist" });
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode;
+		res.status(statusCode).json({ message: error.message });
 	}
 };
 
@@ -34,7 +36,8 @@ const getWatchlist = async (req, res) => {
 			.status(200)
 			.json({ message: "Watchlist fetched successfully", watchlist });
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode;
+		res.status(statusCode).json({ message: error.message });
 	}
 };
 

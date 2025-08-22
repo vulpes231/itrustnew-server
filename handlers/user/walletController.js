@@ -11,7 +11,8 @@ const getUserWallets = async (req, res) => {
 			.status(200)
 			.json({ message: "User wallets fetched succesfully", userWallets });
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode;
+		res.status(statusCode).json({ message: error.message });
 	}
 };
 
@@ -23,7 +24,8 @@ const getWalletAnalytics = async (req, res) => {
 			.status(200)
 			.json({ message: "User analytics fetched succesfully", walletAnalytics });
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode;
+		res.status(statusCode).json({ message: error.message });
 	}
 };
 

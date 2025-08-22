@@ -11,8 +11,8 @@ const registerUser = async (req, res) => {
 		const { username, email } = await registerService(userData);
 		res.status(201).json({ message: `${username} created successfully.` });
 	} catch (error) {
-		console.log("Failed to register user.", error.message);
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode;
+		res.status(statusCode).json({ message: error.message });
 	}
 };
 
@@ -43,8 +43,8 @@ const loginUser = async (req, res) => {
 				.json({ message: `Login successfully.`, token: accessToken, userInfo });
 		}
 	} catch (error) {
-		console.log("Login failed.", error.message);
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode;
+		res.status(statusCode).json({ message: error.message });
 	}
 };
 
@@ -61,7 +61,8 @@ const logoutUser = async (req, res) => {
 		}
 		res.status(204).json({ message: "Logout successful." });
 	} catch (error) {
-		res.status(500).json({ message: error.message });
+		const statusCode = error.statusCode;
+		res.status(statusCode).json({ message: error.message });
 	}
 };
 

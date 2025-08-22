@@ -2,11 +2,11 @@ const Wallet = require("../../models/Wallet");
 
 async function fetchUserWallets(userId) {
 	try {
-		const wallets = await Wallet.find({ userId: userId });
+		const wallets = await Wallet.find({ userId: userId }).lean();
 		return wallets;
 	} catch (error) {
 		console.log(error.message);
-		throw new Error("Failed to fetch user wallets");
+		throw new Error("Failed to fetch user wallets", { statusCode: 500 });
 	}
 }
 
@@ -32,7 +32,9 @@ async function getUserFinancialSummary(userId) {
 		};
 	} catch (error) {
 		console.error("Failed to fetch financial summary:", error.message);
-		throw new Error("Could not retrieve user financial data");
+		throw new Error("Could not retrieve user financial data", {
+			statusCode: 500,
+		});
 	}
 }
 

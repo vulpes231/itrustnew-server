@@ -36,10 +36,10 @@ async function registerService(userData) {
 	} = userData;
 
 	if (!firstname || !lastname) {
-		throw new Error("Fullname required!");
+		throw new Error("Fullname required!", { statusCode: 400 });
 	}
 	if (!username || !password) {
-		throw new Error("Username and password required!");
+		throw new Error("Username and password required!", { statusCode: 400 });
 	}
 	if (
 		!email ||
@@ -49,17 +49,17 @@ async function registerService(userData) {
 		!nationalityId ||
 		!currencyId
 	) {
-		throw new Error("Contact information required!");
+		throw new Error("Contact information required!", { statusCode: 400 });
 	}
 
 	try {
 		const existingUser = await User.find({ username });
 		if (existingUser) {
-			throw new Error("User already exist!");
+			throw new Error("User already exist!", { statusCode: 409 });
 		}
 		const existingMail = await User.find({ username });
 		if (existingMail) {
-			throw new Error("Email already in use!");
+			throw new Error("Email already in use!", { statusCode: 409 });
 		}
 		const countryInfo = await getCountryById(countryId);
 		const stateInfo = await getStateById(stateId);
@@ -149,19 +149,19 @@ async function registerService(userData) {
 		};
 	} catch (error) {
 		console.log("Failed to register user. Try again", error.message);
-		throw new Error(error.message);
+		throw new Error(error.message, { statusCode: 500 });
 	}
 }
 
 async function loginService(loginData) {
 	const { email, password } = loginData;
 	if (!email || !password) {
-		throw new Error("Email and password required!");
+		throw new Error("Email and password required!", { statusCode: 400 });
 	}
 	try {
 		const user = await User.findOne({ email });
 		if (!user) {
-			throw new Error("User does not exist!");
+			throw new Error("User does not exist!", { statusCode: 404 });
 		}
 
 		const verifyPassword = await bcrypt.compare(
@@ -169,7 +169,7 @@ async function loginService(loginData) {
 			user.credentials.password
 		);
 		if (!verifyPassword) {
-			throw new Error("Invalid email or password!");
+			throw new Error("Invalid email or password!", { statusCode: 400 });
 		}
 
 		if (user.accountStatus.twoFaActivated) {
@@ -238,18 +238,18 @@ async function loginService(loginData) {
 		}
 	} catch (error) {
 		console.log("Failed to login user. Try again", error.message);
-		throw new Error(error.message);
+		throw new Error(error.message, { statusCode: 500 });
 	}
 }
 
 async function logoutService(userId) {
 	if (!userId) {
-		throw new Error("ID is required!");
+		throw new Error("ID is required!", { statusCode: 400 });
 	}
 	try {
 		const user = await User.findById(userId);
 		if (!user) {
-			throw new Error("User not found!");
+			throw new Error("User not found!", { statusCode: 404 });
 		}
 		user.credentials.refreshToken = null;
 		if (user.accountStatus.twoFaActivated) {
@@ -259,7 +259,7 @@ async function logoutService(userId) {
 		return true;
 	} catch (error) {
 		console.log("Failed to logout user. Try again", error.message);
-		throw new Error(error.message);
+		throw new Error(error.message, { statusCode: 500 });
 	}
 }
 
