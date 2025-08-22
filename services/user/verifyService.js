@@ -2,26 +2,29 @@ const User = require("../../models/User");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 const bcrypt = require("bcryptjs");
+const { throwError } = require("../../utils/utils");
 
 async function authUser(authData) {
 	const { email, code } = authData;
 	if (!email || !code) {
-		throw new Error("Bad request!");
+		throw new Error("Bad request!", { statusCode: 400 });
 	}
 	try {
 		const user = await User.findOne({ email });
-		if (!user) throw new Error("Invalid credentials"); // Generic error
+		if (!user) throw new Error("Invalid credentials", { statusCode: 404 }); // Generic error
 
 		if (
 			user.accountStatus.otpBlockedUntil &&
 			new Date() < user.accountStatus.otpBlockedUntil
 		) {
-			throw new Error("Too many attempts. Try again later.");
+			throw new Error("Too many attempts. Try again later.", {
+				statusCode: 403,
+			});
 		}
 
 		// Check OTP expiry
 		if (!user.accountStatus.otp || new Date() > user.accountStatus.otpExpires) {
-			throw new Error("OTP expired or invalid");
+			throw new Error("OTP expired or invalid", { statusCode: 400 });
 		}
 
 		// Verify OTP
@@ -39,7 +42,7 @@ async function authUser(authData) {
 			}
 
 			await user.save();
-			throw new Error("Invalid OTP");
+			throw new Error("Invalid OTP", { statusCode: 400 });
 		}
 
 		user.accountStatus.otp = null;
@@ -87,30 +90,31 @@ async function authUser(authData) {
 
 		return { accessToken, refreshToken, userInfo };
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to verify login code!");
+		throwError(error, "Failed to verify login code!", 500);
 	}
 }
 
 async function verifyMail() {
 	const { code, userId } = verifyData;
 	if (!userId || !code) {
-		throw new Error("Bad request!");
+		throw new Error("Bad request!", { statusCode: 400 });
 	}
 	try {
 		const user = await User.findById(userId);
-		if (!user) throw new Error("Invalid credentials"); // Generic error
+		if (!user) throw new Error("Invalid credentials", { statusCode: 404 }); // Generic error
 
 		if (
 			user.accountStatus.otpBlockedUntil &&
 			new Date() < user.accountStatus.otpBlockedUntil
 		) {
-			throw new Error("Too many attempts. Try again later.");
+			throw new Error("Too many attempts. Try again later.", {
+				statusCode: 403,
+			});
 		}
 
 		// Check OTP expiry
 		if (!user.accountStatus.otp || new Date() > user.accountStatus.otpExpires) {
-			throw new Error("OTP expired or invalid");
+			throw new Error("OTP expired or invalid", { statusCode: 400 });
 		}
 
 		// Verify OTP
@@ -128,7 +132,7 @@ async function verifyMail() {
 			}
 
 			await user.save();
-			throw new Error("Invalid OTP");
+			throw new Error("Invalid OTP", { statusCode: 400 });
 		}
 
 		user.accountStatus.otp = null;
@@ -140,8 +144,7 @@ async function verifyMail() {
 		await user.save();
 		return true;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to verify email!");
+		throwError(error, "Failed to verify email!", 500);
 	}
 }
 

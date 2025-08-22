@@ -128,7 +128,7 @@ async function moveFunds(userId, trnxData) {
 
 async function getUserLedger(userId) {
 	try {
-		const transactions = await Transaction.find({ userId });
+		const transactions = await Transaction.find({ userId }).lean();
 		return transactions;
 	} catch (error) {
 		throwError(error.message, "Failed get user transactions!", 500);
@@ -165,8 +165,7 @@ async function getUserTrnxAnalytics(userId) {
 			netBalance: totalDeposit - totalWithdrawal,
 		};
 	} catch (error) {
-		console.error("Transaction analytics error:", error.message);
-		throw new Error("Failed to fetch transaction analytics");
+		throwError(error, "Transaction analytics error:", 500);
 	}
 }
 

@@ -1,4 +1,5 @@
 const Watchlist = require("../../models/Watchlist");
+const { throwError } = require("../../utils/utils");
 const { fetchAssetById } = require("../assetService");
 
 async function addAssetToWatchlist(userId, assetId) {
@@ -25,10 +26,7 @@ async function addAssetToWatchlist(userId, assetId) {
 
 		return watchListItem;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to add asset to user watchlist!", {
-			statusCode: 500,
-		});
+		throwError(error, "Failed to add asset to user watchlist!", 500);
 	}
 }
 
@@ -49,10 +47,7 @@ async function removeAssetFromWatchlist(userId, assetId) {
 
 		return true;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to remove asset from user watchlist!", {
-			statusCode: 500,
-		});
+		throwError(error, "Failed to remove asset from user watchlist!", 500);
 	}
 }
 
@@ -62,13 +57,7 @@ async function fetchUserWatchlist(userId) {
 		const userWatchlist = await Watchlist.find({ userId }).lean();
 		return userWatchlist;
 	} catch (error) {
-		console.error(
-			`Error fetching watchlist for user ${userId}:`,
-			error.message
-		);
-		throw new Error("Failed to fetch user watchlist", {
-			statusCode: 500,
-		});
+		throwError(error, `Error fetching watchlist for user ${userId}:`, 500);
 	}
 }
 

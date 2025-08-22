@@ -1,25 +1,25 @@
 const Currency = require("../models/Currency");
+const { throwError } = require("../utils/utils");
 
 async function getCurrencies() {
 	try {
-		const currencies = await Currency.find();
+		const currencies = await Currency.find().lean();
 		return currencies;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to fetch currencies");
+		throwError(error, "Failed to fetch currencies", 500);
 	}
 }
 
 async function getCurrencyById(currencyId) {
 	if (currencyId) {
-		throw new Error("Currency ID required!");
+		throw new Error("Currency ID required!", { statusCode: 400 });
 	}
 	try {
 		const currency = await Currency.findById(currencyId);
+		if (!currency) throw new Error("Currency not found!", { statusCode: 404 });
 		return currency;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to fetch currency info");
+		throwError(error, "Failed to fetch currency info", 500);
 	}
 }
 

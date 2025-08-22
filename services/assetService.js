@@ -1,11 +1,12 @@
 const Asset = require("../models/Asset");
+const { throwError } = require("../utils/utils");
 
 async function fetchAssets() {
 	try {
-		const assets = await Asset.find();
+		const assets = await Asset.find().lean();
 		return assets;
 	} catch (error) {
-		throw new Error("Failed to fetch assets");
+		throwError(error, "Failed to fetch assets", 500);
 	}
 }
 
@@ -15,7 +16,7 @@ async function fetchAssetById(assetId) {
 		const asset = await Asset.findById(assetId);
 		return asset;
 	} catch (error) {
-		throw new Error("Failed to fetch asset!");
+		throwError(error, "Failed to fetch asset!", 500);
 	}
 }
 
@@ -24,7 +25,7 @@ async function fetchUserAssets(userId) {
 		const userAssets = await Asset.find({ userId });
 		return userAssets;
 	} catch (error) {
-		throw new Error("Failed to fetch user assets");
+		throwError(error, "Failed to fetch user assets", 500);
 	}
 }
 

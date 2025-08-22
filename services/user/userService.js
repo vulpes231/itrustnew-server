@@ -6,6 +6,7 @@ const {
 	getCountryById,
 	getStateById,
 } = require("../locationService");
+const { throwError } = require("../../utils/utils");
 
 async function getUserById(userId) {
 	if (!userId) throw new Error("Bad request!", { statusCode: 400 });
@@ -16,8 +17,7 @@ async function getUserById(userId) {
 		}
 		return user;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to get user!", { statusCode: 500 });
+		throwError(error, "Failed to get user!", 500);
 	}
 }
 
@@ -85,8 +85,7 @@ async function updateUserProfile(userId, userData) {
 		await user.save();
 		return user;
 	} catch (error) {
-		console.log(error);
-		throw new Error("Failed to update user!", { statusCode: 500 });
+		throwError(error, "Failed to update user!", 500);
 	}
 }
 
@@ -108,8 +107,7 @@ async function updatePassword(userId, userData) {
 		await user.save();
 		return user;
 	} catch (error) {
-		console.log(error);
-		throw new Error("Failed to update password!", { statusCode: 500 });
+		throwError(error, "Failed to update password!", 500);
 	}
 }
 
@@ -168,8 +166,7 @@ async function updateBeneficiary(userId, userData) {
 		await settings.save();
 		return settings;
 	} catch (error) {
-		console.log(error);
-		throw new Error("Failed to update beneficiary!", { statusCode: 500 });
+		throwError(error, "Failed to update beneficiary!", 500);
 	}
 }
 
@@ -186,8 +183,7 @@ async function updateTwoFactorAuth(userId) {
 		await user.save();
 		return user;
 	} catch (error) {
-		console.log(error);
-		throw new Error("Failed to update two factor!", { statusCode: 500 });
+		throwError(error, "Failed to update two factor!", 500);
 	}
 }
 
@@ -201,7 +197,7 @@ async function submitDocuments(verifyData) {
 		}
 		return user;
 	} catch (error) {
-		console.log(error.message);
+		throwError(error, "Failed to submit documents!", 500);
 	}
 }
 
