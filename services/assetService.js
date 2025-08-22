@@ -1,10 +1,25 @@
 const Asset = require("../models/Asset");
 const { throwError } = require("../utils/utils");
 
-async function fetchAssets() {
+async function fetchAssets(queryData) {
+	const { page, limit, sortBy, type } = queryData;
 	try {
-		const assets = await Asset.find().lean();
-		return assets;
+		const filter = {};
+		if (type) filter["type"] = type;
+
+		const sort = {};
+		if (sortBy === "type") sort["type"] = -1;
+		if (sortBy === "priceData.changePercent")
+			sort["priceData.changePercent"] = -1;
+
+		const assets = await Asset.find(filter)
+			.sort(sort)
+			.skip((page - 1) * limit)
+			.limit(limit);
+
+		const totalAssetCount = await Asset.countDocuments();
+		const totalPages = Math.ceil(totalAssetCount / limit);
+		return { assets, totalAssetCount, totalPages, currentPage: page };
 	} catch (error) {
 		throwError(error, "Failed to fetch assets", 500);
 	}
