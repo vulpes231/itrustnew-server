@@ -1,5 +1,6 @@
 const Trade = require("../../models/Trade");
 const Wallet = require("../../models/Wallet");
+const { throwError } = require("../../utils/utils");
 const { fetchAssetById } = require("../assetService");
 const { fetchPlanById } = require("./autoPlanService");
 
@@ -73,8 +74,7 @@ async function buyAsset(userId, assetData) {
 		const assetQty = trade.execution.quantity;
 		return { assetName, assetQty };
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to open position!", { statusCode: 422 });
+		throwError(error, "Failed to open position!", 500);
 	}
 }
 
@@ -96,8 +96,7 @@ async function sellAsset(userId, tradeId) {
 
 		return trade;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to close position!", { statusCode: 422 });
+		throwError(error, "Failed to close position!", 500);
 	}
 }
 
@@ -138,8 +137,7 @@ async function fetchUserTrades(userId, queryData) {
 			currentPage: page,
 		};
 	} catch (error) {
-		console.error("Failed to fetch trades:", error.message);
-		throw new Error("Failed to fetch trades", { statusCode: 500 });
+		throwError(error, "Failed to fetch trades", 500);
 	}
 }
 

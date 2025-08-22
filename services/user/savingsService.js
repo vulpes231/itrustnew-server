@@ -9,7 +9,7 @@ async function fetchAvailableSavings() {
 		const savingsAccounts = await SavingsAccount.find().lean();
 		return savingsAccounts;
 	} catch (error) {
-		throwError(error, "Failed to fetch savings account", 500);
+		throwError(error, "Failed to get savings accounts. Try again", 500);
 	}
 }
 
@@ -55,7 +55,7 @@ async function addSavingsAccount(userId, accountId) {
 		await user.save();
 		return newAccountData.name;
 	} catch (error) {
-		throwError(error, "Failed to fetch add savings", 500);
+		throwError(error, "Failed to open savings account. Try again", 500);
 	}
 }
 
@@ -63,12 +63,12 @@ async function fetchUserSavingsAccount(userId) {
 	if (!userId) throw new Error("Bad request", { statusCode: 400 });
 	try {
 		const user = await User.findById(userId);
+		if (!user) throw new Error("Invalid credentials!", { statusCode: 404 });
 
-		if (!user) throw new Error("Invalid credentials!", { statusCode: 401 });
 		const userSavingsAccount = user.savingsAccounts;
 		return userSavingsAccount;
 	} catch (error) {
-		throwError(error, "Failed to fetch user savings account", 500);
+		throwError(error, "Failed to get user savings accounts. Try again", 500);
 	}
 }
 
@@ -78,7 +78,7 @@ async function fetchUserSavingsHistory(userId, queryData) {
 	try {
 		const sort = {};
 		if (sortBy === "createdAt") sort["createdAt"] = -1;
-		if (sortBy === "method") sort["createdAt"] = -1;
+		if (sortBy === "method") sort["method"] = -1;
 
 		const savingsHistory = await Transaction.find({
 			userId,

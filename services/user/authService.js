@@ -13,6 +13,7 @@ const { getCurrencyById } = require("../currencyService");
 const Wallet = require("../../models/Wallet");
 const { sendLoginCode } = require("../mailService");
 const Usersetting = require("../../models/Usersetting");
+const { throwError } = require("../../utils/utils");
 
 async function registerService(userData) {
 	const {
@@ -148,8 +149,7 @@ async function registerService(userData) {
 				brokerageWallet.totalBalance,
 		};
 	} catch (error) {
-		console.log("Failed to register user. Try again", error.message);
-		throw new Error(error.message, { statusCode: 500 });
+		throwError(error, "Failed to register user. Try again", 500);
 	}
 }
 
@@ -237,8 +237,7 @@ async function loginService(loginData) {
 			return { accessToken, refreshToken, userInfo };
 		}
 	} catch (error) {
-		console.log("Failed to login user. Try again", error.message);
-		throw new Error(error.message, { statusCode: 500 });
+		throwError(error, "Failed to login user. Try again", 500);
 	}
 }
 
@@ -258,8 +257,7 @@ async function logoutService(userId) {
 		await user.save();
 		return true;
 	} catch (error) {
-		console.log("Failed to logout user. Try again", error.message);
-		throw new Error(error.message, { statusCode: 500 });
+		throwError(error, "Failed to logout user. Try again", 500);
 	}
 }
 

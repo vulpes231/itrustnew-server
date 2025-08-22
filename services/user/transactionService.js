@@ -1,19 +1,21 @@
 const Transaction = require("../../models/Transaction");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
+const { throwError } = require("../../utils/utils");
 
 async function addFunds(userId, trnxData) {
 	const { method, amount, account, memo, network } = trnxData;
-	if (!amount || !method || !account) throw new Error("Bad request!");
+	if (!amount || !method || !account)
+		throw new Error("Bad request!", { statusCode: 400 });
 	try {
 		const wallets = await Wallet.find({ userId });
 		if (wallets.length < 1) {
-			throw new Error("Contact support for more info!");
+			throw new Error("Contact support for more info!", { statusCode: 404 });
 		}
 
 		const receiver = wallets.find((wallet) => wallet.name === account);
 		if (!receiver) {
-			throw new Error("Invalid receiving account!");
+			throw new Error("Invalid receiving account!", { statusCode: 400 });
 		}
 		const customMemo = `${method} deposit to ${account}`;
 
@@ -30,31 +32,32 @@ async function addFunds(userId, trnxData) {
 		});
 		return trnx;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to add money!");
+		throwError(error, "Failed to add money!", 500);
 	}
 }
 
 async function withdrawFunds(userId, trnxData) {
 	const { method, amount, account, memo, network } = trnxData;
-	if (!amount || !method || !account) throw new Error("Bad request!");
+	if (!amount || !method || !account)
+		throw new Error("Bad request!", { statusCode: 400 });
 	try {
 		const user = await User.findById(userId);
-		if (!user) throw new Error("Invalid credentials!");
+		if (!user) throw new Error("Invalid credentials!", { statusCode: 404 });
 
 		if (user.identityVerification.kycStatus !== "completed")
-			throw new Error("Account not verified!");
+			throw new Error("Account not verified!", { statusCode: 403 });
 
 		const wallets = await Wallet.find({ userId });
 		if (wallets.length < 1) {
-			throw new Error("Contact support for more info!");
+			throw new Error("Contact support for more info!", { statusCode: 404 });
 		}
 
 		const withdrawFrom = wallets.find((wallet) => wallet.name === account);
-		if (!withdrawFrom) throw new Error("Invalid withdrawal account!");
+		if (!withdrawFrom)
+			throw new Error("Invalid withdrawal account!", { statusCode: 400 });
 
 		if (withdrawFrom.availableBalance < parseFloat(amount))
-			throw new Error("Insufficient funds!");
+			throw new Error("Insufficient funds!", { statusCode: 400 });
 
 		const customMemo = `${method} withdrawal from ${account}`;
 
@@ -71,28 +74,30 @@ async function withdrawFunds(userId, trnxData) {
 		});
 		return trnx;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to withdraw money!");
+		throwError(error, "Failed to withdraw money!", 500);
 	}
 }
 
 async function moveFunds(userId, trnxData) {
-	const { method, amount, account, memo, network } = trnxData;
-	if (!amount || !method || !account) throw new Error("Bad request!");
+	const { method, amount, account, memo } = trnxData;
+	if (!amount || !method || !account)
+		throw new Error("Bad request!", { statusCode: 400 });
 	try {
 		const wallets = await Wallet.find({ userId });
 		if (wallets.length < 1) {
-			throw new Error("Contact support for more info!");
+			throw new Error("Contact support for more info!", { statusCode: 404 });
 		}
 
 		const transferFrom = wallets.find((wallet) => wallet.name === method);
-		if (!transferFrom) throw new Error("Invalid from account!");
+		if (!transferFrom)
+			throw new Error("Invalid from account!", { statusCode: 400 });
 
 		if (transferFrom.availableBalance < parseFloat(amount))
-			throw new Error("Insufficient funds!");
+			throw new Error("Insufficient funds!", { statusCode: 400 });
 
 		const transferTo = wallets.find((wallet) => wallet.name === account);
-		if (!transferTo) throw new Error("Invalid receiving account!");
+		if (!transferTo)
+			throw new Error("Invalid receiving account!", { statusCode: 400 });
 
 		const parsedAmount = parseFloat(amount);
 
@@ -117,8 +122,7 @@ async function moveFunds(userId, trnxData) {
 		});
 		return trnx;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed to move money!");
+		throwError(error, "Failed to move money!", 500);
 	}
 }
 
@@ -127,8 +131,7 @@ async function getUserLedger(userId) {
 		const transactions = await Transaction.find({ userId });
 		return transactions;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed get user transactions!");
+		throwError(error.message, "Failed get user transactions!", 500);
 	}
 }
 
@@ -139,8 +142,7 @@ async function cancelTransaction(transactionId) {
 		await transaction.save();
 		return transaction;
 	} catch (error) {
-		console.log(error.message);
-		throw new Error("Failed get user transactions!");
+		throwError(error, "Failed get user transactions!", 500);
 	}
 }
 
