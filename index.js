@@ -5,15 +5,11 @@ const { connectDB, corsOptions } = require("./configs/settings.js");
 const { errorLogger, reqLogger } = require("./middlewares/loggers.js");
 const { mongoose } = require("mongoose");
 require("dotenv").config();
-const {
-	initWalletGrowthCronJobs,
-	shutdownCronJobs,
-	devRouter,
-} = require("./jobs/jobs");
+const { shutdownCronJobs, devRouter, initCronJobs } = require("./jobs/jobs");
 const { verifyJWT } = require("./middlewares/verifyJWT.js");
 
 // Initialize cron jobs
-initWalletGrowthCronJobs();
+initCronJobs();
 
 const app = express();
 const PORT = process.env.PORT || 3000;

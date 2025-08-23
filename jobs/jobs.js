@@ -1,99 +1,14 @@
 const cron = require("node-cron");
-const Chart = require("../models/Chart");
-const Wallet = require("../models/Wallet");
+const {
+	updatePortfolioChart,
+	updateTradePerformance,
+} = require("./customJobs");
 require("dotenv").config();
-
-const BATCH_SIZE = process.env.CRON_BATCH_SIZE || 100;
-const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
 
 // Track active jobs for graceful shutdown
 const activeJobs = new Set();
 
-async function updateWalletGrowth(timeframe) {
-	const startTime = Date.now();
-	let usersProcessed = 0;
-
-	try {
-		console.log(`[${new Date().toISOString()}] Starting ${timeframe} update`);
-
-		let skip = 0;
-		let shouldContinue = true;
-
-		while (shouldContinue) {
-			const userIds = await Wallet.distinct(
-				"userId",
-				{},
-				{ skip, limit: BATCH_SIZE }
-			);
-			if (userIds.length === 0) {
-				shouldContinue = false;
-				break;
-			}
-
-			const userBalances = await Wallet.aggregate([
-				{ $match: { userId: { $in: userIds } } },
-				{
-					$group: {
-						_id: "$userId",
-						totalBalance: { $sum: "$totalBalance" },
-						walletCount: { $sum: 1 }, // For validation
-					},
-				},
-			]);
-
-			// Validate we found all wallets
-			if (userBalances.some((u) => u.walletCount !== 3)) {
-				console.warn("Some users have missing wallets!");
-			}
-
-			const bulkOps = userBalances.map((user) => ({
-				updateOne: {
-					filter: { userId: user._id },
-					update: {
-						$push: {
-							[`history.${timeframe}`]: {
-								timestamp: new Date(),
-								balance: user.totalBalance,
-								metadata: { walletCount: user.walletCount },
-							},
-						},
-						$set: { lastUpdated: new Date() },
-					},
-					upsert: true,
-				},
-			}));
-
-			const result = await Chart.bulkWrite(bulkOps);
-			usersProcessed += userIds.length;
-			skip += BATCH_SIZE;
-
-			console.log(
-				`Processed batch: ${usersProcessed} users | ${result.modifiedCount} updated`
-			);
-
-			if (process.env.NODE_ENV === "development") {
-				// Faster iteration in dev
-				shouldContinue = false;
-			} else {
-				await new Promise((resolve) => setTimeout(resolve, CRON_DELAY_MS));
-			}
-		}
-
-		console.log(
-			`✅ Completed ${timeframe} update for ${usersProcessed} users in ${
-				(Date.now() - startTime) / 1000
-			}s`
-		);
-	} catch (error) {
-		console.error(
-			`❌ ${timeframe} update failed after ${usersProcessed} users:`,
-			error
-		);
-		// Consider adding retry logic here
-	}
-}
-
-function initWalletGrowthCronJobs() {
+function initCronJobs() {
 	if (process.env.NODE_ENV === "development" && !process.env.ENABLE_CRONS) {
 		console.log(
 			"⏸️  Cron jobs disabled in development (set ENABLE_CRONS=1 to enable)"
@@ -111,10 +26,17 @@ function initWalletGrowthCronJobs() {
 	};
 
 	Object.entries(schedules).forEach(([timeframe, schedule]) => {
-		const job = cron.schedule(schedule, () => updateWalletGrowth(timeframe), {
-			scheduled:
-				process.env.NODE_ENV === "production" || !!process.env.ENABLE_CRONS,
-		});
+		const job = cron.schedule(
+			schedule,
+			() => {
+				updatePortfolioChart(timeframe);
+				updateTradePerformance();
+			},
+			{
+				scheduled:
+					process.env.NODE_ENV === "production" || !!process.env.ENABLE_CRONS,
+			}
+		);
 		activeJobs.add(job);
 	});
 
@@ -134,11 +56,16 @@ if (process.env.NODE_ENV === "development") {
 	const devRouter = express.Router();
 
 	devRouter.get("/trigger/:timeframe", async (req, res) => {
-		await updateWalletGrowth(req.params.timeframe);
+		await updatePortfolioChart(req.params.timeframe);
 		res.json({ status: "completed" });
 	});
 
-	module.exports = { initWalletGrowthCronJobs, shutdownCronJobs, devRouter };
+	devRouter.get("/performance", async (req, res) => {
+		await updateTradePerformance();
+		res.json({ status: "completed" });
+	});
+
+	module.exports = { initCronJobs, shutdownCronJobs, devRouter };
 } else {
-	module.exports = { initWalletGrowthCronJobs, shutdownCronJobs };
+	module.exports = { initCronJobs, shutdownCronJobs };
 }
