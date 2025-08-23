@@ -11,10 +11,11 @@ const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
 const updateTradePerformance = async () => {
 	try {
 		console.log("Starting trade performance update...");
+		const startTime = Date.now();
 
 		// Fetch all open trades
 		const openTrades = await Trade.find({ status: "open" })
-			.populate("userId", "name email") // Optional: populate user info if needed
+			.populate("userId", "name email")
 			.exec();
 
 		if (openTrades.length === 0) {
@@ -40,12 +41,12 @@ const updateTradePerformance = async () => {
 
 		console.log(`Fetching current prices for ${assetSymbols.length} assets...`);
 
-		// Fetch current asset data using your service
+		// Fetch current asset data with retry logic
 		let currentAssets;
 		try {
-			currentAssets = await fetchAssets(); // Your service function
+			currentAssets = await fetchAssetsWithRetry(assetSymbols);
 		} catch (error) {
-			console.error("Error fetching assets:", error.message);
+			console.error("Error fetching assets after retries:", error.message);
 			return;
 		}
 
@@ -57,68 +58,140 @@ const updateTradePerformance = async () => {
 			}
 		});
 
-		// Update each trade
-		const updatePromises = openTrades.map(async (trade) => {
-			if (!trade.asset || !trade.asset.symbol) {
-				console.log(`Trade ${trade._id} has no asset symbol, skipping.`);
-				return null;
-			}
+		// Process trades in batches to avoid overwhelming the database
+		const BATCH_SIZE = 50; // Adjust based on your system capacity
+		let successfulUpdates = 0;
 
-			const symbol = trade.asset.symbol.toUpperCase();
-			const currentPrice = assetPriceMap[symbol];
-
-			if (!currentPrice) {
-				console.log(
-					`No current price found for ${symbol}, skipping trade ${trade._id}`
-				);
-				return null;
-			}
-
-			// Calculate performance metrics
-			const executionPrice = trade.execution.price;
-			const quantity = trade.execution.quantity;
-
-			// Calculate current value
-			const currentValue = currentPrice * quantity;
-
-			// Calculate total return (current value - initial investment)
-			const totalReturn = currentValue - trade.execution.amount;
-
-			// Calculate total return percentage
-			const totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
-
-			// For today's return, we need to compare with previous close
-			// This would require storing yesterday's price or fetching historical data
-			// For simplicity, we'll use the same calculation as total return
-			const todayReturn = totalReturn;
-			const todayReturnPercent = totalReturnPercent;
-
-			// Update trade performance
-			return Trade.findByIdAndUpdate(
-				trade._id,
-				{
-					$set: {
-						"performance.totalReturn": totalReturn,
-						"performance.totalReturnPercent": totalReturnPercent,
-						"performance.todayReturn": todayReturn,
-						"performance.todayReturnPercent": todayReturnPercent,
-						"performance.currentValue": currentValue,
-						updatedAt: new Date(),
-					},
-				},
-				{ new: true }
+		for (let i = 0; i < openTrades.length; i += BATCH_SIZE) {
+			const batch = openTrades.slice(i, i + BATCH_SIZE);
+			console.log(
+				`Processing batch ${i / BATCH_SIZE + 1} of ${Math.ceil(
+					openTrades.length / BATCH_SIZE
+				)}`
 			);
-		});
 
-		// Wait for all updates to complete
-		const results = await Promise.all(updatePromises);
-		const successfulUpdates = results.filter((result) => result !== null);
+			const batchPromises = batch.map(async (trade) => {
+				return updateSingleTrade(trade, assetPriceMap);
+			});
 
-		console.log(`Successfully updated ${successfulUpdates.length} trades.`);
+			try {
+				const batchResults = await Promise.all(batchPromises);
+				successfulUpdates += batchResults.filter(
+					(result) => result !== null
+				).length;
+
+				// Small delay between batches to avoid overwhelming the system
+				if (i + BATCH_SIZE < openTrades.length) {
+					await new Promise((resolve) => setTimeout(resolve, 100));
+				}
+			} catch (error) {
+				console.error(`Error processing batch starting at index ${i}:`, error);
+			}
+		}
+
+		const duration = Date.now() - startTime;
+		console.log(
+			`Successfully updated ${successfulUpdates} trades in ${duration}ms.`
+		);
 	} catch (error) {
 		console.error("Error in updateTradePerformance:", error);
 	}
 };
+
+// Helper function to fetch assets with retry logic
+async function fetchAssetsWithRetry(assetSymbols, maxRetries = 3) {
+	for (let attempt = 1; attempt <= maxRetries; attempt++) {
+		try {
+			console.log(`Fetching assets (attempt ${attempt}/${maxRetries})...`);
+			const assets = await fetchAssets(); // Your existing service function
+
+			// Verify we got data for all requested symbols
+			const fetchedSymbols = assets
+				.map((a) => a.symbol?.toUpperCase())
+				.filter(Boolean);
+			const missingSymbols = assetSymbols.filter(
+				(symbol) => !fetchedSymbols.includes(symbol)
+			);
+
+			if (missingSymbols.length > 0) {
+				console.log(`Missing data for symbols: ${missingSymbols.join(", ")}`);
+				if (attempt < maxRetries) {
+					await new Promise((resolve) => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+					continue;
+				}
+			}
+
+			return assets;
+		} catch (error) {
+			console.error(`Attempt ${attempt} failed:`, error.message);
+			if (attempt < maxRetries) {
+				await new Promise((resolve) => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+			} else {
+				throw error;
+			}
+		}
+	}
+}
+
+// Helper function to update a single trade
+async function updateSingleTrade(trade, assetPriceMap) {
+	try {
+		if (!trade.asset || !trade.asset.symbol) {
+			console.log(`Trade ${trade._id} has no asset symbol, skipping.`);
+			return null;
+		}
+
+		const symbol = trade.asset.symbol.toUpperCase();
+		const currentPrice = assetPriceMap[symbol];
+
+		if (!currentPrice) {
+			console.log(
+				`No current price found for ${symbol}, skipping trade ${trade._id}`
+			);
+			return null;
+		}
+
+		// Calculate performance metrics
+		const executionPrice = trade.execution.price;
+		const quantity = trade.execution.quantity;
+
+		// Calculate current value
+		const currentValue = currentPrice * quantity;
+
+		// Calculate total return (current value - initial investment)
+		const totalReturn = currentValue - trade.execution.amount;
+
+		// Calculate total return percentage
+		const totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+
+		// For today's return, we need to compare with previous close
+		// This would require storing yesterday's price or fetching historical data
+		// For simplicity, we'll use the same calculation as total return
+		const todayReturn = totalReturn;
+		const todayReturnPercent = totalReturnPercent;
+
+		// Update trade performance
+		await Trade.findByIdAndUpdate(
+			trade._id,
+			{
+				$set: {
+					"performance.totalReturn": totalReturn,
+					"performance.totalReturnPercent": totalReturnPercent,
+					"performance.todayReturn": todayReturn,
+					"performance.todayReturnPercent": todayReturnPercent,
+					"performance.currentValue": currentValue,
+					updatedAt: new Date(),
+				},
+			},
+			{ new: true }
+		);
+
+		return trade._id; // Return the ID to count successful updates
+	} catch (error) {
+		console.error(`Error updating trade ${trade._id}:`, error.message);
+		return null;
+	}
+}
 
 async function updatePorfolioChart(timeframe) {
 	const startTime = Date.now();

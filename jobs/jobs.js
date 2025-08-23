@@ -7,6 +7,8 @@ require("dotenv").config();
 
 // Track active jobs for graceful shutdown
 const activeJobs = new Set();
+// Track when jobs were last run to prevent overlap
+const lastRunTimestamps = new Map();
 
 function initCronJobs() {
 	if (process.env.NODE_ENV === "development" && !process.env.ENABLE_CRONS) {
@@ -16,21 +18,55 @@ function initCronJobs() {
 		return;
 	}
 
-	// Schedule with override for testing
 	const schedules = {
-		hourly: process.env.CRON_HOURLY || "0 * * * *",
-		daily: process.env.CRON_DAILY || "0 0 * * *",
-		weekly: process.env.CRON_WEEKLY || "0 0 * * 0",
-		monthly: process.env.CRON_MONTHLY || "0 0 1 * *",
-		yearly: process.env.CRON_YEARLY || "0 0 1 1 *",
+		// Run trade performance updates only hourly (not at all intervals)
+		tradePerformance: process.env.CRON_TRADE_PERFORMANCE || "0 * * * *", // Hourly
+		portfolioHourly: process.env.CRON_HOURLY || "0 * * * *",
+		portfolioDaily: process.env.CRON_DAILY || "0 0 * * *",
+		portfolioWeekly: process.env.CRON_WEEKLY || "0 0 * * 0",
+		portfolioMonthly: process.env.CRON_MONTHLY || "0 0 1 * *",
+		portfolioYearly: process.env.CRON_YEARLY || "0 0 1 1 *",
 	};
 
+	// Trade performance job (hourly)
+	const tradeJob = cron.schedule(
+		schedules.tradePerformance,
+		async () => {
+			// Prevent overlapping executions
+			const now = Date.now();
+			const lastRun = lastRunTimestamps.get("tradePerformance") || 0;
+
+			// If last run was less than 55 minutes ago, skip this execution
+			if (now - lastRun < 55 * 60 * 1000) {
+				console.log(
+					"Skipping trade performance update - previous execution still recent"
+				);
+				return;
+			}
+
+			lastRunTimestamps.set("tradePerformance", now);
+			try {
+				await updateTradePerformance();
+			} catch (error) {
+				console.error("Trade performance update failed:", error);
+			}
+		},
+		{
+			scheduled:
+				process.env.NODE_ENV === "production" || !!process.env.ENABLE_CRONS,
+		}
+	);
+	activeJobs.add(tradeJob);
+
+	// Portfolio chart jobs
 	Object.entries(schedules).forEach(([timeframe, schedule]) => {
+		if (timeframe === "tradePerformance") return; // Skip as we already added it
+
 		const job = cron.schedule(
 			schedule,
 			() => {
-				updatePortfolioChart(timeframe);
-				updateTradePerformance();
+				// Only update portfolio charts, not trade performance
+				updatePortfolioChart(timeframe.replace("portfolio", "").toLowerCase());
 			},
 			{
 				scheduled:
@@ -45,9 +81,10 @@ function initCronJobs() {
 	);
 }
 
-function shutdownCronJobs() {
-	activeJobs.forEach((job) => job.stop());
-	console.log(`🛑 Stopped ${activeJobs.size} cron jobs`);
+// Add a function to manually trigger trade performance updates
+function manuallyTriggerTradePerformance() {
+	console.log("Manually triggering trade performance update");
+	updateTradePerformance().catch(console.error);
 }
 
 // Handle manual triggers in development
@@ -65,7 +102,16 @@ if (process.env.NODE_ENV === "development") {
 		res.json({ status: "completed" });
 	});
 
-	module.exports = { initCronJobs, shutdownCronJobs, devRouter };
+	module.exports = {
+		initCronJobs,
+		shutdownCronJobs,
+		devRouter,
+		manuallyTriggerTradePerformance,
+	};
 } else {
-	module.exports = { initCronJobs, shutdownCronJobs };
+	module.exports = {
+		initCronJobs,
+		shutdownCronJobs,
+		manuallyTriggerTradePerformance,
+	};
 }
