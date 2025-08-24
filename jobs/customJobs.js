@@ -5,6 +5,7 @@ const Wallet = require("../models/Wallet");
 const Trade = require("../models/Trade");
 const { fetchAssets } = require("../services/assetService");
 const User = require("../models/User");
+const { logEvent } = require("../middlewares/loggers");
 
 const BATCH_SIZE = process.env.CRON_BATCH_SIZE || 100;
 const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
@@ -264,11 +265,11 @@ async function updatePorfolioChart(timeframe) {
 			}
 		}
 
-		console.log(
-			`✅ Completed ${timeframe} update for ${usersProcessed} users in ${
-				(Date.now() - startTime) / 1000
-			}s`
-		);
+		const msg = `✅ Completed ${timeframe} update for ${usersProcessed} users in ${
+			(Date.now() - startTime) / 1000
+		}s`;
+		logEvent(msg, "cron.txt\n");
+		console.log(msg);
 	} catch (error) {
 		console.error(
 			`❌ ${timeframe} update failed after ${usersProcessed} users:`,
@@ -326,7 +327,7 @@ async function updateWalletPerformance() {
 					if (userTrades.length === 0) {
 						console.log(`No open trades found for user ${user._id}`);
 						// Reset daily profits if no open trades
-						// await resetWalletDailyProfits(userWallets);
+						await resetWalletDailyProfits(userWallets);
 						continue;
 					}
 
@@ -388,9 +389,10 @@ async function updateWalletPerformance() {
 		}
 
 		const duration = Date.now() - startTime;
-		console.log(
-			`Successfully updated ${updatedWallets} wallets in ${duration}ms.`
-		);
+
+		const msg = `Successfully updated ${updatedWallets} wallets in ${duration}ms.`;
+		logEvent(msg, "cron.txt\n");
+		console.log(msg);
 	} catch (error) {
 		console.error("Error in updateWalletPerformance:", error);
 	}
