@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const {
 	updatePortfolioChart,
 	updateTradePerformance,
+	updateWalletPerformance,
 } = require("./customJobs");
 require("dotenv").config();
 
@@ -19,7 +20,7 @@ function initCronJobs() {
 	}
 
 	const schedules = {
-		// Run trade performance updates only hourly (not at all intervals)
+		walletPerformance: process.env.CRON_WALLET_PERFORMANCE || "0 1 * * *", //1am daily
 		tradePerformance: process.env.CRON_TRADE_PERFORMANCE || "0 * * * *", // Hourly
 		portfolioHourly: process.env.CRON_HOURLY || "0 * * * *",
 		portfolioDaily: process.env.CRON_DAILY || "0 0 * * *",
@@ -27,6 +28,18 @@ function initCronJobs() {
 		portfolioMonthly: process.env.CRON_MONTHLY || "0 0 1 * *",
 		portfolioYearly: process.env.CRON_YEARLY || "0 0 1 1 *",
 	};
+
+	const walletJob = cron.schedule(
+		schedules.walletPerformance,
+		async () => {
+			await updateWalletPerformance();
+		},
+		{
+			scheduled:
+				process.env.NODE_ENV === "production" || !!process.env.ENABLE_CRONS,
+		}
+	);
+	activeJobs.add(walletJob);
 
 	// Trade performance job (hourly)
 	const tradeJob = cron.schedule(
@@ -60,7 +73,8 @@ function initCronJobs() {
 
 	// Portfolio chart jobs
 	Object.entries(schedules).forEach(([timeframe, schedule]) => {
-		if (timeframe === "tradePerformance") return; // Skip as we already added it
+		if (timeframe === "tradePerformance") return;
+		if (timeframe === "walletPerformance") return;
 
 		const job = cron.schedule(
 			schedule,

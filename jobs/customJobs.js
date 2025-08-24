@@ -1,9 +1,10 @@
-const mongoose = require("mongoose");
-const cron = require("node-cron");
+// const mongoose = require("mongoose");
+// const cron = require("node-cron");
 const Chart = require("../models/Chart");
 const Wallet = require("../models/Wallet");
 const Trade = require("../models/Trade");
 const { fetchAssets } = require("../services/assetService");
+const User = require("../models/User");
 
 const BATCH_SIZE = process.env.CRON_BATCH_SIZE || 100;
 const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
@@ -277,7 +278,207 @@ async function updatePorfolioChart(timeframe) {
 	}
 }
 
+// =========================================================
+
+async function updateWalletPerformance() {
+	console.log("Starting Wallet performance update...");
+	const startTime = Date.now();
+
+	try {
+		// Get all users
+		const users = await User.find().select("_id");
+
+		if (users.length === 0) {
+			console.log("No users found.");
+			return;
+		}
+
+		console.log(`Found ${users.length} users to update.`);
+
+		// Process users in batches
+		const BATCH_SIZE = 20;
+		let updatedWallets = 0;
+
+		for (let i = 0; i < users.length; i += BATCH_SIZE) {
+			const userBatch = users.slice(i, i + BATCH_SIZE);
+			console.log(
+				`Processing user batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(
+					users.length / BATCH_SIZE
+				)}`
+			);
+
+			for (const user of userBatch) {
+				try {
+					// Get all wallets for this user
+					const userWallets = await Wallet.find({ userId: user._id });
+
+					if (userWallets.length === 0) {
+						console.log(`No wallets found for user ${user._id}`);
+						continue;
+					}
+
+					// Get all open trades for this user
+					const userTrades = await Trade.find({
+						userId: user._id,
+						status: "open",
+					});
+
+					if (userTrades.length === 0) {
+						console.log(`No open trades found for user ${user._id}`);
+						// Reset daily profits if no open trades
+						// await resetWalletDailyProfits(userWallets);
+						continue;
+					}
+
+					// Calculate daily profit for each wallet
+					for (const wallet of userWallets) {
+						const walletTrades = userTrades.filter(
+							(trade) =>
+								trade.wallet.id &&
+								trade.wallet.id.toString() === wallet._id.toString()
+						);
+
+						if (walletTrades.length === 0) {
+							// No trades in this wallet, reset daily profit
+							await Wallet.findByIdAndUpdate(wallet._id, {
+								dailyProfit: 0,
+								dailyProfitPercent: 0,
+							});
+							continue;
+						}
+
+						// Calculate total daily profit and percent for this wallet
+						const totalDailyProfit = walletTrades.reduce(
+							(sum, trade) => sum + (trade.performance.todayReturn || 0),
+							0
+						);
+
+						// Calculate total investment in this wallet
+						const totalInvestment = walletTrades.reduce(
+							(sum, trade) => sum + (trade.execution.amount || 0),
+							0
+						);
+
+						// Calculate daily profit percentage
+						const dailyProfitPercent =
+							totalInvestment > 0
+								? (totalDailyProfit / totalInvestment) * 100
+								: 0;
+
+						// Update wallet with calculated values
+						await Wallet.findByIdAndUpdate(wallet._id, {
+							dailyProfit: totalDailyProfit,
+							dailyProfitPercent: dailyProfitPercent,
+						});
+
+						updatedWallets++;
+					}
+				} catch (userError) {
+					console.error(
+						`Error processing user ${user._id}:`,
+						userError.message
+					);
+				}
+			}
+
+			// Small delay between batches
+			if (i + BATCH_SIZE < users.length) {
+				await new Promise((resolve) => setTimeout(resolve, 100));
+			}
+		}
+
+		const duration = Date.now() - startTime;
+		console.log(
+			`Successfully updated ${updatedWallets} wallets in ${duration}ms.`
+		);
+	} catch (error) {
+		console.error("Error in updateWalletPerformance:", error);
+	}
+}
+
+// Helper function to reset daily profits when no trades exist
+async function resetWalletDailyProfits(wallets) {
+	const updatePromises = wallets.map((wallet) =>
+		Wallet.findByIdAndUpdate(wallet._id, {
+			dailyProfit: 0,
+			dailyProfitPercent: 0,
+		})
+	);
+
+	await Promise.all(updatePromises);
+}
+
+// Optional: Function to update a single user's wallet performance
+// async function updateSingleUserWalletPerformance(userId) {
+// 	try {
+// 		console.log(`Updating wallet performance for user ${userId}`);
+
+// 		// Get user wallets
+// 		const userWallets = await Wallet.find({ userId });
+
+// 		if (userWallets.length === 0) {
+// 			console.log(`No wallets found for user ${userId}`);
+// 			return;
+// 		}
+
+// 		// Get user's open trades
+// 		const userTrades = await Trade.find({
+// 			userId,
+// 			status: "open",
+// 		});
+
+// 		if (userTrades.length === 0) {
+// 			console.log(`No open trades found for user ${userId}`);
+// 			await resetWalletDailyProfits(userWallets);
+// 			return;
+// 		}
+
+// 		// Update each wallet
+// 		for (const wallet of userWallets) {
+// 			const walletTrades = userTrades.filter(
+// 				(trade) =>
+// 					trade.wallet.id &&
+// 					trade.wallet.id.toString() === wallet._id.toString()
+// 			);
+
+// 			if (walletTrades.length === 0) {
+// 				await Wallet.findByIdAndUpdate(wallet._id, {
+// 					dailyProfit: 0,
+// 					dailyProfitPercent: 0,
+// 				});
+// 				continue;
+// 			}
+
+// 			const totalDailyProfit = walletTrades.reduce(
+// 				(sum, trade) => sum + (trade.performance.todayReturn || 0),
+// 				0
+// 			);
+
+// 			const totalInvestment = walletTrades.reduce(
+// 				(sum, trade) => sum + (trade.execution.amount || 0),
+// 				0
+// 			);
+
+// 			const dailyProfitPercent =
+// 				totalInvestment > 0 ? (totalDailyProfit / totalInvestment) * 100 : 0;
+
+// 			await Wallet.findByIdAndUpdate(wallet._id, {
+// 				dailyProfit: totalDailyProfit,
+// 				dailyProfitPercent: dailyProfitPercent,
+// 			});
+// 		}
+
+// 		console.log(`Successfully updated wallets for user ${userId}`);
+// 	} catch (error) {
+// 		console.error(
+// 			`Error updating wallet performance for user ${userId}:`,
+// 			error
+// 		);
+// 	}
+// }
+
 module.exports = {
 	updateTradePerformance,
 	updatePorfolioChart,
+	updateWalletPerformance,
 };
