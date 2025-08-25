@@ -6,18 +6,18 @@ const {
 	getCountryById,
 	getStateById,
 } = require("../locationService");
-const { throwError } = require("../../utils/utils");
+const { CustomError } = require("../../utils/utils");
 
 async function getUserById(userId) {
-	if (!userId) throw new Error("Bad request!", { statusCode: 400 });
+	if (!userId) throw new CustomError("Bad request!", 400);
 	try {
 		const user = await User.findById(userId);
 		if (!user) {
-			throw new Error("User not found!", { statusCode: 404 });
+			throw new CustomError("User not found!", 404);
 		}
 		return user;
 	} catch (error) {
-		throwError(error, "Failed to get user!", 500);
+		throw new CustomError("Failed to get user!", 500);
 	}
 }
 
@@ -38,7 +38,7 @@ async function updateUserProfile(userId, userData) {
 	try {
 		const user = await User.findOne({ userId: userId });
 		if (!user) {
-			throw new Error("user not found", { statusCode: 404 });
+			throw new CustomError("user not found", 404);
 		}
 
 		const nation = await getNationById(nationalityId);
@@ -85,21 +85,21 @@ async function updateUserProfile(userId, userData) {
 		await user.save();
 		return user;
 	} catch (error) {
-		throwError(error, "Failed to update user!", 500);
+		throw new CustomError("Failed to update user!", 500);
 	}
 }
 
 async function updatePassword(userId, userData) {
 	const { password, newPassword } = userData;
 	if (!userId || !password || !newPassword)
-		throw new Error("Bad request!", { statusCode: 400 });
+		throw new CustomError("Bad request!", 400);
 	try {
 		const user = await User.findById(userId);
-		if (!user) throw new Error("Invalid credentials!", { statusCode: 404 });
+		if (!user) throw new CustomError("Invalid credentials!", 404);
 
 		const passMatch = await bcrypt.compare(password, user.credentials.password);
 
-		if (!passMatch) throw new Error("Invalid password!", { statusCode: 401 });
+		if (!passMatch) throw new CustomError("Invalid password!", 401);
 
 		const newHashedPass = await bcrypt.hash(newPassword, 10);
 		user.credentials.password = newHashedPass;
@@ -107,7 +107,7 @@ async function updatePassword(userId, userData) {
 		await user.save();
 		return user;
 	} catch (error) {
-		throwError(error, "Failed to update password!", 500);
+		throw new CustomError("Failed to update password!", 500);
 	}
 }
 
@@ -128,7 +128,7 @@ async function updateBeneficiary(userId, userData) {
 	try {
 		const settings = await Usersetting.findOne({ userId: userId });
 		if (!settings) {
-			throw new Error("settings not found", { statusCode: 404 });
+			throw new CustomError("settings not found", 404);
 		}
 		if (firstName) {
 			settings.beneficiary.firstName = firstName;
@@ -166,16 +166,16 @@ async function updateBeneficiary(userId, userData) {
 		await settings.save();
 		return settings;
 	} catch (error) {
-		throwError(error, "Failed to update beneficiary!", 500);
+		throw new CustomError("Failed to update beneficiary!", 500);
 	}
 }
 
 async function updateTwoFactorAuth(userId) {
-	if (!userId) throw new Error("Bad request!", { statusCode: 400 });
+	if (!userId) throw new CustomError("Bad request!", 400);
 	try {
 		const user = await User.findById(userId);
 		if (!user) {
-			throw new Error("Inavlid credentials!", { statusCode: 404 });
+			throw new CustomError("Inavlid credentials!", 404);
 		}
 		user.accountStatus.twoFaActivated = user.accountStatus.twoFaActivated
 			? false
@@ -183,7 +183,7 @@ async function updateTwoFactorAuth(userId) {
 		await user.save();
 		return user;
 	} catch (error) {
-		throwError(error, "Failed to update two factor!", 500);
+		throw new CustomError("Failed to update two factor!", 500);
 	}
 }
 
@@ -193,11 +193,11 @@ async function submitDocuments(verifyData) {
 	try {
 		const user = await User.findById(userId);
 		if (!user) {
-			throw new Error("User not found!");
+			throw new CustomError("User not found!");
 		}
 		return user;
 	} catch (error) {
-		throwError(error, "Failed to submit documents!", 500);
+		throw new CustomError("Failed to submit documents!", 500);
 	}
 }
 

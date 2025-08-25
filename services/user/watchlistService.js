@@ -1,18 +1,17 @@
 const Watchlist = require("../../models/Watchlist");
-const { throwError } = require("../../utils/utils");
+const { CustomError } = require("../../utils/utils");
 const { fetchAssetById } = require("../assetService");
 
 async function addAssetToWatchlist(userId, assetId) {
-	if (!assetId) throw new Error("Asset ID required!", { statusCode: 400 });
+	if (!assetId) throw new CustomError("Asset ID required!", 400);
 	try {
 		const asset = await fetchAssetById(assetId);
-		if (!asset) throw new Error("Asset not found!", { statusCode: 404 });
+		if (!asset) throw new CustomError("Asset not found!", 404);
 
 		const userWatchlist = await fetchUserWatchlist(userId);
 
 		const assetExists = userWatchlist.some((item) => item.assetId === assetId);
-		if (assetExists)
-			throw new Error("Asset already on watchlist!", { statusCode: 409 });
+		if (assetExists) throw new CustomError("Asset already on watchlist!", 409);
 
 		const watchListItem = await Watchlist.create({
 			userId: userId,
@@ -26,12 +25,12 @@ async function addAssetToWatchlist(userId, assetId) {
 
 		return watchListItem;
 	} catch (error) {
-		throwError(error, "Failed to add asset to user watchlist!", 500);
+		throw new CustomError("Failed to add asset to user watchlist!", 500);
 	}
 }
 
 async function removeAssetFromWatchlist(userId, assetId) {
-	if (!assetId) throw new Error("Asset ID required!", { statusCode: 400 });
+	if (!assetId) throw new CustomError("Asset ID required!", 400);
 	try {
 		// Option 1: If using Mongoose model directly
 		const result = await Watchlist.deleteOne({
@@ -40,24 +39,24 @@ async function removeAssetFromWatchlist(userId, assetId) {
 		});
 
 		if (result.deletedCount === 0) {
-			throw new Error("Asset not on watchlist!", {
+			throw new CustomError("Asset not on watchlist!", {
 				statusCode: 400,
 			});
 		}
 
 		return true;
 	} catch (error) {
-		throwError(error, "Failed to remove asset from user watchlist!", 500);
+		throw new CustomError("Failed to remove asset from user watchlist!", 500);
 	}
 }
 
 async function fetchUserWatchlist(userId) {
-	if (!userId) throw new Error("User ID required!", { statusCode: 400 });
+	if (!userId) throw new CustomError("User ID required!", 400);
 	try {
 		const userWatchlist = await Watchlist.find({ userId }).lean();
 		return userWatchlist;
 	} catch (error) {
-		throwError(error, `Error fetching watchlist for user ${userId}:`, 500);
+		throw new CustomError(`Error fetching watchlist for user ${userId}!`, 500);
 	}
 }
 
