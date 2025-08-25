@@ -7,19 +7,18 @@ const {
 	getNationById,
 } = require("../services/locationService");
 
-const getAllCountries = async (req, res) => {
+const getAllCountries = async (req, res, next) => {
 	try {
 		const countries = await getCountries();
 		res
 			.status(200)
 			.json({ data: countries, success: true, message: "Countries retrieved" });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getCountryInfo = async (req, res) => {
+const getCountryInfo = async (req, res, next) => {
 	const { countryId } = req.params;
 	try {
 		const country = await getCountryById(countryId);
@@ -29,24 +28,22 @@ const getCountryInfo = async (req, res) => {
 			message: "Country info retrieved",
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getAllStates = async (req, res) => {
+const getAllStates = async (req, res, next) => {
 	try {
 		const states = await getStates();
 		res
 			.status(200)
 			.json({ data: states, success: true, message: "States retrieved" });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getStateInfo = async (req, res) => {
+const getStateInfo = async (req, res, next) => {
 	const { stateId } = req.params;
 	try {
 		const state = await getStateById(stateId);
@@ -54,12 +51,11 @@ const getStateInfo = async (req, res) => {
 			.status(200)
 			.json({ data: state, success: true, message: "State info retrieved" });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getAllNations = async (req, res) => {
+const getAllNations = async (req, res, next) => {
 	try {
 		const nations = await getNationalities();
 		res.status(200).json({
@@ -68,12 +64,11 @@ const getAllNations = async (req, res) => {
 			message: "Nationalities retrieved",
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getNationalityInfo = async (req, res) => {
+const getNationalityInfo = async (req, res, next) => {
 	const { nationId } = req.params;
 	try {
 		const nationality = await getNationById(nationId);
@@ -83,8 +78,7 @@ const getNationalityInfo = async (req, res) => {
 			message: "Nationality info retrieved",
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 

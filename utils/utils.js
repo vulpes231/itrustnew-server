@@ -21,8 +21,14 @@ function generateOtp(length = 6) {
 	return otp;
 }
 
-function throwError(err, msg, code) {
-	console.log(msg, err.message);
-	throw new Error(err.message, { statusCode: code });
+class CustomError extends Error {
+	constructor(message, code = 500) {
+		super(message);
+		this.name = this.constructor.name;
+		this.statusCode = code;
+
+		Error.captureStackTrace(this, this.constructor);
+	}
 }
-module.exports = { getClientIp, generateOtp, throwError };
+
+module.exports = { getClientIp, generateOtp, throwError, CustomError };

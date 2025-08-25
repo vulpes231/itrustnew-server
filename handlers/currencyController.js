@@ -3,7 +3,7 @@ const {
 	getCurrencyById,
 } = require("../services/currencyService");
 
-const getAllCurrencies = async (req, res) => {
+const getAllCurrencies = async (req, res, next) => {
 	try {
 		const currencies = await getCurrencies();
 		res.status(200).json({
@@ -12,12 +12,11 @@ const getAllCurrencies = async (req, res) => {
 			message: "Currencies fetched successfully",
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getCurrencyInfo = async (req, res) => {
+const getCurrencyInfo = async (req, res, next) => {
 	const { currencyId } = req.params;
 	try {
 		const currency = await getCurrencyById(currencyId);
@@ -27,8 +26,7 @@ const getCurrencyInfo = async (req, res) => {
 			message: "Currency fetched successfully",
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 

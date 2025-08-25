@@ -45,6 +45,7 @@ const watchlistRoute = require("./routes/user/watchlist.js");
 const investPlanRoute = require("./routes/user/autoplan.js");
 const tradeRoute = require("./routes/user/trade.js");
 const savingsRoute = require("./routes/user/savings.js");
+const errorHandler = require("./middlewares/errorHandler.js");
 
 // routes
 app.use("/", rootRoute);
@@ -72,6 +73,7 @@ mongoose.connection.once("connected", () => {
 	);
 });
 
+app.use(errorHandler);
 app.use(errorLogger);
 
 const shutdown = async (signal) => {

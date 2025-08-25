@@ -1,5 +1,5 @@
 const Asset = require("../models/Asset");
-const { throwError } = require("../utils/utils");
+const { CustomError } = require("../utils/utils");
 
 async function fetchAssets(queryData) {
 	const { page, limit, sortBy, type } = queryData;
@@ -21,17 +21,17 @@ async function fetchAssets(queryData) {
 		const totalPages = Math.ceil(totalAssetCount / limit);
 		return { assets, totalAssetCount, totalPages, currentPage: page };
 	} catch (error) {
-		throwError(error, "Failed to fetch assets", 500);
+		throw new CustomError("Failed to fetch assets", 500);
 	}
 }
 
 async function fetchAssetById(assetId) {
-	if (!assetId) throw new Error("Asset ID required!");
+	if (!assetId) throw new CustomError("Asset ID required!", 400);
 	try {
 		const asset = await Asset.findById(assetId);
 		return asset;
 	} catch (error) {
-		throwError(error, "Failed to fetch asset!", 500);
+		throw new CustomError("Failed to fetch asset!", 500);
 	}
 }
 
@@ -40,7 +40,7 @@ async function fetchUserAssets(userId) {
 		const userAssets = await Asset.find({ userId });
 		return userAssets;
 	} catch (error) {
-		throwError(error, "Failed to fetch user assets", 500);
+		throw new CustomError("Failed to fetch user assets", 500);
 	}
 }
 

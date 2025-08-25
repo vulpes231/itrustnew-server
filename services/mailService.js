@@ -1,11 +1,11 @@
 const User = require("../models/User");
 const { sendMail } = require("../utils/mailer");
-const { generateOtp, throwError } = require("../utils/utils");
+const { generateOtp, CustomError } = require("../utils/utils");
 
 const bcrypt = require("bcryptjs");
 
 async function sendLoginCode(email) {
-	if (!email) throw new Error("Email required", { statusCode: 400 });
+	if (!email) throw new CustomError("Email required!", 400);
 
 	const otp = generateOtp(); // e.g., 6-digit code
 	const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins expiry
@@ -47,13 +47,13 @@ async function sendLoginCode(email) {
 		await sendMail(email, subject, message);
 		return true;
 	} catch (error) {
-		throwError(error, "OTP send error:", 500);
+		throw new CustomError("OTP send error!", 500);
 	}
 }
 
 async function sendMailVerificationCode(email) {
 	if (!email) {
-		throw new Error("Email required!", { statusCode: 400 });
+		throw new Error("Email required!", 400);
 	}
 
 	const otp = generateOtp(); // e.g., 6-digit code
@@ -129,9 +129,8 @@ async function sendMailVerificationCode(email) {
 		await sendMail(email, subject, message);
 		return true;
 	} catch (error) {
-		throwError(
-			error,
-			"Failed to send email verification code. Please try again later.",
+		throw new CustomError(
+			"Failed to send email verification code! Please try again later.",
 			500
 		);
 	}
@@ -190,9 +189,8 @@ async function sendWelcomeMessage(email, firstName) {
 	try {
 		await sendMail(email, subject, message);
 	} catch (error) {
-		throwError(
-			error,
-			"Failed to send welcome message. Please contact support if you need assistance.",
+		throw new CustomError(
+			"Failed to send welcome message! Please contact support if you need assistance.",
 			500
 		);
 	}
@@ -281,9 +279,8 @@ async function sendDepositAlert(email, amount, paymentMethod, currency) {
 	try {
 		await sendMail(email, subject, message);
 	} catch (error) {
-		throwError(
-			error,
-			"Failed to send deposit alert. Your funds are safe - this is just a notification failure.",
+		throw new CustomError(
+			"Failed to send deposit alert. Your funds are safe - this is just a notification failure!",
 			500
 		);
 	}
@@ -295,7 +292,7 @@ async function sendWithdrawalAlert(email, amount, paymentMethod, currency) {
 	try {
 		await sendMail(email, subject, message);
 	} catch (error) {
-		throwError(error, "Failed to send withdrawal alert.", 500);
+		throw new CustomError("Failed to send withdrawal alert!", 500);
 	}
 }
 
@@ -378,11 +375,7 @@ async function sendTradeAlert(email, action, asset, quantity) {
 	try {
 		await sendMail(email, subject, message);
 	} catch (error) {
-		throwError(
-			error,
-			"Failed to send trade alert. Your trade was successful - this is just a notification failure.",
-			500
-		);
+		throw new CustomError("Failed to send trade alert!", 500);
 	}
 }
 

@@ -4,7 +4,7 @@ const {
 	fetchUserAssets,
 } = require("../services/assetService");
 
-const getAssets = async (req, res) => {
+const getAssets = async (req, res, next) => {
 	const page = Math.max(1, parseInt(req.query.page, 10) || 1);
 	const limit = Math.min(50, parseInt(req.query.limit, 10) || 15);
 	const sortBy = req.query.sortBy;
@@ -24,12 +24,11 @@ const getAssets = async (req, res) => {
 			},
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getAssetInfo = async (req, res) => {
+const getAssetInfo = async (req, res, next) => {
 	const { assetId } = req.params;
 	try {
 		const asset = await fetchAssetById(assetId);
@@ -39,12 +38,11 @@ const getAssetInfo = async (req, res) => {
 			message: "Asset fetched successfully",
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getUserAssets = async (req, res) => {
+const getUserAssets = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const asset = await fetchUserAssets(userId);
@@ -54,8 +52,7 @@ const getUserAssets = async (req, res) => {
 			message: "User assets fetched successfully",
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
