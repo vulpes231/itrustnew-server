@@ -6,7 +6,7 @@ const {
 	withdrawSavings,
 } = require("../../services/user/savingsService");
 
-const getSavingsAccounts = async (req, res) => {
+const getSavingsAccounts = async (req, res, next) => {
 	try {
 		const accounts = await fetchAvailableSavings();
 		res.status(200).json({
@@ -15,12 +15,11 @@ const getSavingsAccounts = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const createSavingsAccounts = async (req, res) => {
+const createSavingsAccounts = async (req, res, next) => {
 	const userId = req.user.userId;
 	const { accountId } = req.body;
 	try {
@@ -31,12 +30,11 @@ const createSavingsAccounts = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getSavingsHistory = async (req, res) => {
+const getSavingsHistory = async (req, res, next) => {
 	const userId = req.user.userId;
 	const limit = Math.min(50, parseInt(req.query.limit) || 15);
 	const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -59,12 +57,11 @@ const getSavingsHistory = async (req, res) => {
 			},
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const contributeSavings = async (req, res) => {
+const contributeSavings = async (req, res, next) => {
 	const userId = req.user.userId;
 	const fundData = req.body;
 	try {
@@ -75,12 +72,11 @@ const contributeSavings = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const cashoutSavings = async (req, res) => {
+const cashoutSavings = async (req, res, next) => {
 	const userId = req.user.userId;
 	const withdrawData = req.body;
 	try {
@@ -91,8 +87,7 @@ const cashoutSavings = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 

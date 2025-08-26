@@ -4,27 +4,21 @@ const {
 	fetchPlans,
 } = require("../../services/user/autoPlanService");
 
-const createPlan = async (req, res) => {
+const createPlan = async (req, res, next) => {
 	const planData = req.body;
 	try {
 		const planName = await addNewPlan(planData);
-		res
-			.status(201)
-			.json({
-				message: `${planName} added successfully`,
-				success: true,
-				data: null,
-			});
-	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({
-			success: false,
-			message: "Failed to create plan: " + error.message,
+		res.status(201).json({
+			message: `${planName} added successfully`,
+			success: true,
+			data: null,
 		});
+	} catch (error) {
+		next(error);
 	}
 };
 
-const getPlan = async (req, res) => {
+const getPlan = async (req, res, next) => {
 	const { planId } = req.params;
 	try {
 		const plan = await fetchPlanById(planId);
@@ -35,15 +29,11 @@ const getPlan = async (req, res) => {
 			formattedDuration: plan.formattedDuration,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({
-			success: false,
-			message: "Failed to fetch plan: " + error.message,
-		});
+		next(error);
 	}
 };
 
-const getAllPlans = async (req, res) => {
+const getAllPlans = async (req, res, next) => {
 	const page = Math.max(1, parseInt(req.query.page) || 1);
 	const limit = Math.min(50, parseInt(req.query.limit) || 15);
 	const sortBy = req.query.sortBy;
@@ -65,11 +55,7 @@ const getAllPlans = async (req, res) => {
 			},
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({
-			success: false,
-			message: "Failed to fetch plans: " + error.message,
-		});
+		next(error);
 	}
 };
 

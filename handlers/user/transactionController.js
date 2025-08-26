@@ -7,7 +7,7 @@ const {
 	getUserTrnxAnalytics,
 } = require("../../services/user/transactionService");
 
-const deposit = async (req, res) => {
+const deposit = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const trnxData = req.body;
@@ -16,12 +16,11 @@ const deposit = async (req, res) => {
 			.status(200)
 			.json({ message: "Deposit initiated.", success: true, data: null });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const withdraw = async (req, res) => {
+const withdraw = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const trnxData = req.body;
@@ -30,12 +29,11 @@ const withdraw = async (req, res) => {
 			.status(200)
 			.json({ message: "Withdrawal initiated.", success: true, data: null });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const transfer = async (req, res) => {
+const transfer = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const trnxData = req.body;
@@ -44,41 +42,37 @@ const transfer = async (req, res) => {
 			.status(200)
 			.json({ message: "Transfer completed.", success: true, data: null });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getTransactionHistory = async (req, res) => {
+const getTransactionHistory = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const transactions = await getUserLedger(userId);
 		res.status(200).json({ data: transactions, success: true });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const stopTransaction = async (req, res) => {
+const stopTransaction = async (req, res, next) => {
 	const { transactionId } = req.body;
 	try {
 		await cancelTransaction(transactionId);
 		res.status(200).json({ message: "Transaction cancelled.", success: true });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getTransactionAnalytics = async (req, res) => {
+const getTransactionAnalytics = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const trnxAnalytics = await getUserTrnxAnalytics(userId);
 		res.status(200).json({ data: trnxAnalytics, success: true });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 

@@ -13,3 +13,5 @@ router.route("/").get(getSavingsAccounts).post(createSavingsAccounts);
 router.route("/history").get(getSavingsHistory);
 router.route("/contribute").get(contributeSavings);
 router.route("/cashout").post(cashoutSavings);
+
+module.exports = router;

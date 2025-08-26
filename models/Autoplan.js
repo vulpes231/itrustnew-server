@@ -6,18 +6,15 @@ const autoPlanSchema = new Schema(
 		name: {
 			type: String,
 			required: true,
-			index: true,
 			trim: true,
 		},
 		planType: {
 			type: String,
 			required: true,
-			index: true,
 			enum: ["low", "moderate", "high"],
 		},
 		status: {
 			type: String,
-			index: true,
 			enum: ["active", "inactive"],
 			default: "active",
 		},
@@ -70,7 +67,6 @@ const autoPlanSchema = new Schema(
 		isFeatured: {
 			type: Boolean,
 			default: false,
-			index: true,
 		},
 	},
 	{

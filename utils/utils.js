@@ -31,4 +31,4 @@ class CustomError extends Error {
 	}
 }
 
-module.exports = { getClientIp, generateOtp, throwError, CustomError };
+module.exports = { getClientIp, generateOtp, CustomError };

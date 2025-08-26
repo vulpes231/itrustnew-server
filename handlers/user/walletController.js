@@ -3,7 +3,7 @@ const {
 	getUserFinancialSummary,
 } = require("../../services/user/walletService");
 
-const getUserWallets = async (req, res) => {
+const getUserWallets = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const userWallets = await fetchUserWallets(userId);
@@ -13,12 +13,11 @@ const getUserWallets = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getWalletAnalytics = async (req, res) => {
+const getWalletAnalytics = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const walletAnalytics = await getUserFinancialSummary(userId);
@@ -28,8 +27,7 @@ const getWalletAnalytics = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 

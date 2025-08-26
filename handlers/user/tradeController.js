@@ -4,28 +4,22 @@ const {
 	fetchUserTrades,
 } = require("../../services/user/tradeService");
 
-const openPosition = async (req, res) => {
+const openPosition = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const assetData = req.body;
 		const { assetName, assetQty } = await buyAsset(userId, assetData);
-		res
-			.status(201)
-			.json({
-				message: `${assetName} position opened`,
-				success: true,
-				data: null,
-			});
-	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({
-			message: error.message,
-			success: false,
+		res.status(201).json({
+			message: `${assetName} position opened`,
+			success: true,
+			data: null,
 		});
+	} catch (error) {
+		next(error);
 	}
 };
 
-const closePosition = async (req, res) => {
+const closePosition = async (req, res, next) => {
 	const userId = req.user.userId;
 	const { tradeId } = req.body;
 	try {
@@ -36,15 +30,11 @@ const closePosition = async (req, res) => {
 			data: null,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({
-			message: error.message,
-			success: false,
-		});
+		next(error);
 	}
 };
 
-const getUserTrades = async (req, res) => {
+const getUserTrades = async (req, res, next) => {
 	const userId = req.user.userId;
 	const limit = Math.min(50, parseInt(req.query.limit) || 15);
 	const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -66,11 +56,7 @@ const getUserTrades = async (req, res) => {
 			},
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({
-			message: error.message,
-			success: false,
-		});
+		next(error);
 	}
 };
 

@@ -4,25 +4,22 @@ const {
 	logoutService,
 } = require("../../services/user/authService");
 
-const registerUser = async (req, res) => {
+const registerUser = async (req, res, next) => {
 	if (!req.body) return res.status(400).json({ message: "Bad request!" });
 	try {
 		const userData = req.body;
 		const { username, email } = await registerService(userData);
-		res
-			.status(201)
-			.json({
-				message: `${username} created successfully.`,
-				success: true,
-				data: null,
-			});
+		res.status(201).json({
+			message: `${username} created successfully.`,
+			success: true,
+			data: null,
+		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const loginUser = async (req, res) => {
+const loginUser = async (req, res, next) => {
 	if (!req.body) return res.status(400).json({ message: "Bad request!" });
 	try {
 		const loginData = req.body;
@@ -52,12 +49,11 @@ const loginUser = async (req, res) => {
 			});
 		}
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const logoutUser = async (req, res) => {
+const logoutUser = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const loggedOut = await logoutService(userId);
@@ -72,8 +68,7 @@ const logoutUser = async (req, res) => {
 			.status(204)
 			.json({ message: "Logout successful.", success: true, data: null });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 

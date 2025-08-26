@@ -7,6 +7,7 @@ const { mongoose } = require("mongoose");
 require("dotenv").config();
 const { shutdownCronJobs, devRouter, initCronJobs } = require("./jobs/jobs");
 const { verifyJWT } = require("./middlewares/verifyJWT.js");
+const errorHandler = require("./middlewares/errorHandler.js");
 
 // Initialize cron jobs
 initCronJobs();
@@ -45,7 +46,6 @@ const watchlistRoute = require("./routes/user/watchlist.js");
 const investPlanRoute = require("./routes/user/autoplan.js");
 const tradeRoute = require("./routes/user/trade.js");
 const savingsRoute = require("./routes/user/savings.js");
-const errorHandler = require("./middlewares/errorHandler.js");
 
 // routes
 app.use("/", rootRoute);

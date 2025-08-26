@@ -67,7 +67,7 @@ const savingsAccountSchema = new Schema(
 );
 
 // Indexes
-savingsAccountSchema.index({ name: 1 });
+// savingsAccountSchema.index({ name: 1 });
 savingsAccountSchema.index({ status: 1 });
 savingsAccountSchema.index({ interestRate: -1 });
 

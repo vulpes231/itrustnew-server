@@ -4,7 +4,7 @@ const {
 	removeAssetFromWatchlist,
 } = require("../../services/user/watchlistService");
 
-const addToWatchlist = async (req, res) => {
+const addToWatchlist = async (req, res, next) => {
 	const userId = req.user.userId;
 	const { assetId } = req.body;
 	try {
@@ -13,12 +13,11 @@ const addToWatchlist = async (req, res) => {
 			.status(200)
 			.json({ message: "Asset added to watchlist", data: null, success: true });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const removeFromWatchlist = async (req, res) => {
+const removeFromWatchlist = async (req, res, next) => {
 	const userId = req.user.userId;
 	const { assetId } = req.body;
 	try {
@@ -29,12 +28,11 @@ const removeFromWatchlist = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const getWatchlist = async (req, res) => {
+const getWatchlist = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const watchlist = await fetchUserWatchlist(userId);
@@ -44,8 +42,7 @@ const getWatchlist = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 

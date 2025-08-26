@@ -95,6 +95,8 @@ function initCronJobs() {
 	);
 }
 
+function shutdownCronJobs() {}
+
 // Add a function to manually trigger trade performance updates
 function manuallyTriggerTradePerformance() {
 	console.log("Manually triggering trade performance update");

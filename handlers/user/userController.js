@@ -6,7 +6,7 @@ const {
 	updateTwoFactorAuth,
 } = require("../../services/user/userService");
 
-const getUserInfo = async (req, res) => {
+const getUserInfo = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const user = await getUserById(userId);
@@ -16,12 +16,11 @@ const getUserInfo = async (req, res) => {
 			data: user,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const editUserInfo = async (req, res) => {
+const editUserInfo = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const userData = req.body;
@@ -32,12 +31,11 @@ const editUserInfo = async (req, res) => {
 			data: null,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const changePassword = async (req, res) => {
+const changePassword = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const userData = req.body;
@@ -48,12 +46,11 @@ const changePassword = async (req, res) => {
 			data: null,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const setBeneficiary = async (req, res) => {
+const setBeneficiary = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		const userData = req.body;
@@ -64,12 +61,11 @@ const setBeneficiary = async (req, res) => {
 			data: null,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const setTwoFactor = async (req, res) => {
+const setTwoFactor = async (req, res, next) => {
 	const userId = req.user.userId;
 	try {
 		await updateTwoFactorAuth(userId);
@@ -79,8 +75,7 @@ const setTwoFactor = async (req, res) => {
 			data: null,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 

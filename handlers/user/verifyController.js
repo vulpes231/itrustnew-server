@@ -1,6 +1,6 @@
 const { authUser, verifyMail } = require("../../services/user/verifyService");
 
-const verifyLoginCode = async (req, res) => {
+const verifyLoginCode = async (req, res, next) => {
 	const authData = req.body;
 	try {
 		const { refreshToken, accessToken, userInfo } = await authUser(authData);
@@ -16,12 +16,11 @@ const verifyLoginCode = async (req, res) => {
 			success: true,
 		});
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const verifyEmailCode = async (req, res) => {
+const verifyEmailCode = async (req, res, next) => {
 	const { code } = req.body;
 	const userId = req.user.userId;
 	try {
@@ -31,11 +30,10 @@ const verifyEmailCode = async (req, res) => {
 			.status(200)
 			.json({ message: "Email verified.", success: true, data: null });
 	} catch (error) {
-		const statusCode = error.statusCode || 500;
-		res.status(statusCode).json({ message: error.message, success: false });
+		next(error);
 	}
 };
 
-const approveAccount = async (req, res) => {};
+const approveAccount = async (req, res, next) => {};
 
 module.exports = { verifyLoginCode, verifyEmailCode };
