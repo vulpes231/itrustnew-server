@@ -47,6 +47,9 @@ const investPlanRoute = require("./routes/user/autoplan.js");
 const tradeRoute = require("./routes/user/trade.js");
 const savingsRoute = require("./routes/user/savings.js");
 
+// admin routers
+const authAdmin = require("./routes/admin/adminuth.js");
+
 // routes
 app.use("/", rootRoute);
 app.use("/location", locationRoute);
@@ -58,6 +61,10 @@ app.use("/mail", mailRoute);
 app.use("/asset", assetRoute);
 app.use("/plan", investPlanRoute);
 
+// admin unproteted routes
+app.use("/authadmin", authAdmin);
+
+// user protected routes
 app.use(verifyJWT);
 app.use("/user", userProfileRoute);
 app.use("/wallet", walletRoute);
@@ -65,6 +72,8 @@ app.use("/transaction", transactionRoute);
 app.use("/watchlist", watchlistRoute);
 app.use("/trade", tradeRoute);
 app.use("/savings", savingsRoute);
+
+// admin protected routes
 
 let server;
 mongoose.connection.once("connected", () => {

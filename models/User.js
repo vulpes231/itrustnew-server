@@ -153,6 +153,11 @@ const userSchema = new Schema(
 				},
 			},
 		],
+		role: {
+			type: String,
+			enum: ["0000"],
+			default: "0000",
+		},
 	},
 	{ timestamps: true }
 );

@@ -23,7 +23,10 @@ const verifyJWT = (req, res, next) => {
 		req.user = {
 			username: decoded.username,
 			userId: decoded.userId,
+			role: decoded.role,
+			adminId: decoded.adminId,
 		};
+
 		next();
 	});
 };
