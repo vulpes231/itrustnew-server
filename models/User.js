@@ -111,6 +111,7 @@ const userSchema = new Schema(
 		accountStatus: {
 			status: {
 				type: String,
+				default: "active",
 			},
 			banned: {
 				type: Boolean,

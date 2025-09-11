@@ -3,11 +3,11 @@ const {
 	adminSignin,
 	enrollAdmin,
 } = require("../../handlers/admin/adminAuthHandler");
-const { verifyRole } = require("../../middlewares/verifyRole");
+const { verifySuperUser } = require("../../middlewares/verifyRole");
 
 const router = Router();
 
 router.route("/login").post(adminSignin);
-router.route("/register").post(enrollAdmin, verifyRole);
+router.route("/register").post(enrollAdmin, verifySuperUser);
 
 module.exports = router;

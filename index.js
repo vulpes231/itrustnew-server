@@ -8,6 +8,7 @@ require("dotenv").config();
 const { shutdownCronJobs, devRouter, initCronJobs } = require("./jobs/jobs");
 const { verifyJWT } = require("./middlewares/verifyJWT.js");
 const errorHandler = require("./middlewares/errorHandler.js");
+const { verifyAdmin } = require("./middlewares/verifyRole.js");
 
 // Initialize cron jobs
 initCronJobs();
@@ -49,6 +50,7 @@ const savingsRoute = require("./routes/user/savings.js");
 
 // admin routers
 const authAdmin = require("./routes/admin/adminuth.js");
+const manageUserRoute = require("./routes/admin/manageuser.js");
 
 // routes
 app.use("/", rootRoute);
@@ -74,6 +76,8 @@ app.use("/trade", tradeRoute);
 app.use("/savings", savingsRoute);
 
 // admin protected routes
+app.use(verifyAdmin);
+app.use("/manageuser", manageUserRoute);
 
 let server;
 mongoose.connection.once("connected", () => {
