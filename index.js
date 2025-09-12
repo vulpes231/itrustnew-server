@@ -49,22 +49,24 @@ const tradeRoute = require("./routes/user/trade.js");
 const savingsRoute = require("./routes/user/savings.js");
 
 // admin routers
-const authAdmin = require("./routes/admin/adminuth.js");
+const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
+const loginAdminRoute = require("./routes/admin/loginadmin.js");
 const manageUserRoute = require("./routes/admin/manageuser.js");
 
 // routes
 app.use("/", rootRoute);
 app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
-app.use("/register", userRegisterRoute);
-app.use("/login", userLoginRoute);
+app.use("/signup", userRegisterRoute);
+app.use("/signin", userLoginRoute);
 app.use("/code", otpVerificationRoute);
 app.use("/mail", mailRoute);
 app.use("/asset", assetRoute);
 app.use("/plan", investPlanRoute);
 
 // admin unproteted routes
-app.use("/authadmin", authAdmin);
+app.use("/login", loginAdminRoute);
+app.use("/register", enrollAdminRoute);
 
 // user protected routes
 app.use(verifyJWT);

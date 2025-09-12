@@ -76,7 +76,7 @@ async function loginAdmin(adminData) {
 
 		return { accessToken, refreshToken };
 	} catch (error) {
-		throw new CustomError("Failed to login admin", 500);
+		throw new CustomError(error.message, 500);
 	}
 }
 
