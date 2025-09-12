@@ -6,10 +6,11 @@ async function verifySuperUser(req, res, next) {
 	const authHeader = req.headers.authorization || req.headers.Authorization;
 
 	if (!authHeader?.startsWith("Bearer ")) {
-		return res.status(401).json({ message: "Unauthorized" });
+		return res.status(401).json({ message: "Unauthorized!" });
 	}
 	const token = authHeader.split(" ")[1];
 
+	if (!token) return res.status(401).json({ message: "You're not logged in!" });
 	const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
 	if (decoded.role !== process.env.SUPER_USER_CODE) {

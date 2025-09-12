@@ -1,11 +1,7 @@
 const { mongoose } = require("mongoose");
 require("dotenv").config();
 
-const allowedOrigins = [
-	"http://localhost:3000",
-	"https://yourproductiondomain.com",
-	"https://yourotherdomain.com",
-];
+const allowedOrigins = ["http://localhost:5173"];
 const DATABASE_URI = process.env.DATABASE_URI;
 
 async function connectDB() {
@@ -29,5 +25,10 @@ const corsOptions = {
 	credentials: true,
 	optionsSuccessStatus: 200,
 };
+
+// const corsOptions = {
+// 	origin: true, // Reflects request origin automatically
+// 	credentials: true, // Allow cookies/headers
+// };
 
 module.exports = { connectDB, corsOptions };

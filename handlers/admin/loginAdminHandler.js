@@ -2,7 +2,6 @@ const { loginAdmin } = require("../../services/admin/adminService");
 
 const adminSignin = async (req, res, next) => {
 	try {
-		console.log(req.body);
 		const adminData = req.body;
 		const { accessToken, refreshToken } = await loginAdmin(adminData);
 

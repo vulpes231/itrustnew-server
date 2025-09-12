@@ -16,6 +16,8 @@ initCronJobs();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(cors(corsOptions));
+
 connectDB();
 
 if (process.env.NODE_ENV === "development") {
@@ -23,7 +25,7 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Middleware
-app.use(cors(corsOptions));
+
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
