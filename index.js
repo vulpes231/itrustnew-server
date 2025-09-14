@@ -54,6 +54,7 @@ const savingsRoute = require("./routes/user/savings.js");
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
 const loginAdminRoute = require("./routes/admin/loginadmin.js");
 const manageUserRoute = require("./routes/admin/manageuser.js");
+const manageAdminRoute = require("./routes/admin/manageadmin.js");
 const manageTransactionRoute = require("./routes/admin/managetransaction.js");
 
 // routes
@@ -82,6 +83,7 @@ app.use("/savings", savingsRoute);
 
 // admin protected routes
 app.use(verifyAdmin);
+app.use("/manageadmin", manageAdminRoute);
 app.use("/manageuser", manageUserRoute);
 app.use("/managetrans", manageTransactionRoute);
 

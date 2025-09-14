@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const getClientIp = (req) => {
 	// Destructure from headers first (for proxy servers)
 	const ip =
@@ -31,4 +33,9 @@ class CustomError extends Error {
 	}
 }
 
-module.exports = { getClientIp, generateOtp, CustomError };
+const ROLES = {
+	ADMIN: process.env.ADMIN_CODE,
+	SUPER_USER: process.env.SUPER_USER_CODE,
+};
+
+module.exports = { getClientIp, generateOtp, CustomError, ROLES };

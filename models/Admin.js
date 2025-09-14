@@ -16,12 +16,14 @@ const adminSchema = new Schema({
 		type: String,
 	},
 	role: {
-		enum: ["0010", "0001"],
-		default: "0010",
 		required: true,
-		type: String,
+		type: Array,
+		default: ["0010"],
 	},
 });
 
 const Admin = mongoose.model("Admin", adminSchema);
 module.exports = Admin;
+
+// enum: ["0010", "0001"],
+// default: "0010",

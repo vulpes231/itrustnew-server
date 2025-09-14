@@ -2,6 +2,7 @@ const {
 	fetchAllTransactions,
 	getTransactionInfo,
 	editTransaction,
+	createTransaction,
 } = require("../../services/admin/manageTransactionService");
 
 const getTransactionData = async (req, res, next) => {
@@ -46,4 +47,23 @@ const updateTransaction = async (req, res, next) => {
 	}
 };
 
-module.exports = { updateTransaction, getAllTransactions, getTransactionData };
+const adminCreateTransaction = async (req, res, next) => {
+	try {
+		const trnxData = req.body;
+		await createTransaction(trnxData);
+		res.status(200).json({
+			message: `${req.body.type} initiated`,
+			success: true,
+			data: null,
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
+module.exports = {
+	updateTransaction,
+	getAllTransactions,
+	getTransactionData,
+	adminCreateTransaction,
+};

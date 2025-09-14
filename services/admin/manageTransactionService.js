@@ -75,4 +75,45 @@ async function getTransactionInfo(transactionId) {
 	}
 }
 
-module.exports = { getTransactionInfo, editTransaction, fetchAllTransactions };
+async function createTransaction(transactionData) {
+	const { method, amount, accountId, memo, network, userId, type } =
+		transactionData;
+	if (!amount || !method || !accountId || !userId)
+		throw new CustomError("Bad request!", 400);
+	try {
+		const wallets = await Wallet.find({ userId });
+		if (wallets.length < 1) {
+			throw new CustomError("Contact support for more info!", {
+				statusCode: 404,
+			});
+		}
+
+		const receiver = wallets.find((wallet) => wallet._id === accountId);
+		if (!receiver) {
+			throw new CustomError("Invalid wallet!", 400);
+		}
+		const customMemo = `${method} ${type} to ${receiver.name}`;
+
+		const trnx = await Transaction.create({
+			method: {
+				mode: method,
+				network: network,
+			},
+			amount: amount,
+			account: receiver.name,
+			memo: memo || customMemo,
+			type: type,
+			userId: userId,
+		});
+		return trnx;
+	} catch (error) {
+		throw new CustomError("Failed to add money!", 500);
+	}
+}
+
+module.exports = {
+	getTransactionInfo,
+	editTransaction,
+	fetchAllTransactions,
+	createTransaction,
+};

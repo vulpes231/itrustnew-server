@@ -1,12 +1,12 @@
 const Admin = require("../../models/Admin");
-const { CustomError } = require("../../utils/utils");
+const { CustomError, ROLES } = require("../../utils/utils");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 async function registerAdmin(adminData) {
 	const { email, username, password, adminRole } = adminData;
-	console.log("adminData", adminData);
+
 	if (!email || !adminRole || !username || !password)
 		throw new CustomError("Bad request!", 400);
 
@@ -19,19 +19,19 @@ async function registerAdmin(adminData) {
 
 		const hashedPassword = await bcrypt.hash(password, 10);
 
-		const customRole =
-			adminRole === "admin"
-				? process.env.ADMIN_CODE
-				: process.env.SUPER_USER_CODE;
-
 		const newAdminData = {
 			username,
 			password: hashedPassword,
 			email,
-			role: customRole,
 		};
 
 		const admin = await Admin.create(newAdminData);
+
+		if (!admin.role.includes(ROLES.ADMIN)) {
+			admin.role.push(ROLES.ADMIN);
+			await admin.save();
+		}
+
 		return admin.username;
 	} catch (error) {
 		throw new CustomError(error.message, error.statusCode);
@@ -40,7 +40,7 @@ async function registerAdmin(adminData) {
 
 async function registerSuperUser(adminData) {
 	const { email, username, password, adminRole } = adminData;
-	console.log("adminData", adminData);
+
 	if (!email || !adminRole || !username || !password)
 		throw new CustomError("Bad request!", 400);
 
@@ -53,21 +53,19 @@ async function registerSuperUser(adminData) {
 
 		const hashedPassword = await bcrypt.hash(password, 10);
 
-		const customRole =
-			adminRole === "admin"
-				? process.env.ADMIN_CODE
-				: adminRole === "su"
-				? process.env.SUPER_USER_CODE
-				: null;
-
 		const newAdminData = {
 			username,
 			password: hashedPassword,
 			email,
-			role: customRole,
 		};
 
 		const admin = await Admin.create(newAdminData);
+
+		if (!admin.role.includes(ROLES.SUPER_USER)) {
+			admin.role.push(ROLES.SUPER_USER);
+			await admin.save();
+		}
+
 		return admin.username;
 	} catch (error) {
 		throw new CustomError(error.message, error.statusCode);
@@ -83,17 +81,15 @@ async function loginAdmin(adminData) {
 		const admin = await Admin.findOne({ email });
 		if (!admin) throw new CustomError("Admin does not exist!", 400);
 
-		console.log("db", typeof admin.role);
-		console.log("env", typeof process.env.SUPER_USER_CODE);
-
 		const passMatch = await bcrypt.compare(password, admin.password);
 		if (!passMatch) throw new CustomError("Invalid username or password!", 400);
 
 		if (
-			admin.role !== process.env.ADMIN_CODE &&
-			admin.role !== process.env.SUPER_USER_CODE
-		)
-			throw new CustomError("You are not authorized on this server!", 400);
+			!admin.role.includes(ROLES.ADMIN) &&
+			!admin.role.includes(ROLES.SUPER_USER)
+		) {
+			throw new CustomError("Unauthorized", 401);
+		}
 
 		const accessToken = jwt.sign(
 			{
@@ -124,4 +120,56 @@ async function loginAdmin(adminData) {
 	}
 }
 
-module.exports = { loginAdmin, registerAdmin, registerSuperUser };
+async function assignRole(adminId, role) {
+	if (!adminId || !role) throw new CustomError("Bad request!", 400);
+	try {
+		const admin = await Admin.findById(adminId);
+		if (!admin) throw new CustomError("Admin not found!", 404);
+
+		const roleToAssign = role === "admin" ? ROLES.ADMIN : ROLES.SUPER_USER;
+
+		if (!admin.role.includes(roleToAssign)) {
+			admin.role.push(roleToAssign);
+
+			await admin.save();
+		}
+		return admin.role;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
+async function removeRole(adminId, role) {
+	if (!adminId || !role) throw new CustomError("Bad request!", 400);
+	try {
+		const admin = await Admin.findById(adminId);
+		if (!admin) throw new CustomError("Admin not found!", 404);
+
+		const roleToRemove = role === "admin" ? ROLES.ADMIN : ROLES.SUPER_USER;
+		if (admin.role.includes(roleToRemove)) {
+			admin.role = admin.role.filter((r) => r !== roleToRemove);
+			await admin.save();
+		}
+		return admin.role;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
+async function fetchAdmins() {
+	try {
+		const admins = await Admin.find().lean();
+		return admins;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
+module.exports = {
+	loginAdmin,
+	registerAdmin,
+	registerSuperUser,
+	assignRole,
+	removeRole,
+	fetchAdmins,
+};

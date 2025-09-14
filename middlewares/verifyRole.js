@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { CustomError } = require("../utils/utils");
+const { CustomError, ROLES } = require("../utils/utils");
 require("dotenv").config();
 
 async function verifySuperUser(req, res, next) {
@@ -13,7 +13,7 @@ async function verifySuperUser(req, res, next) {
 	if (!token) return res.status(401).json({ message: "You're not logged in!" });
 	const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
-	if (decoded.role !== process.env.SUPER_USER_CODE) {
+	if (!decoded.role.includes(ROLES.SUPER_USER)) {
 		throw new CustomError("Forbidden!", 403);
 	}
 
@@ -32,8 +32,8 @@ async function verifyAdmin(req, res, next) {
 		const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
 		if (
-			decoded.role !== process.env.ADMIN_CODE &&
-			decoded.role !== process.env.SUPER_USER_CODE
+			!decoded.role.includes(ROLES.ADMIN) &&
+			!decoded.role.includes(ROLES.SUPER_USER)
 		) {
 			throw new CustomError("Forbidden!", 403);
 		}
