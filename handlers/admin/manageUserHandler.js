@@ -2,6 +2,7 @@ const {
 	fetchAllUsers,
 	completeVerification,
 	suspendUser,
+	deleteUser,
 } = require("../../services/admin/manageUserService");
 
 const getAllUsers = async (req, res, next) => {
@@ -56,4 +57,23 @@ const suspendAccount = async (req, res, next) => {
 	}
 };
 
-module.exports = { getAllUsers, reviewVerification, suspendAccount };
+const removeUser = async (req, res, next) => {
+	const { userId } = req.params;
+	try {
+		await deleteUser(userId);
+		res.status(200).json({
+			data: null,
+			success: true,
+			message: "Account deleted.",
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
+module.exports = {
+	getAllUsers,
+	reviewVerification,
+	suspendAccount,
+	removeUser,
+};

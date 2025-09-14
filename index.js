@@ -54,6 +54,7 @@ const savingsRoute = require("./routes/user/savings.js");
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
 const loginAdminRoute = require("./routes/admin/loginadmin.js");
 const manageUserRoute = require("./routes/admin/manageuser.js");
+const manageTransactionRoute = require("./routes/admin/managetransaction.js");
 
 // routes
 app.use("/", rootRoute);
@@ -82,6 +83,7 @@ app.use("/savings", savingsRoute);
 // admin protected routes
 app.use(verifyAdmin);
 app.use("/manageuser", manageUserRoute);
+app.use("/managetrans", manageTransactionRoute);
 
 let server;
 mongoose.connection.once("connected", () => {

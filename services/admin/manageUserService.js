@@ -1,4 +1,9 @@
+const Chart = require("../../models/Chart");
+const Trade = require("../../models/Trade");
 const User = require("../../models/User");
+const Usersetting = require("../../models/Usersetting");
+const Wallet = require("../../models/Wallet");
+const Watchlist = require("../../models/Watchlist");
 const { CustomError } = require("../../utils/utils");
 const { getUserById } = require("../user/userService");
 
@@ -57,4 +62,36 @@ async function suspendUser(userId) {
 	}
 }
 
-module.exports = { fetchAllUsers, completeVerification, suspendUser };
+async function deleteUser(userId) {
+	try {
+		// Verify user exists
+		const user = await getUserById(userId);
+		if (!user) {
+			throw new CustomError("User not found", 404);
+		}
+
+		// Delete related records
+		await Promise.all([
+			Transaction.deleteMany({ userId }),
+			Trade.deleteMany({ userId }),
+			Wallet.deleteMany({ userId }),
+			Chart.deleteMany({ userId }),
+			Watchlist.deleteMany({ userId }),
+			Usersetting.deleteMany({ userId }),
+		]);
+
+		// Delete the user itself
+		await User.findByIdAndDelete(userId);
+
+		return { success: true, message: "User and related data deleted" };
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
+module.exports = {
+	fetchAllUsers,
+	completeVerification,
+	suspendUser,
+	deleteUser,
+};

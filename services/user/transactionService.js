@@ -173,6 +173,18 @@ async function getUserTrnxAnalytics(userId) {
 	}
 }
 
+async function fetchTransactionInfo(transactionId) {
+	if (!transactionId) throw new CustomError("Transaction ID required!", 400);
+	try {
+		const transaction = await Transaction.findById(transactionId);
+		if (!transaction) throw new CustomError("Transaction not found!", 404);
+
+		return transaction;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
 module.exports = {
 	cancelTransaction,
 	getUserLedger,
@@ -180,4 +192,5 @@ module.exports = {
 	withdrawFunds,
 	moveFunds,
 	getUserTrnxAnalytics,
+	fetchTransactionInfo,
 };
