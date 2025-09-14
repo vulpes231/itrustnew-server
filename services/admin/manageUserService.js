@@ -21,7 +21,7 @@ async function fetchAllUsers(queryData) {
 
 		return { users, totalUser, totalPages };
 	} catch (error) {
-		throw new CustomError(error.message, 500);
+		throw new CustomError(error.message, error.statusCode);
 	}
 }
 

@@ -1,27 +1,29 @@
 const cron = require("node-cron");
 const {
-	updatePortfolioChart,
 	updateTradePerformance,
 	updateWalletPerformance,
+	updatePortfolioChart,
 } = require("./customJobs");
 require("dotenv").config();
 
-// Track active jobs for graceful shutdown
 const activeJobs = new Set();
-// Track when jobs were last run to prevent overlap
 const lastRunTimestamps = new Map();
 
+// Centralized flag
+const enableCrons =
+	process.env.NODE_ENV === "production" || process.env.ENABLE_CRONS === "1";
+
 function initCronJobs() {
-	if (process.env.NODE_ENV === "development" && !process.env.ENABLE_CRONS) {
+	if (!enableCrons) {
 		console.log(
-			"⏸️  Cron jobs disabled in development (set ENABLE_CRONS=1 to enable)"
+			"⏸️  Cron jobs disabled (NODE_ENV=development and ENABLE_CRONS!=1)"
 		);
 		return;
 	}
 
 	const schedules = {
-		walletPerformance: process.env.CRON_WALLET_PERFORMANCE || "0 1 * * *", //1am daily
-		tradePerformance: process.env.CRON_TRADE_PERFORMANCE || "0 * * * *", // Hourly
+		walletPerformance: process.env.CRON_WALLET_PERFORMANCE || "0 1 * * *",
+		tradePerformance: process.env.CRON_TRADE_PERFORMANCE || "0 * * * *",
 		portfolioHourly: process.env.CRON_HOURLY || "0 * * * *",
 		portfolioDaily: process.env.CRON_DAILY || "0 0 * * *",
 		portfolioWeekly: process.env.CRON_WEEKLY || "0 0 * * 0",
@@ -29,27 +31,23 @@ function initCronJobs() {
 		portfolioYearly: process.env.CRON_YEARLY || "0 0 1 1 *",
 	};
 
+	// Wallet performance job
 	const walletJob = cron.schedule(
 		schedules.walletPerformance,
 		async () => {
 			await updateWalletPerformance();
 		},
-		{
-			scheduled:
-				process.env.NODE_ENV === "production" || !!process.env.ENABLE_CRONS,
-		}
+		{ scheduled: enableCrons }
 	);
 	activeJobs.add(walletJob);
 
-	// Trade performance job (hourly)
+	// Trade performance job
 	const tradeJob = cron.schedule(
 		schedules.tradePerformance,
 		async () => {
-			// Prevent overlapping executions
 			const now = Date.now();
 			const lastRun = lastRunTimestamps.get("tradePerformance") || 0;
 
-			// If last run was less than 55 minutes ago, skip this execution
 			if (now - lastRun < 55 * 60 * 1000) {
 				console.log(
 					"Skipping trade performance update - previous execution still recent"
@@ -64,38 +62,49 @@ function initCronJobs() {
 				console.error("Trade performance update failed:", error);
 			}
 		},
-		{
-			scheduled:
-				process.env.NODE_ENV === "production" || !!process.env.ENABLE_CRONS,
-		}
+		{ scheduled: enableCrons }
 	);
 	activeJobs.add(tradeJob);
 
 	// Portfolio chart jobs
 	Object.entries(schedules).forEach(([timeframe, schedule]) => {
-		if (timeframe === "tradePerformance") return;
-		if (timeframe === "walletPerformance") return;
+		if (timeframe === "tradePerformance" || timeframe === "walletPerformance")
+			return;
 
 		const job = cron.schedule(
 			schedule,
 			() => {
-				// Only update portfolio charts, not trade performance
 				updatePortfolioChart(timeframe.replace("portfolio", "").toLowerCase());
 			},
-			{
-				scheduled:
-					process.env.NODE_ENV === "production" || !!process.env.ENABLE_CRONS,
-			}
+			{ scheduled: enableCrons }
 		);
 		activeJobs.add(job);
 	});
 
 	console.log(
-		`🟢 Initialized ${activeJobs.size} cron jobs in ${process.env.NODE_ENV} mode`
+		`🟢 Initialized ${activeJobs.size} cron jobs in ${
+			process.env.NODE_ENV
+		} mode (ENABLE_CRONS=${process.env.ENABLE_CRONS || "unset"})`
 	);
 }
 
-function shutdownCronJobs() {}
+function shutdownCronJobs() {
+	if (activeJobs.size === 0) {
+		console.log("⚪ No cron jobs to shutdown");
+		return;
+	}
+
+	console.log(`🛑 Shutting down ${activeJobs.size} cron jobs...`);
+	for (const job of activeJobs) {
+		try {
+			job.stop(); // stop the cron schedule
+		} catch (err) {
+			console.error("Error stopping job:", err);
+		}
+	}
+	activeJobs.clear();
+	console.log("✅ All cron jobs stopped");
+}
 
 // Add a function to manually trigger trade performance updates
 function manuallyTriggerTradePerformance() {
@@ -109,7 +118,7 @@ if (process.env.NODE_ENV === "development") {
 	const devRouter = express.Router();
 
 	devRouter.get("/trigger/:timeframe", async (req, res) => {
-		await updatePortfolioChart(req.params.timeframe);
+		await updatePorfolioChart(req.params.timeframe);
 		res.json({ status: "completed" });
 	});
 

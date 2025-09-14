@@ -27,6 +27,8 @@ const verifyJWT = (req, res, next) => {
 			adminId: decoded.adminId,
 		};
 
+		// console.log("JWT", decoded);
+
 		next();
 	});
 };

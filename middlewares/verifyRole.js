@@ -28,13 +28,20 @@ async function verifyAdmin(req, res, next) {
 	}
 	const token = authHeader.split(" ")[1];
 
-	const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+	try {
+		const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
-	if (decoded.role !== process.env.ADMIN_CODE) {
-		throw new CustomError("Forbidden!", 403);
+		if (
+			decoded.role !== process.env.ADMIN_CODE &&
+			decoded.role !== process.env.SUPER_USER_CODE
+		) {
+			throw new CustomError("Forbidden!", 403);
+		}
+
+		next();
+	} catch (err) {
+		return res.status(403).json({ message: "Forbidden", error: err.message });
 	}
-
-	next();
 }
 
 module.exports = { verifySuperUser, verifyAdmin };

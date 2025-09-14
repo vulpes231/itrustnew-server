@@ -195,7 +195,7 @@ async function updateSingleTrade(trade, assetPriceMap) {
 	}
 }
 
-async function updatePorfolioChart(timeframe) {
+async function updatePortfolioChart(timeframe) {
 	const startTime = Date.now();
 	let usersProcessed = 0;
 
@@ -481,6 +481,6 @@ async function resetWalletDailyProfits(wallets) {
 
 module.exports = {
 	updateTradePerformance,
-	updatePorfolioChart,
+	updatePortfolioChart,
 	updateWalletPerformance,
 };
