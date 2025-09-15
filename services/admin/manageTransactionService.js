@@ -1,13 +1,35 @@
 const Transaction = require("../../models/Transaction");
+const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { fetchTransactionInfo } = require("../user/transactionService");
 
-async function fetchAllTransactions() {
+async function fetchAllTransactions(queryData) {
+	const {
+		sortBy = "createdAt",
+		sortOrder = "desc",
+		page = 1,
+		limit = 15,
+		filterBy,
+	} = queryData;
 	try {
-		const transactions = await Transaction.find();
-		if (!transactions) throw new CustomError("Transaction not found!", 404);
+		const filter = {};
+		// Expecting filterBy to be like { field: value }
+		if (filterBy && typeof filterBy === "object") {
+			Object.assign(filter, filterBy);
+		}
 
-		return transactions;
+		const sort = {};
+		if (sortBy) sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+
+		const transactions = await Transaction.find(filter)
+			.sort(sort)
+			.skip((page - 1) * limit) // ✅ correct skip
+			.limit(limit);
+
+		const totalTrnxs = await Transaction.countDocuments(filter);
+		const totalPages = Math.ceil(totalTrnxs / limit);
+
+		return { transactions, totalTrnxs, totalPages, page };
 	} catch (error) {
 		throw new CustomError(error.message, 500);
 	}
@@ -81,6 +103,9 @@ async function createTransaction(transactionData) {
 	if (!amount || !method || !accountId || !userId)
 		throw new CustomError("Bad request!", 400);
 	try {
+		const user = await User.findById(userId);
+		if (!user) throw new CustomError("Invalid credentials!", 404);
+
 		const wallets = await Wallet.find({ userId });
 		if (wallets.length < 1) {
 			throw new CustomError("Contact support for more info!", {
@@ -104,6 +129,7 @@ async function createTransaction(transactionData) {
 			memo: memo || customMemo,
 			type: type,
 			userId: userId,
+			email: user.credentials.email,
 		});
 		return trnx;
 	} catch (error) {

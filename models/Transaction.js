@@ -33,6 +33,10 @@ const transactionSchema = new Schema(
 			default: "pending",
 			enum: ["pending", "cancelled", "completed", "failed"],
 		},
+		email: {
+			type: String,
+			required: true,
+		},
 	},
 	{
 		timestamps: true,

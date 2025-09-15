@@ -8,18 +8,21 @@ async function addFunds(userId, trnxData) {
 	if (!amount || !method || !account)
 		throw new CustomError("Bad request!", 400);
 	try {
+		const user = await User.findById(userId);
+		if (!user) {
+			throw new CustomError("Contact support for more info!", 404);
+		}
+
 		const wallets = await Wallet.find({ userId });
 		if (wallets.length < 1) {
-			throw new CustomError("Contact support for more info!", {
-				statusCode: 404,
-			});
+			throw new CustomError("Contact support for more info!", 404);
 		}
 
 		const receiver = wallets.find((wallet) => wallet.name === account);
 		if (!receiver) {
 			throw new CustomError("Invalid receiving account!", 400);
 		}
-		const customMemo = `${method} deposit to ${account}`;
+		const customMemo = `${method} deposit to ${receiver.name}`;
 
 		const trnx = await Transaction.create({
 			method: {
@@ -31,6 +34,7 @@ async function addFunds(userId, trnxData) {
 			memo: memo || customMemo,
 			type: "deposit",
 			userId: userId,
+			email: user.credentials.email,
 		});
 		return trnx;
 	} catch (error) {
@@ -75,6 +79,7 @@ async function withdrawFunds(userId, trnxData) {
 			memo: memo || customMemo,
 			type: "withdraw",
 			userId: userId,
+			email: user.credentials.email,
 		});
 		return trnx;
 	} catch (error) {
@@ -87,20 +92,16 @@ async function moveFunds(userId, trnxData) {
 	if (!amount || !method || !account)
 		throw new CustomError("Bad request!", 400);
 	try {
-		const wallets = await Wallet.find({ userId });
-		if (wallets.length < 1) {
-			throw new CustomError("Contact support for more info!", {
-				statusCode: 404,
-			});
-		}
+		const user = await User.findById(userId);
+		if (!user) throw new CustomError("Invalid credentials!", 404);
 
-		const transferFrom = wallets.find((wallet) => wallet.name === method);
+		const transferFrom = await Wallet.findOne({ userId: userId, name: method });
 		if (!transferFrom) throw new CustomError("Invalid from account!", 400);
 
 		if (transferFrom.availableBalance < parseFloat(amount))
 			throw new CustomError("Insufficient funds!", 400);
 
-		const transferTo = wallets.find((wallet) => wallet.name === account);
+		const transferTo = await Wallet.findOne({ userId: userId, name: account });
 		if (!transferTo) throw new CustomError("Invalid receiving account!", 400);
 
 		const parsedAmount = parseFloat(amount);
@@ -123,6 +124,7 @@ async function moveFunds(userId, trnxData) {
 			memo: memo || customMemo,
 			type: "transfer",
 			userId: userId,
+			email: user.credentials.email,
 		});
 		return trnx;
 	} catch (error) {

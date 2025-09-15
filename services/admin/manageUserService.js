@@ -8,20 +8,29 @@ const { CustomError } = require("../../utils/utils");
 const { getUserById } = require("../user/userService");
 
 async function fetchAllUsers(queryData) {
-	const { sortBy, page, limit, filterBy } = queryData;
+	const {
+		sortBy = "createdAt",
+		sortOrder = "desc",
+		page = 1,
+		limit = 15,
+		filterBy,
+	} = queryData;
 	try {
 		const filter = {};
-		if (filterBy) filter[filterBy] = filterBy;
+		// Expecting filterBy to be like { field: value }
+		if (filterBy && typeof filterBy === "object") {
+			Object.assign(filter, filterBy);
+		}
 
 		const sort = {};
-		if (sortBy) sort[sortBy] = sortBy;
+		if (sortBy) sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
 		const users = await User.find(filter)
 			.sort(sort)
-			.skip(page - 1, limit)
+			.skip((page - 1) * limit)
 			.limit(limit);
 
-		const totalUser = await User.countDocuments();
+		const totalUser = await User.countDocuments(filter);
 		const totalPages = Math.ceil(totalUser / limit);
 
 		return { users, totalUser, totalPages };
