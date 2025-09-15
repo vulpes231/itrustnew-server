@@ -20,12 +20,27 @@ const getTransactionData = async (req, res, next) => {
 };
 
 const getAllTransactions = async (req, res, next) => {
+	const sortBy = req.query.sortBy;
+	const limit = Math.min(req.query.limit || 15);
+	const page = Math.max(req.query.page || 1);
+	const filterBy = req.query.filterBy;
 	try {
-		const transactions = await fetchAllTransactions();
+		const { transactions, totalTrnxs, totalPages, currentPage } =
+			await fetchAllTransactions({
+				sortBy,
+				limit,
+				page,
+				filterBy,
+			});
 		res.status(200).json({
 			data: transactions,
 			success: true,
 			message: "transactions fetched successfully",
+			pagination: {
+				totalPage: totalPages,
+				totalItem: totalTrnxs,
+				currentPage: currentPage,
+			},
 		});
 	} catch (error) {
 		next(error);

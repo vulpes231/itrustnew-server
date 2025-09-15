@@ -1,6 +1,7 @@
 const Transaction = require("../../models/Transaction");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
+const { CustomError } = require("../../utils/utils");
 const { fetchTransactionInfo } = require("../user/transactionService");
 
 async function fetchAllTransactions(queryData) {
@@ -27,10 +28,12 @@ async function fetchAllTransactions(queryData) {
 			.limit(limit);
 
 		const totalTrnxs = await Transaction.countDocuments(filter);
-		const totalPages = Math.ceil(totalTrnxs / limit);
+		const totalPages =
+			Math.ceil(totalTrnxs / limit) === 0 ? 1 : Math.ceil(totalTrnxs / limit);
 
-		return { transactions, totalTrnxs, totalPages, page };
+		return { transactions, totalTrnxs, totalPages, currentPage: page };
 	} catch (error) {
+		console.log(error);
 		throw new CustomError(error.message, 500);
 	}
 }

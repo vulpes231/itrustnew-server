@@ -31,7 +31,8 @@ async function fetchAllUsers(queryData) {
 			.limit(limit);
 
 		const totalUser = await User.countDocuments(filter);
-		const totalPages = Math.ceil(totalUser / limit);
+		const totalPages =
+			Math.ceil(totalUser / limit) === 0 ? 1 : Math.ceil(totalUser / limit);
 
 		return { users, totalUser, totalPages };
 	} catch (error) {
