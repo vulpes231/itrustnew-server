@@ -3,6 +3,8 @@ const {
 	elevateAdmin,
 	deElevateAdmin,
 	getAdmins,
+	getAdminInfo,
+	removeAdmin,
 } = require("../../handlers/admin/manageAdminHandler");
 const { verifySuperUser } = require("../../middlewares/verifyRole");
 
@@ -10,8 +12,11 @@ const router = Router();
 
 router
 	.route("/")
-	.get(getAdmins)
+	.get(getAdminInfo)
 	.post(elevateAdmin, verifySuperUser)
-	.put(deElevateAdmin, verifySuperUser);
+	.put(deElevateAdmin, verifySuperUser)
+	.delete(removeAdmin, verifySuperUser);
+
+router.route("/all").get(getAdmins);
 
 module.exports = router;

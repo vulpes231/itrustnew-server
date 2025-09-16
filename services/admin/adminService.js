@@ -165,6 +165,30 @@ async function fetchAdmins() {
 	}
 }
 
+async function fetchAdminInfo(adminId) {
+	if (!adminId) throw new CustomError("Bad request!", 400);
+	try {
+		const admin = await Admin.findById(adminId).select(
+			"-password -refreshToken"
+		);
+		if (!admin) throw new CustomError("Admin not found!", 404);
+		return admin;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
+async function deleteAdmin(adminId) {
+	if (!adminId) throw new CustomError("Bad request!", 400);
+	try {
+		const adminToDelete = await Admin.findByIdAndDelete(adminId);
+		if (!adminToDelete) throw new CustomError("Admin not found!", 404);
+		return true;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
 module.exports = {
 	loginAdmin,
 	registerAdmin,
@@ -172,4 +196,6 @@ module.exports = {
 	assignRole,
 	removeRole,
 	fetchAdmins,
+	fetchAdminInfo,
+	deleteAdmin,
 };
