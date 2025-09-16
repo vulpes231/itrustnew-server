@@ -11,10 +11,14 @@ async function registerAdmin(adminData) {
 		throw new CustomError("Bad request!", 400);
 
 	try {
-		const emailExists = await Admin.findOne({ email });
+		const emailExists = await Admin.findOne({ email }).select(
+			"-password -refreshToken"
+		);
 		if (emailExists) throw new CustomError("Email taken!", 409);
 
-		const userExists = await Admin.findOne({ username });
+		const userExists = await Admin.findOne({ username }).select(
+			"-password -refreshToken"
+		);
 		if (userExists) throw new CustomError("Username taken!", 409);
 
 		const hashedPassword = await bcrypt.hash(password, 10);
@@ -27,14 +31,31 @@ async function registerAdmin(adminData) {
 
 		const admin = await Admin.create(newAdminData);
 
-		if (!admin.role.includes(ROLES.ADMIN)) {
-			admin.role.push(ROLES.ADMIN);
-			await admin.save();
+		if (adminRole) {
+			const roleValue =
+				adminRole === "admin"
+					? ROLES[adminRole.toUpperCase()]
+					: ROLES["SUPER_USER"];
+
+			if (roleValue) {
+				if (!admin.role.includes(roleValue)) {
+					admin.role.push(roleValue);
+					await admin.save();
+				}
+			}
 		}
 
-		return admin.username;
+		const safeAdmin = await Admin.findById(admin._id).select(
+			"-password -refreshToken"
+		);
+
+		return {
+			username: safeAdmin.username,
+			email: safeAdmin.email,
+			role: safeAdmin.role,
+		};
 	} catch (error) {
-		throw new CustomError(error.message, error.statusCode);
+		throw new CustomError(error.message, error.statusCode || 500);
 	}
 }
 
@@ -45,10 +66,14 @@ async function registerSuperUser(adminData) {
 		throw new CustomError("Bad request!", 400);
 
 	try {
-		const emailExists = await Admin.findOne({ email });
+		const emailExists = await Admin.findOne({ email }).select(
+			"-password -refreshToken"
+		);
 		if (emailExists) throw new CustomError("Email taken!", 409);
 
-		const userExists = await Admin.findOne({ username });
+		const userExists = await Admin.findOne({ username }).select(
+			"-password -refreshToken"
+		);
 		if (userExists) throw new CustomError("Username taken!", 409);
 
 		const hashedPassword = await bcrypt.hash(password, 10);
@@ -78,7 +103,7 @@ async function loginAdmin(adminData) {
 	if (!email || !password)
 		throw new CustomError("Email and password required!", 400);
 	try {
-		const admin = await Admin.findOne({ email });
+		const admin = await Admin.findOne({ email }).select("-refreshToken");
 		if (!admin) throw new CustomError("Admin does not exist!", 400);
 
 		const passMatch = await bcrypt.compare(password, admin.password);
@@ -88,7 +113,7 @@ async function loginAdmin(adminData) {
 			!admin.role.includes(ROLES.ADMIN) &&
 			!admin.role.includes(ROLES.SUPER_USER)
 		) {
-			throw new CustomError("Unauthorized", 401);
+			throw new CustomError("You're not allowed on this server", 403);
 		}
 
 		const accessToken = jwt.sign(
@@ -172,6 +197,7 @@ async function fetchAdminInfo(adminId) {
 			"-password -refreshToken"
 		);
 		if (!admin) throw new CustomError("Admin not found!", 404);
+
 		return admin;
 	} catch (error) {
 		throw new CustomError(error.message, 500);

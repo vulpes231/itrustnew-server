@@ -4,11 +4,9 @@ const {
 } = require("../../services/admin/adminService");
 
 const enrollAdmin = async (req, res, next) => {
-	const role = req.user.role;
-
 	try {
 		const adminData = req.body;
-		const admin = await registerAdmin(role, adminData);
+		const admin = await registerAdmin(adminData);
 
 		res.status(200).json({
 			success: true,

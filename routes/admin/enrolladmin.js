@@ -8,6 +8,6 @@ const { verifySuperUser } = require("../../middlewares/verifyRole");
 const router = Router();
 
 router.route("/").post(enrollAdmin, verifySuperUser);
-router.route("/su").post(enrollSU);
+// router.route("/su").post(enrollSU);
 
 module.exports = router;

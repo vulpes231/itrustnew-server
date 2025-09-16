@@ -16,9 +16,9 @@ const adminSchema = new Schema({
 		type: String,
 	},
 	role: {
-		required: true,
-		type: Array,
+		type: [String],
 		default: ["0010"],
+		enum: ["0001", "0010"],
 	},
 });
 
