@@ -7,7 +7,7 @@ require("dotenv").config();
 async function registerAdmin(adminData) {
 	const { email, username, password, adminRole } = adminData;
 
-	if (!email || !adminRole || !username || !password)
+	if (!email || !username || !password)
 		throw new CustomError("Bad request!", 400);
 
 	try {
@@ -183,7 +183,7 @@ async function removeRole(adminId, role) {
 
 async function fetchAdmins() {
 	try {
-		const admins = await Admin.find().lean();
+		const admins = await Admin.find().select("-password -refreshToken");
 		return admins;
 	} catch (error) {
 		throw new CustomError(error.message, 500);

@@ -6,17 +6,20 @@ const {
 	getAdminInfo,
 	removeAdmin,
 } = require("../../handlers/admin/manageAdminHandler");
-const { verifySuperUser } = require("../../middlewares/verifyRole");
+const { requireRole } = require("../../middlewares/requireRole");
+const { ROLES } = require("../../utils/utils");
 
 const router = Router();
 
 router
 	.route("/")
-	.get(getAdminInfo)
-	.post(elevateAdmin, verifySuperUser)
-	.put(deElevateAdmin, verifySuperUser)
-	.delete(removeAdmin, verifySuperUser);
+	.get(requireRole([ROLES.ADMIN, ROLES.SUPER_USER]), getAdminInfo) // any admin can view info
+	.post(requireRole([ROLES.SUPER_USER]), elevateAdmin) // only superuser
+	.put(requireRole([ROLES.SUPER_USER]), deElevateAdmin) // only superuser
+	.delete(requireRole([ROLES.SUPER_USER]), removeAdmin); // only superuser
 
-router.route("/all").get(getAdmins);
+router
+	.route("/all")
+	.get(requireRole([ROLES.ADMIN, ROLES.SUPER_USER]), getAdmins);
 
 module.exports = router;

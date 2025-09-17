@@ -63,6 +63,8 @@ const deElevateAdmin = async (req, res, next) => {
 
 const removeAdmin = async (req, res, next) => {
 	const { adminId } = req.body;
+
+	console.log(req.body);
 	try {
 		await deleteAdmin(adminId);
 		res.status(200).json({
