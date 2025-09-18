@@ -1,9 +1,8 @@
 const {
 	fetchAdmins,
-	assignRole,
-	removeRole,
 	fetchAdminInfo,
 	deleteAdmin,
+	updateAdminRole,
 } = require("../../services/admin/adminService");
 
 const getAdmins = async (req, res, next) => {
@@ -33,26 +32,15 @@ const getAdminInfo = async (req, res, next) => {
 	}
 };
 
-const elevateAdmin = async (req, res, next) => {
-	const { adminId, role } = req.body;
+const updateRole = async (req, res, next) => {
+	const { adminId, action } = req.body;
 	try {
-		await assignRole(adminId, role);
+		await updateAdminRole(adminId, action);
 		res.status(200).json({
-			message: `New role assigned successfully.`,
-			success: true,
-			data: null,
-		});
-	} catch (error) {
-		next(error);
-	}
-};
-
-const deElevateAdmin = async (req, res, next) => {
-	const { adminId, role } = req.body;
-	try {
-		await removeRole(adminId, role);
-		res.status(200).json({
-			message: `Role removed successfully.`,
+			message:
+				action == "addsu"
+					? `New role assigned successfully.`
+					: `New removed assigned successfully.`,
 			success: true,
 			data: null,
 		});
@@ -78,8 +66,7 @@ const removeAdmin = async (req, res, next) => {
 };
 
 module.exports = {
-	elevateAdmin,
-	deElevateAdmin,
+	updateRole,
 	getAdmins,
 	getAdminInfo,
 	removeAdmin,

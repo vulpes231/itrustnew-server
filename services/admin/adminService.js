@@ -145,36 +145,28 @@ async function loginAdmin(adminData) {
 	}
 }
 
-async function assignRole(adminId, role) {
-	if (!adminId || !role) throw new CustomError("Bad request!", 400);
+async function updateAdminRole(adminId, action) {
+	if (!adminId || !action) throw new CustomError("Bad request!", 400);
 	try {
 		const admin = await Admin.findById(adminId);
 		if (!admin) throw new CustomError("Admin not found!", 404);
 
-		const roleToAssign = role === "admin" ? ROLES.ADMIN : ROLES.SUPER_USER;
+		if (action === "addsu") {
+			if (!admin.role.includes(ROLES.SUPER_USER)) {
+				admin.role.push(ROLES.SUPER_USER);
 
-		if (!admin.role.includes(roleToAssign)) {
-			admin.role.push(roleToAssign);
+				await admin.save();
+			}
+		} else if (action === "removesu") {
+			if (admin.role.includes(ROLES.SUPER_USER)) {
+				admin.role = admin.role.filter((r) => r !== ROLES.SUPER_USER);
 
-			await admin.save();
+				await admin.save();
+			}
+		} else {
+			throw new CustomError("Unknown action!", 400);
 		}
-		return admin.role;
-	} catch (error) {
-		throw new CustomError(error.message, 500);
-	}
-}
 
-async function removeRole(adminId, role) {
-	if (!adminId || !role) throw new CustomError("Bad request!", 400);
-	try {
-		const admin = await Admin.findById(adminId);
-		if (!admin) throw new CustomError("Admin not found!", 404);
-
-		const roleToRemove = role === "admin" ? ROLES.ADMIN : ROLES.SUPER_USER;
-		if (admin.role.includes(roleToRemove)) {
-			admin.role = admin.role.filter((r) => r !== roleToRemove);
-			await admin.save();
-		}
 		return admin.role;
 	} catch (error) {
 		throw new CustomError(error.message, 500);
@@ -219,8 +211,7 @@ module.exports = {
 	loginAdmin,
 	registerAdmin,
 	registerSuperUser,
-	assignRole,
-	removeRole,
+	updateAdminRole,
 	fetchAdmins,
 	fetchAdminInfo,
 	deleteAdmin,
