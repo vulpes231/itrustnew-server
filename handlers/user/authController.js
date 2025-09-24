@@ -8,7 +8,7 @@ const registerUser = async (req, res, next) => {
 	if (!req.body) return res.status(400).json({ message: "Bad request!" });
 	try {
 		const userData = req.body;
-		const { username, email } = await registerService(userData);
+		const { username } = await registerService(userData);
 		res.status(201).json({
 			message: `${username} created successfully.`,
 			success: true,
@@ -65,7 +65,7 @@ const logoutUser = async (req, res, next) => {
 			});
 		}
 		res
-			.status(204)
+			.status(200)
 			.json({ message: "Logout successful.", success: true, data: null });
 	} catch (error) {
 		next(error);

@@ -8,16 +8,23 @@ const {
 } = require("../locationService");
 const { CustomError } = require("../../utils/utils");
 
-async function getUserById(userId) {
+async function getUserById(userId, session = null) {
 	if (!userId) throw new CustomError("Bad request!", 400);
 	try {
-		const user = await User.findById(userId);
+		let user;
+		if (session) {
+			user = await User.findById(userId).session(session);
+		} else {
+			user = await User.findById(userId);
+		}
+
 		if (!user) {
 			throw new CustomError("User not found!", 404);
 		}
+
 		return user;
 	} catch (error) {
-		throw new CustomError("Failed to get user!", 500);
+		throw new CustomError(error.message, 500);
 	}
 }
 

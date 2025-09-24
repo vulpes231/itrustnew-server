@@ -14,6 +14,7 @@ const Wallet = require("../../models/Wallet");
 const { sendLoginCode } = require("../mailService");
 const Usersetting = require("../../models/Usersetting");
 const { CustomError } = require("../../utils/utils");
+const { default: mongoose } = require("mongoose");
 
 async function registerService(userData) {
 	const {
@@ -45,29 +46,39 @@ async function registerService(userData) {
 	if (
 		!email ||
 		!phone ||
-		!countryId ||
-		!stateId ||
-		!nationalityId ||
-		!currencyId
+		!dob //||
+		// !countryId ||
+		// !stateId ||
+		// !nationalityId ||
+		// !currencyId
 	) {
 		throw new CustomError("Contact information required!", 400);
 	}
 
+	const session = await mongoose.startSession();
+	session.startTransaction();
+
 	try {
-		const existingUser = await User.find({ username });
+		const existingUser = await User.findOne({ username }).session(session);
 		if (existingUser) {
 			throw new CustomError("User already exist!", 409);
 		}
-		const existingMail = await User.find({ username });
+		const existingMail = await User.findOne({ username });
 		if (existingMail) {
 			throw new CustomError("Email already in use!", 409);
 		}
-		const countryInfo = await getCountryById(countryId);
-		const stateInfo = await getStateById(stateId);
-		const nationInfo = await getNationById(nationalityId);
-		const currencyInfo = await getCurrencyById(currencyId);
+		// const countryInfo = await getCountryById(countryId);
+		// const stateInfo = await getStateById(stateId);
+		// const nationInfo = await getNationById(nationalityId);
+		// const currencyInfo = await getCurrencyById(currencyId);
 
 		const hashPassword = await bcrypt.hash(password, 10);
+
+		const [year, month, day] = dob.split("/");
+		const formattedDob = new Date(`${year}-${month}-${day}`);
+
+		// console.log(dob);
+		// console.log(formattedDob);
 
 		const userInfo = {
 			name: {
@@ -87,31 +98,31 @@ async function registerService(userData) {
 					zipCode: zipCode,
 				},
 			},
-			locationDetails: {
-				country: {
-					countryId: countryInfo._id,
-					name: countryInfo.name,
-					phoneCode: countryInfo.phoneCode,
-				},
-				state: {
-					stateId: stateInfo._id,
-					name: stateInfo.name,
-				},
-				nationality: {
-					id: nationInfo._id,
-					name: nationInfo.name,
-				},
-				currency: {
-					id: currencyInfo._id,
-					name: currencyInfo.name,
-					symbol: currencyInfo.symbol,
-					sign: currencyInfo.sign,
-					rate: currencyInfo.rate,
-					fees: currencyInfo.fees,
-				},
-			},
+			// locationDetails: {
+			// 	country: {
+			// 		countryId: countryInfo._id,
+			// 		name: countryInfo.name,
+			// 		phoneCode: countryInfo.phoneCode,
+			// 	},
+			// 	state: {
+			// 		stateId: stateInfo._id,
+			// 		name: stateInfo.name,
+			// 	},
+			// 	nationality: {
+			// 		id: nationInfo._id,
+			// 		name: nationInfo.name,
+			// 	},
+			// 	currency: {
+			// 		id: currencyInfo._id,
+			// 		name: currencyInfo.name,
+			// 		symbol: currencyInfo.symbol,
+			// 		sign: currencyInfo.sign,
+			// 		rate: currencyInfo.rate,
+			// 		fees: currencyInfo.fees,
+			// 	},
+			// },
 			personalDetails: {
-				dob: dob,
+				dob: formattedDob,
 				ssn: ssn || null,
 			},
 			professionalInfo: {
@@ -120,36 +131,34 @@ async function registerService(userData) {
 			},
 		};
 
-		const newUser = await User.create(userInfo);
+		const newUser = await User.create([userInfo], { session });
+		const userId = newUser[0]._id;
 
-		const cashWallet = await Wallet.create({
-			name: "cash",
-			userId: newUser._id,
-		});
-		const investWallet = await Wallet.create({
-			name: "automated investing",
-			userId: newUser._id,
-		});
-		const brokerageWallet = await Wallet.create({
-			name: "brokerage",
-			userId: newUser._id,
-		});
+		const [cashWallet, investWallet, brokerageWallet] = await Promise.all([
+			Wallet.create([{ name: "cash", userId }], { session }),
+			Wallet.create([{ name: "automated investing", userId }], { session }),
+			Wallet.create([{ name: "brokerage", userId }], { session }),
+		]);
 
-		const userSettings = await Usersetting.create({
-			userId: user._id,
-		});
+		await Usersetting.create([{ userId }], { session });
 
-		const user = await getUserById(newUser._id);
+		const user = await getUserById(userId, session);
+
+		await session.commitTransaction();
+		session.endSession();
 		return {
 			username: user.credentials.username,
 			email: user.credentials.email,
 			totalBalance:
-				cashWallet.totalBalance +
-				investWallet.totalBalance +
-				brokerageWallet.totalBalance,
+				cashWallet[0].totalBalance +
+				investWallet[0].totalBalance +
+				brokerageWallet[0].totalBalance,
 		};
 	} catch (error) {
-		throw new CustomError("Failed to register user! Try again.", 500);
+		await session.abortTransaction();
+		session.endSession();
+		// console.log(error, "clg");
+		throw new CustomError(error.message, 500);
 	}
 }
 
@@ -159,7 +168,7 @@ async function loginService(loginData) {
 		throw new CustomError("Email and password required!", 400);
 	}
 	try {
-		const user = await User.findOne({ email });
+		const user = await User.findOne({ "credentials.email": email });
 		if (!user) {
 			throw new CustomError("User does not exist!", 404);
 		}
@@ -180,7 +189,7 @@ async function loginService(loginData) {
 
 			const userInfo = {
 				credentials: {
-					username: username,
+					username: user.credentials.username,
 					email: email,
 				},
 				identityVerification: {
@@ -220,8 +229,8 @@ async function loginService(loginData) {
 
 			const userInfo = {
 				credentials: {
-					username: username,
-					email: email,
+					username: user.credentials.username,
+					email: user.credentials.email,
 				},
 				identityVerification: {
 					kycStatus: user.identityVerification.kycStatus,
@@ -237,13 +246,13 @@ async function loginService(loginData) {
 			return { accessToken, refreshToken, userInfo };
 		}
 	} catch (error) {
-		throw new CustomError("Failed to login user. Try again", 500);
+		throw new CustomError(error.message, 500);
 	}
 }
 
 async function logoutService(userId) {
 	if (!userId) {
-		throw new CustomError("ID is required!", 400);
+		throw new CustomError("Bad request!", 400);
 	}
 	try {
 		const user = await User.findById(userId);
@@ -257,7 +266,7 @@ async function logoutService(userId) {
 		await user.save();
 		return true;
 	} catch (error) {
-		throw new CustomError("Failed to logout user. Try again", 500);
+		throw new CustomError(error.message, 500);
 	}
 }
 

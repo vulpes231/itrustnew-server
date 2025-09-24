@@ -39,6 +39,7 @@ const currencyRoute = require("./routes/currency.js");
 const assetRoute = require("./routes/asset.js");
 const userRegisterRoute = require("./routes/user/register.js");
 const userLoginRoute = require("./routes/user/login.js");
+const userLogoutRoute = require("./routes/user/logout.js");
 
 //protected routes
 const otpVerificationRoute = require("./routes/user/verification.js");
@@ -60,7 +61,7 @@ const manageTransactionRoute = require("./routes/admin/managetransaction.js");
 const { ROLES } = require("./utils/utils.js");
 
 // routes
-app.use("/", rootRoute);
+
 app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
 app.use("/signup", userRegisterRoute);
@@ -69,6 +70,7 @@ app.use("/code", otpVerificationRoute);
 app.use("/mail", mailRoute);
 app.use("/asset", assetRoute);
 app.use("/plan", investPlanRoute);
+app.use("/", rootRoute);
 
 // admin unproteted routes
 app.use("/login", loginAdminRoute);
@@ -77,6 +79,7 @@ app.use("/register", enrollAdminRoute);
 // user protected routes
 app.use(verifyJWT);
 app.use("/user", userProfileRoute);
+app.use("/signout", userLogoutRoute);
 app.use("/wallet", walletRoute);
 app.use("/transaction", transactionRoute);
 app.use("/watchlist", watchlistRoute);
