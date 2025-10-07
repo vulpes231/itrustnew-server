@@ -40,6 +40,20 @@ async function fetchAllUsers(queryData) {
 	}
 }
 
+async function fetchUser(userId) {
+	if (!userId) {
+		throw new CustomError("Bad request!", 400);
+	}
+	try {
+		const user = await User.findById(userId).select(
+			"-credentials.password -credentials.refreshToken"
+		);
+		return user;
+	} catch (error) {
+		throw new CustomError(error.message, error.code);
+	}
+}
+
 async function completeVerification(userId, action) {
 	try {
 		const user = await getUserById(userId);
@@ -104,4 +118,5 @@ module.exports = {
 	completeVerification,
 	suspendUser,
 	deleteUser,
+	fetchUser,
 };

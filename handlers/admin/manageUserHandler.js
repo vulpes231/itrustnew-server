@@ -3,7 +3,23 @@ const {
 	completeVerification,
 	suspendUser,
 	deleteUser,
+	fetchUser,
 } = require("../../services/admin/manageUserService");
+
+const getUser = async (req, res, next) => {
+	const { userId } = req.params;
+
+	try {
+		const user = await fetchUser(userId);
+		res.status(200).json({
+			data: user,
+			success: true,
+			message: "User fetched successfully.",
+		});
+	} catch (error) {
+		next(error);
+	}
+};
 
 const getAllUsers = async (req, res, next) => {
 	const sortBy = req.query["sort_by"];
@@ -76,4 +92,5 @@ module.exports = {
 	reviewVerification,
 	suspendAccount,
 	removeUser,
+	getUser,
 };
