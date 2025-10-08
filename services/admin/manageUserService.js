@@ -48,9 +48,22 @@ async function fetchUser(userId) {
 		const user = await User.findById(userId).select(
 			"-credentials.password -credentials.refreshToken"
 		);
-		return user;
+
+		if (!user) {
+			throw new CustomError("User not found", 404);
+		}
+
+		const userSettings = await Usersetting.findOne({ userId: user._id });
+
+		// Convert both to plain objects and combine
+		const userData = {
+			...user.toObject(), // Convert Mongoose document to plain object
+			settings: userSettings ? userSettings.toObject() : null,
+		};
+
+		return userData;
 	} catch (error) {
-		throw new CustomError(error.message, error.code);
+		throw new CustomError(error.message, error.code || 500);
 	}
 }
 
@@ -77,7 +90,7 @@ async function suspendUser(userId) {
 	try {
 		const user = await getUserById(userId);
 
-		user.accountStatus.banned = true;
+		user.accountStatus.banned = true ? false : true;
 		await user.save();
 
 		return user;
