@@ -2,6 +2,7 @@ const {
 	fetchAssets,
 	fetchAssetById,
 	fetchUserAssets,
+	searchAssets,
 } = require("../services/assetService");
 
 const getAssets = async (req, res, next) => {
@@ -56,4 +57,20 @@ const getUserAssets = async (req, res, next) => {
 	}
 };
 
-module.exports = { getUserAssets, getAssetInfo, getAssets };
+const searchAssetByName = async (req, res, next) => {
+	const query = req.query.query;
+	console.log("fetching assets");
+	try {
+		const queryData = { query };
+		const asset = await searchAssets(queryData);
+		res.status(200).json({
+			data: asset,
+			success: true,
+			message: "asset fetched successfully",
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
+module.exports = { getUserAssets, getAssetInfo, getAssets, searchAssetByName };

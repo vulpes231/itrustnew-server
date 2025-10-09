@@ -44,8 +44,29 @@ async function fetchUserAssets(userId) {
 	}
 }
 
+async function searchAssets(queryData) {
+	const { query } = queryData;
+	if (!query || query.length < 2) {
+		throw new CustomError("Invalid search term!", 400);
+	}
+	try {
+		const assets = await Asset.find({
+			$or: [
+				{ name: { $regex: query, $options: "i" } },
+				{ symbol: { $regex: query, $options: "i" } },
+			],
+		})
+			.select("name symbol type priceData.current _id")
+			.lean();
+		return assets;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
 module.exports = {
 	fetchAssets,
 	fetchAssetById,
 	fetchUserAssets,
+	searchAssets,
 };
