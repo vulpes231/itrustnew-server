@@ -14,7 +14,7 @@ async function fetchAllTransactions(queryData) {
 	} = queryData;
 	try {
 		const filter = {};
-		// Expecting filterBy to be like { field: value }
+
 		if (filterBy && typeof filterBy === "object") {
 			Object.assign(filter, filterBy);
 		}
@@ -24,7 +24,7 @@ async function fetchAllTransactions(queryData) {
 
 		const transactions = await Transaction.find(filter)
 			.sort(sort)
-			.skip((page - 1) * limit) // ✅ correct skip
+			.skip((page - 1) * limit)
 			.limit(limit);
 
 		const totalTrnxs = await Transaction.countDocuments(filter);
@@ -54,8 +54,10 @@ async function editTransaction(transactionId, action) {
 		if (!transaction) {
 			throw new CustomError("Transaction not found!", 404);
 		}
+		if (transaction.status === "completed") {
+			throw new CustomError("Action already completed!", 404);
+		}
 
-		// Find user's wallet
 		const transactionWallet = await Wallet.findOne({
 			userId: transaction.userId,
 			name: transaction.account,
@@ -67,6 +69,7 @@ async function editTransaction(transactionId, action) {
 
 		if (action === "approve") {
 			transactionWallet.availableBalance += transaction.amount;
+			transactionWallet.totalBalance += transaction.amount;
 			await transactionWallet.save({ session });
 
 			transaction.status = "completed";
@@ -78,13 +81,11 @@ async function editTransaction(transactionId, action) {
 			throw new CustomError("Invalid action!", 400);
 		}
 
-		// Commit both updates atomically
 		await session.commitTransaction();
 		session.endSession();
 
 		return transaction;
 	} catch (error) {
-		// Roll back all changes if any step fails
 		await session.abortTransaction();
 		session.endSession();
 		throw new CustomError(error.message, 500);
