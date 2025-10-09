@@ -116,7 +116,12 @@ async function createTransaction(transactionData) {
 			});
 		}
 
-		const receiver = wallets.find((wallet) => wallet._id === accountId);
+		// console.log(wallets);
+		// console.log(accountId);
+
+		const receiver = wallets.find(
+			(wallet) => wallet._id.toString() === accountId
+		);
 		if (!receiver) {
 			throw new CustomError("Invalid wallet!", 400);
 		}
@@ -136,7 +141,7 @@ async function createTransaction(transactionData) {
 		});
 		return trnx;
 	} catch (error) {
-		throw new CustomError("Failed to add money!", 500);
+		throw new CustomError(error.message, 500);
 	}
 }
 

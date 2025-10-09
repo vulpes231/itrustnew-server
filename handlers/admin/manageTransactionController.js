@@ -50,6 +50,8 @@ const getAllTransactions = async (req, res, next) => {
 const updateTransaction = async (req, res, next) => {
 	const { transactionId } = req.params;
 	const { action } = req.body;
+
+	console.log(action, transactionId);
 	try {
 		await editTransaction(transactionId, action);
 		res.status(200).json({
