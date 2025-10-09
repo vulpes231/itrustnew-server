@@ -59,6 +59,7 @@ const manageUserRoute = require("./routes/admin/manageuser.js");
 const manageAdminRoute = require("./routes/admin/manageadmin.js");
 const manageTransactionRoute = require("./routes/admin/managetransaction.js");
 const manageWalletRoute = require("./routes/admin/managewallet.js");
+const manageTradeRoute = require("./routes/admin/managetrade.js");
 const { ROLES } = require("./utils/utils.js");
 
 // routes
@@ -103,6 +104,11 @@ app.use(
 	"/managewallet",
 	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
 	manageWalletRoute
+);
+app.use(
+	"/managetrade",
+	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+	manageTradeRoute
 );
 
 let server;
