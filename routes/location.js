@@ -6,11 +6,13 @@ const {
 	getCountryInfo,
 	getStateInfo,
 	getNationalityInfo,
+	searchCountry,
 } = require("../handlers/locationController");
 
 const router = Router();
 
 router.route("/countries").get(getAllCountries);
+router.route("/search").get(searchCountry);
 router.route("/country/:countryId").get(getCountryInfo);
 router.route("/states").get(getAllStates);
 router.route("/state/:stateId").get(getStateInfo);

@@ -5,6 +5,7 @@ const {
 	getCountryById,
 	getStateById,
 	getNationById,
+	searchCountries,
 } = require("../services/locationService");
 
 const getAllCountries = async (req, res, next) => {
@@ -82,6 +83,21 @@ const getNationalityInfo = async (req, res, next) => {
 	}
 };
 
+const searchCountry = async (req, res, next) => {
+	const query = req.query.query;
+	console.log(query);
+	try {
+		const countries = await searchCountries(query);
+		res.status(200).json({
+			data: countries,
+			success: true,
+			message: "countries fetched successfully",
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
 module.exports = {
 	getAllCountries,
 	getAllStates,
@@ -89,4 +105,5 @@ module.exports = {
 	getCountryInfo,
 	getStateInfo,
 	getNationalityInfo,
+	searchCountry,
 };

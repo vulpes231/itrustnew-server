@@ -1,6 +1,8 @@
+const { default: mongoose } = require("mongoose");
 const SavingsAccount = require("../../models/Savingsaccount");
 const { CustomError } = require("../../utils/utils");
-
+const { fetchAvailableSavings } = require("../user/savingsService");
+// mongoose
 async function newSavingsAccount(accountData) {
 	const {
 		name,
@@ -61,7 +63,6 @@ async function newSavingsAccount(accountData) {
 		return savedAccount;
 	} catch (error) {
 		if (error.code === 11000) {
-			// Duplicate key error
 			throw new CustomError("Account name already exists", 400);
 		}
 		throw new CustomError(error.message, 500);
@@ -215,8 +216,21 @@ async function deleteSavingsAccount(accountData) {
 	}
 }
 
+async function fetchAllSavingsAccount() {
+	try {
+		const savingsAccts = await fetchAvailableSavings();
+		if (!savingsAccts) {
+			throw new CustomError("Savings account not found", 404);
+		}
+		return savingsAccts;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
 module.exports = {
 	newSavingsAccount,
 	editSavingsAccount,
 	deleteSavingsAccount,
+	fetchAllSavingsAccount,
 };

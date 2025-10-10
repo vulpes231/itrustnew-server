@@ -75,6 +75,22 @@ async function getNationById(nationId) {
 	}
 }
 
+async function searchCountries(query) {
+	if (!query || query.length < 2) {
+		throw new CustomError("Invalid search term!", 400);
+	}
+	try {
+		const countries = await Country.find({
+			$or: [{ name: { $regex: query, $options: "i" } }],
+		})
+			.select("name phoneCode status _id")
+			.lean();
+		return countries;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
 module.exports = {
 	getCountries,
 	getStates,
@@ -82,4 +98,5 @@ module.exports = {
 	getStateById,
 	getCountryById,
 	getNationById,
+	searchCountries,
 };
