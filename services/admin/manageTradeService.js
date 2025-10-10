@@ -124,35 +124,38 @@ async function closeTrade(tradeId) {
 		const entryPrice = trade.execution.price;
 		const quantity = trade.execution.quantity;
 		const leverage = trade.execution.leverage || 1;
-		const initialAmount = trade.execution.amount;
 		const extraBonus = trade.extra || 0;
 
-		let finalValue, profitLoss;
+		let currentValue, totalReturn, totalReturnPercent;
 
 		if (trade.orderType === "buy") {
-			finalValue = quantity * currentPrice * leverage;
-			profitLoss = finalValue - initialAmount;
+			currentValue = quantity * currentPrice * leverage;
+			totalReturn = currentValue - trade.execution.amount;
+			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
 		} else if (trade.orderType === "sell") {
-			finalValue = initialAmount - quantity * currentPrice * leverage;
-			profitLoss = finalValue - initialAmount;
+			currentValue =
+				trade.execution.amount - quantity * currentPrice * leverage;
+			totalReturn = currentValue - trade.execution.amount;
+			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
 		} else {
-			// For spot trades
-			finalValue = quantity * currentPrice;
-			profitLoss = finalValue - initialAmount;
+			currentValue = quantity * currentPrice;
+			totalReturn = currentValue - trade.execution.amount;
+			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
 		}
 
-		const totalFinalValue = finalValue + extraBonus;
-		const totalProfitLoss = profitLoss + extraBonus;
+		const totalCurrentValue = currentValue + extraBonus;
+		const totalProfitLoss = totalReturn + extraBonus;
+		const totalProfitLossPercentage =
+			(totalProfitLoss / trade.execution.amount) * 100;
 
-		wallet.availableBalance += totalFinalValue;
+		trade.performance.currentValue = totalCurrentValue;
+		trade.performance.totalReturn = totalProfitLoss;
+		trade.performance.totalReturnPercent = totalProfitLossPercentage;
+
+		wallet.availableBalance += totalCurrentValue;
 		wallet.totalBalance += totalProfitLoss;
 
 		await wallet.save();
-
-		trade.performance.currentValue = totalFinalValue;
-		trade.performance.profitLoss = totalProfitLoss;
-		trade.performance.profitLossPercentage =
-			(totalProfitLoss / initialAmount) * 100;
 
 		trade.targets.exitPoint = currentPrice;
 		trade.status = "closed";
@@ -181,52 +184,57 @@ async function updateTradePerformance(tradeId) {
 		const leverage = trade.execution.leverage || 1;
 		const extraBonus = trade.extra || 0;
 
-		let currentValue, profitLoss, profitLossPercentage;
+		let currentValue, totalReturn, totalReturnPercent;
 
 		if (trade.orderType === "buy") {
 			currentValue = quantity * currentPrice * leverage;
-			profitLoss = currentValue - trade.execution.amount;
-			profitLossPercentage = (profitLoss / trade.execution.amount) * 100;
+			totalReturn = currentValue - trade.execution.amount;
+			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
 		} else if (trade.orderType === "sell") {
 			currentValue =
 				trade.execution.amount - quantity * currentPrice * leverage;
-			profitLoss = currentValue - trade.execution.amount;
-			profitLossPercentage = (profitLoss / trade.execution.amount) * 100;
+			totalReturn = currentValue - trade.execution.amount;
+			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
 		} else {
 			currentValue = quantity * currentPrice;
-			profitLoss = currentValue - trade.execution.amount;
-			profitLossPercentage = (profitLoss / trade.execution.amount) * 100;
+			totalReturn = currentValue - trade.execution.amount;
+			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
 		}
 
 		const totalCurrentValue = currentValue + extraBonus;
-		const totalProfitLoss = profitLoss + extraBonus;
+		const totalProfitLoss = totalReturn + extraBonus;
 		const totalProfitLossPercentage =
 			(totalProfitLoss / trade.execution.amount) * 100;
 
 		trade.performance.currentValue = totalCurrentValue;
-		trade.performance.profitLoss = totalProfitLoss;
-		trade.performance.profitLossPercentage = totalProfitLossPercentage;
-		trade.performance.extraBonus = extraBonus;
+		trade.performance.totalReturn = totalProfitLoss;
+		trade.performance.totalReturnPercent = totalProfitLossPercentage;
+
+		// trade.performance.todayReturn = someValue;
+		// trade.performance.todayReturnPercent = somePercentage;
 
 		if (
 			trade.targets.takeProfit &&
-			profitLossPercentage >= trade.targets.takeProfit
+			totalReturnPercent >= trade.targets.takeProfit
 		) {
 			trade.status = "closed";
 			trade.closedAt = new Date();
 			trade.closeReason = "take_profit";
 		} else if (
 			trade.targets.stopLoss &&
-			profitLossPercentage <= trade.targets.stopLoss
+			totalReturnPercent <= trade.targets.stopLoss
 		) {
 			trade.status = "closed";
 			trade.closedAt = new Date();
 			trade.closeReason = "stop_loss";
 		}
 
+		trade.markModified("performance"); // Ensure nested object changes are saved
 		await trade.save();
+
 		return trade;
 	} catch (error) {
+		console.error("Error in updateTradePerformance:", error);
 		throw new CustomError(error.message, 500);
 	}
 }
@@ -240,8 +248,8 @@ async function editTradeData(tradeData) {
 		const trade = await Trade.findById(tradeId);
 		if (!trade || trade.status !== "open")
 			throw new CustomError("Cannot update closed trade!", 400);
-
-		if (extra) trade.extra = extra;
+		const parsedExtra = parseFloat(extra);
+		if (extra) trade.extra += parsedExtra;
 		if (leverage) trade.execution.leverage = leverage;
 		if (sl) trade.targets.stopLoss = sl;
 		if (tp) trade.targets.takeProfit = tp;

@@ -1,6 +1,15 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
+// Custom Error class
+class CustomError extends Error {
+	constructor(message, statusCode) {
+		super(message);
+		this.statusCode = statusCode;
+		this.name = "CustomError";
+	}
+}
+
 const savingsAccountSchema = new Schema(
 	{
 		name: {
@@ -33,6 +42,13 @@ const savingsAccountSchema = new Schema(
 				type: Number,
 				required: true,
 				min: 0,
+				validate: {
+					validator: function (value) {
+						return value >= this.contributionLimits.min;
+					},
+					message:
+						"Max contribution limit must be greater than or equal to min contribution limit",
+				},
 			},
 		},
 		withdrawalLimits: {
@@ -45,12 +61,20 @@ const savingsAccountSchema = new Schema(
 				type: Number,
 				required: true,
 				min: 0,
+				validate: {
+					validator: function (value) {
+						return value >= this.withdrawalLimits.min;
+					},
+					message:
+						"Max withdrawal limit must be greater than or equal to min withdrawal limit",
+				},
 			},
 		},
 		eligibleCountries: [
 			{
 				type: Schema.Types.ObjectId,
 				ref: "Country",
+				required: true,
 			},
 		],
 		status: {
@@ -60,33 +84,12 @@ const savingsAccountSchema = new Schema(
 		},
 	},
 	{
-		timestamps: true, // Auto-add createdAt and updatedAt
+		timestamps: true,
 		toJSON: { virtuals: true },
 		toObject: { virtuals: true },
 	}
 );
 
-// Indexes
-// savingsAccountSchema.index({ name: 1 });
-savingsAccountSchema.index({ status: 1 });
-savingsAccountSchema.index({ interestRate: -1 });
+const SavingsAccount = mongoose.model("SavingsAccount", savingsAccountSchema);
 
-// Virtual for formatted display
-savingsAccountSchema.virtual("displayName").get(function () {
-	return `${this.name} (${(this.interestRate * 100).toFixed(2)}%)`;
-});
-
-// Pre-save hook to convert HTML note to plain text for description
-// savingsAccountSchema.pre("save", function (next) {
-// 	if (this.isModified("description")) {
-// 		// Simple HTML to text conversion (customize as needed)
-// 		this.description = this.description
-// 			.replace(/<[^>]*>/g, "") // Remove HTML tags
-// 			.replace(/\s+/g, " ") // Collapse whitespace
-// 			.trim();
-// 	}
-// 	next();
-// });
-
-const SavingsAccount = mongoose.model("Savingsaccount", savingsAccountSchema);
 module.exports = SavingsAccount;

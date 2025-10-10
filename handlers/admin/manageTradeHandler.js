@@ -8,6 +8,7 @@ const {
 
 const addNewTrade = async (req, res, next) => {
 	const tradeData = req.body;
+	console.log(req.body);
 	try {
 		const trade = await createTrade(tradeData);
 		res.status(200).json({
@@ -22,6 +23,7 @@ const addNewTrade = async (req, res, next) => {
 
 const exitTrade = async (req, res, next) => {
 	const { tradeId } = req.params;
+	console.log(tradeId);
 	try {
 		const closedTrade = await closeTrade(tradeId);
 		res.status(200).json({
@@ -36,6 +38,8 @@ const exitTrade = async (req, res, next) => {
 
 const updateTrade = async (req, res, next) => {
 	const tradeData = req.body;
+
+	console.log(req.body);
 	try {
 		const trade = await editTradeData(tradeData);
 		res.status(200).json({

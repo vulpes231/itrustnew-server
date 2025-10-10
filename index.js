@@ -8,7 +8,7 @@ require("dotenv").config();
 const { shutdownCronJobs, devRouter, initCronJobs } = require("./jobs/jobs");
 const { verifyJWT } = require("./middlewares/verifyJWT.js");
 const errorHandler = require("./middlewares/errorHandler.js");
-
+const { ROLES } = require("./utils/utils.js");
 const { requireRole } = require("./middlewares/requireRole.js");
 
 // Initialize cron jobs
@@ -60,7 +60,7 @@ const manageAdminRoute = require("./routes/admin/manageadmin.js");
 const manageTransactionRoute = require("./routes/admin/managetransaction.js");
 const manageWalletRoute = require("./routes/admin/managewallet.js");
 const manageTradeRoute = require("./routes/admin/managetrade.js");
-const { ROLES } = require("./utils/utils.js");
+const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 
 // routes
 
@@ -109,6 +109,11 @@ app.use(
 	"/managetrade",
 	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
 	manageTradeRoute
+);
+app.use(
+	"/managesavings",
+	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+	manageSavingsAccountRoute
 );
 
 let server;
