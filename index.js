@@ -60,6 +60,7 @@ const manageAdminRoute = require("./routes/admin/manageadmin.js");
 const manageTransactionRoute = require("./routes/admin/managetransaction.js");
 const manageWalletRoute = require("./routes/admin/managewallet.js");
 const manageTradeRoute = require("./routes/admin/managetrade.js");
+const managePlansRoute = require("./routes/admin/manageplans.js");
 const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 
 // routes
@@ -114,6 +115,11 @@ app.use(
 	"/managesavings",
 	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
 	manageSavingsAccountRoute
+);
+app.use(
+	"/manageplans",
+	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+	managePlansRoute
 );
 
 let server;

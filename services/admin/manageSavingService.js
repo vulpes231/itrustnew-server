@@ -2,7 +2,7 @@ const { default: mongoose } = require("mongoose");
 const SavingsAccount = require("../../models/Savingsaccount");
 const { CustomError } = require("../../utils/utils");
 const { fetchAvailableSavings } = require("../user/savingsService");
-// mongoose
+
 async function newSavingsAccount(accountData) {
 	const {
 		name,
@@ -228,9 +228,22 @@ async function fetchAllSavingsAccount() {
 	}
 }
 
+async function getSavingAccountInfo(accountId) {
+	try {
+		const account = await SavingsAccount.findById(accountId);
+		if (!account) {
+			throw new CustomError("Account not found!", 404);
+		}
+		return account;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
 module.exports = {
 	newSavingsAccount,
 	editSavingsAccount,
 	deleteSavingsAccount,
 	fetchAllSavingsAccount,
+	getSavingAccountInfo,
 };

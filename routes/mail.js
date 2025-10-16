@@ -1,5 +1,5 @@
 const { Router } = require("express");
-const { sendLoginOtp, sendMailOtp } = require("../handlers/mailcontroller");
+const { sendLoginOtp, sendMailOtp } = require("../handlers/mailController");
 
 const router = Router();
 router.route("/loginotp").post(sendLoginOtp);

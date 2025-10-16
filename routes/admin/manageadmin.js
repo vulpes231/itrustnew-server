@@ -4,6 +4,7 @@ const {
 	getAdminInfo,
 	removeAdmin,
 	updateRole,
+	logoutAdminSession,
 } = require("../../handlers/admin/manageAdminHandler");
 const { requireRole } = require("../../middlewares/requireRole");
 const { ROLES } = require("../../utils/utils");
@@ -12,10 +13,12 @@ const router = Router();
 
 router
 	.route("/")
-	.get(requireRole([ROLES.ADMIN, ROLES.SUPER_USER]), getAdminInfo) // any admin can view info
+	.get(requireRole([ROLES.ADMIN, ROLES.SUPER_USER]), getAdminInfo)
 	.put(requireRole([ROLES.SUPER_USER]), updateRole)
-	.delete(requireRole([ROLES.SUPER_USER]), removeAdmin); // only superuser
-
+	.delete(requireRole([ROLES.SUPER_USER]), removeAdmin);
+router
+	.route("/logout")
+	.put(requireRole([ROLES.ADMIN, ROLES.SUPER_USER]), logoutAdminSession);
 router
 	.route("/all")
 	.get(requireRole([ROLES.ADMIN, ROLES.SUPER_USER]), getAdmins);

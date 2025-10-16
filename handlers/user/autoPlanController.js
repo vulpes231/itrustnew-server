@@ -1,22 +1,7 @@
 const {
-	addNewPlan,
 	fetchPlanById,
 	fetchPlans,
 } = require("../../services/user/autoPlanService");
-
-const createPlan = async (req, res, next) => {
-	const planData = req.body;
-	try {
-		const planName = await addNewPlan(planData);
-		res.status(201).json({
-			message: `${planName} added successfully`,
-			success: true,
-			data: null,
-		});
-	} catch (error) {
-		next(error);
-	}
-};
 
 const getPlan = async (req, res, next) => {
 	const { planId } = req.params;
@@ -59,4 +44,4 @@ const getAllPlans = async (req, res, next) => {
 	}
 };
 
-module.exports = { getAllPlans, getPlan, createPlan };
+module.exports = { getAllPlans, getPlan };

@@ -207,8 +207,23 @@ async function deleteAdmin(adminId) {
 	}
 }
 
+async function logoutAdmin(adminId) {
+	try {
+		const admin = await Admin.findById(adminId).select("-password");
+		if (!admin) {
+			throw new CustomError("Admin not found!", 404);
+		}
+		admin.refreshToken = null;
+		await admin.save();
+		return admin;
+	} catch (error) {
+		throw new CustomError(error.message, 500);
+	}
+}
+
 module.exports = {
 	loginAdmin,
+	logoutAdmin,
 	registerAdmin,
 	registerSuperUser,
 	updateAdminRole,

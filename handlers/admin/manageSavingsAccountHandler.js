@@ -3,6 +3,7 @@ const {
 	editSavingsAccount,
 	deleteSavingsAccount,
 	fetchAllSavingsAccount,
+	getSavingAccountInfo,
 } = require("../../services/admin/manageSavingService");
 
 const adminCreateSavings = async (req, res, next) => {
@@ -55,9 +56,24 @@ const getAllSavingsAccounts = async (req, res, next) => {
 	}
 };
 
+const getSavings = async (req, res, next) => {
+	const { accountId } = req.params;
+	try {
+		const acct = await getSavingAccountInfo(accountId);
+		res.status(200).json({
+			message: "Savings account Info fetched successfully.",
+			data: acct,
+			success: true,
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
 module.exports = {
 	adminCreateSavings,
 	adminEditSavings,
 	adminDeleteSavings,
 	getAllSavingsAccounts,
+	getSavings,
 };

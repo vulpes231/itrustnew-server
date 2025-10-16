@@ -3,6 +3,7 @@ const {
 	fetchAdminInfo,
 	deleteAdmin,
 	updateAdminRole,
+	logoutAdmin,
 } = require("../../services/admin/adminService");
 
 const getAdmins = async (req, res, next) => {
@@ -65,9 +66,28 @@ const removeAdmin = async (req, res, next) => {
 	}
 };
 
+const logoutAdminSession = async (req, res, next) => {
+	const adminId = req.user.adminId;
+	try {
+		await logoutAdmin(adminId);
+		res.clearCookie("jwt", {
+			httpOnly: true,
+			maxAge: 24 * 60 * 60 * 1000,
+		});
+		res.status(200).json({
+			message: `Admin logged out successfully.`,
+			success: true,
+			data: null,
+		});
+	} catch (error) {
+		next(error);
+	}
+};
+
 module.exports = {
 	updateRole,
 	getAdmins,
 	getAdminInfo,
 	removeAdmin,
+	logoutAdminSession,
 };
