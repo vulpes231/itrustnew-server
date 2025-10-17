@@ -29,9 +29,4 @@ const corsOptions = {
 	optionsSuccessStatus: 200,
 };
 
-// const corsOptions = {
-// 	origin: true, // Reflects request origin automatically
-// 	credentials: true, // Allow cookies/headers
-// };
-
 module.exports = { connectDB, corsOptions };
