@@ -1,7 +1,10 @@
 const { mongoose } = require("mongoose");
 require("dotenv").config();
 
-const allowedOrigins = ["http://localhost:5173"];
+const allowedOrigins = [
+	"http://localhost:5173",
+	"https://itrust-admin.netlify.app",
+];
 const DATABASE_URI = process.env.DATABASE_URI;
 
 async function connectDB() {
