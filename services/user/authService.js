@@ -46,11 +46,11 @@ async function registerService(userData) {
 	if (
 		!email ||
 		!phone ||
-		!dob //||
-		// !countryId ||
-		// !stateId ||
-		// !nationalityId ||
-		// !currencyId
+		!dob ||
+		!countryId ||
+		!stateId ||
+		!nationalityId ||
+		!currencyId
 	) {
 		throw new CustomError("Contact information required!", 400);
 	}
@@ -67,18 +67,15 @@ async function registerService(userData) {
 		if (existingMail) {
 			throw new CustomError("Email already in use!", 409);
 		}
-		// const countryInfo = await getCountryById(countryId);
-		// const stateInfo = await getStateById(stateId);
-		// const nationInfo = await getNationById(nationalityId);
-		// const currencyInfo = await getCurrencyById(currencyId);
+		const countryInfo = await getCountryById(countryId);
+		const stateInfo = await getStateById(stateId);
+		const nationInfo = await getNationById(nationalityId);
+		const currencyInfo = await getCurrencyById(currencyId);
 
 		const hashPassword = await bcrypt.hash(password, 10);
 
 		const [year, month, day] = dob.split("/");
 		const formattedDob = new Date(`${year}-${month}-${day}`);
-
-		// console.log(dob);
-		// console.log(formattedDob);
 
 		const userInfo = {
 			name: {
@@ -98,29 +95,29 @@ async function registerService(userData) {
 					zipCode: zipCode,
 				},
 			},
-			// locationDetails: {
-			// 	country: {
-			// 		countryId: countryInfo._id,
-			// 		name: countryInfo.name,
-			// 		phoneCode: countryInfo.phoneCode,
-			// 	},
-			// 	state: {
-			// 		stateId: stateInfo._id,
-			// 		name: stateInfo.name,
-			// 	},
-			// 	nationality: {
-			// 		id: nationInfo._id,
-			// 		name: nationInfo.name,
-			// 	},
-			// 	currency: {
-			// 		id: currencyInfo._id,
-			// 		name: currencyInfo.name,
-			// 		symbol: currencyInfo.symbol,
-			// 		sign: currencyInfo.sign,
-			// 		rate: currencyInfo.rate,
-			// 		fees: currencyInfo.fees,
-			// 	},
-			// },
+			locationDetails: {
+				country: {
+					countryId: countryInfo._id,
+					name: countryInfo.name,
+					phoneCode: countryInfo.phoneCode,
+				},
+				state: {
+					stateId: stateInfo._id,
+					name: stateInfo.name,
+				},
+				nationality: {
+					id: nationInfo._id,
+					name: nationInfo.name,
+				},
+				currency: {
+					id: currencyInfo._id,
+					name: currencyInfo.name,
+					symbol: currencyInfo.symbol,
+					sign: currencyInfo.sign,
+					rate: currencyInfo.rate,
+					fees: currencyInfo.fees,
+				},
+			},
 			personalDetails: {
 				dob: formattedDob,
 				ssn: ssn || null,
@@ -144,20 +141,33 @@ async function registerService(userData) {
 
 		const user = await getUserById(userId, session);
 
+		const accessToken = jwt.sign(
+			{
+				username: user.credentials.username,
+				userId: user._id,
+			},
+			process.env.ACCESS_TOKEN_SECRET,
+			{ expiresIn: "1d" }
+		);
+		const refreshToken = jwt.sign(
+			{
+				username: user.credentials.username,
+				userId: user._id,
+			},
+			process.env.REFRESH_TOKEN_SECRET,
+			{ expiresIn: "4d" }
+		);
+
 		await session.commitTransaction();
 		session.endSession();
 		return {
 			username: user.credentials.username,
-			email: user.credentials.email,
-			totalBalance:
-				cashWallet[0].totalBalance +
-				investWallet[0].totalBalance +
-				brokerageWallet[0].totalBalance,
+			accessToken,
+			refreshToken,
 		};
 	} catch (error) {
 		await session.abortTransaction();
 		session.endSession();
-		// console.log(error, "clg");
 		throw new CustomError(error.message, 500);
 	}
 }

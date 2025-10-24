@@ -101,7 +101,7 @@ async function verifyMail() {
 	}
 	try {
 		const user = await User.findById(userId);
-		if (!user) throw new CustomError("Invalid credentials", 404); // Generic error
+		if (!user) throw new CustomError("Invalid credentials", 404);
 
 		if (
 			user.accountStatus.otpBlockedUntil &&
@@ -112,19 +112,15 @@ async function verifyMail() {
 			});
 		}
 
-		// Check OTP expiry
 		if (!user.accountStatus.otp || new Date() > user.accountStatus.otpExpires) {
 			throw new CustomError("OTP expired or invalid", 400);
 		}
 
-		// Verify OTP
 		const otpMatch = await bcrypt.compare(code, user.accountStatus.otp);
 
 		if (!otpMatch) {
-			// Increment failed attempts
 			user.accountStatus.otpAttempts += 1;
 
-			// Block after 3 failed attempts for 15 mins
 			if (user.accountStatus.otpAttempts >= 3) {
 				user.accountStatus.otpBlockedUntil = new Date(
 					Date.now() + 15 * 60 * 1000

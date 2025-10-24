@@ -8,11 +8,19 @@ const registerUser = async (req, res, next) => {
 	if (!req.body) return res.status(400).json({ message: "Bad request!" });
 	try {
 		const userData = req.body;
-		const { username } = await registerService(userData);
+		const { username, accessToken, refreshToken } = await registerService(
+			userData
+		);
+		res.cookie("jwt", refreshToken, {
+			httpOnly: true,
+			secure: true,
+			maxAge: 1000 * 60 * 60 * 30,
+		});
 		res.status(201).json({
 			message: `${username} created successfully.`,
 			success: true,
 			data: null,
+			token: accessToken,
 		});
 	} catch (error) {
 		next(error);

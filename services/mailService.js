@@ -7,8 +7,8 @@ const bcrypt = require("bcryptjs");
 async function sendLoginCode(email) {
 	if (!email) throw new CustomError("Email required!", 400);
 
-	const otp = generateOtp(); // e.g., 6-digit code
-	const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins expiry
+	const otp = generateOtp();
+	const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
 	const subject = "Your iTrust Investments Login Verification Code";
 	const message = `
@@ -56,8 +56,8 @@ async function sendMailVerificationCode(email) {
 		throw new Error("Email required!", 400);
 	}
 
-	const otp = generateOtp(); // e.g., 6-digit code
-	const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins expiry
+	const otp = generateOtp();
+	const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
 	const subject = "Verify Your Email Address - iTrust Investments";
 	const message = `
