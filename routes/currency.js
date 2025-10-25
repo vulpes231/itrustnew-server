@@ -6,7 +6,7 @@ const {
 
 const router = Router();
 
-router.route("/all").get(getAllCurrencies);
+router.route("/").get(getAllCurrencies);
 router.route("/:currencyId").get(getCurrencyInfo);
 
 module.exports = router;

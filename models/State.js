@@ -8,7 +8,8 @@ const stateSchema = new Schema(
 			required: true,
 		},
 		countryId: {
-			type: String,
+			type: Schema.Types.ObjectId,
+			ref: "Country",
 			required: true,
 		},
 		status: {

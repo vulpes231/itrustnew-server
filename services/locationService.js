@@ -1,3 +1,4 @@
+const { default: mongoose } = require("mongoose");
 const Country = require("../models/Country");
 const Nationality = require("../models/Nationality");
 const State = require("../models/State");
@@ -91,6 +92,22 @@ async function searchCountries(query) {
 	}
 }
 
+async function getStatesByCountryId(countryId) {
+	if (!countryId) {
+		throw new CustomError("Invalid country ID!", 400);
+	}
+	try {
+		const states = await State.find({
+			countryId: new mongoose.Types.ObjectId(countryId),
+		}).lean();
+
+		return states;
+	} catch (error) {
+		console.log(error);
+		throw new CustomError(error.message, 500);
+	}
+}
+
 module.exports = {
 	getCountries,
 	getStates,
@@ -99,4 +116,5 @@ module.exports = {
 	getCountryById,
 	getNationById,
 	searchCountries,
+	getStatesByCountryId,
 };
