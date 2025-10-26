@@ -11,7 +11,7 @@ async function getCurrencies() {
 }
 
 async function getCurrencyById(currencyId) {
-	if (currencyId) {
+	if (!currencyId) {
 		throw new CustomError("Currency ID required!", 400);
 	}
 	try {

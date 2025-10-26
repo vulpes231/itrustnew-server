@@ -8,6 +8,7 @@ const registerUser = async (req, res, next) => {
 	if (!req.body) return res.status(400).json({ message: "Bad request!" });
 	try {
 		const userData = req.body;
+		console.log(req.body);
 		const { username, accessToken, refreshToken } = await registerService(
 			userData
 		);

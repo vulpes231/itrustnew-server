@@ -74,7 +74,7 @@ async function registerService(userData) {
 
 		const hashPassword = await bcrypt.hash(password, 10);
 
-		const [year, month, day] = dob.split("/");
+		const [day, month, year] = dob.split("/");
 		const formattedDob = new Date(`${year}-${month}-${day}`);
 
 		const userInfo = {

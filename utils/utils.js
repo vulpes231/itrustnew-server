@@ -11,7 +11,7 @@ const getClientIp = (req) => {
 	return ip.includes("::") ? ip.split(":").pop() : ip;
 };
 
-function generateOtp(length = 6) {
+function generateOtp(length = 4) {
 	const numbers = "0123456789"; // Include 0 as well
 	let otp = "";
 
