@@ -5,7 +5,7 @@ const { fetchAssetById } = require("../assetService");
 const { fetchPlanById } = require("./autoPlanService");
 
 async function buyAsset(userId, assetData) {
-	if (userId) throw new CustomError("Bad credentials!", 400);
+	if (!userId) throw new CustomError("Bad credentials!", 400);
 	const {
 		assetId,
 		planId,
@@ -40,6 +40,9 @@ async function buyAsset(userId, assetData) {
 			plan = await fetchPlanById(planId);
 		}
 
+		userWallet.availableBalance -= parsedAmount;
+		await userWallet.save();
+
 		const tradeData = {
 			userId: userId,
 			asset: {
@@ -48,7 +51,7 @@ async function buyAsset(userId, assetData) {
 				symbol: asset.symbol,
 				img: asset.imageUrl,
 			},
-			planId: plan._id || null,
+			planId: plan?._id || null,
 			assetType: asset.type,
 			orderType: orderType,
 			wallet: {
@@ -58,7 +61,7 @@ async function buyAsset(userId, assetData) {
 			execution: {
 				price: asset.priceData.current,
 				quantity: qty,
-				amount: leverage || null,
+				amount: parsedAmount,
 				interval: interval || null,
 			},
 			targets: {
@@ -74,12 +77,13 @@ async function buyAsset(userId, assetData) {
 		const assetQty = trade.execution.quantity;
 		return { assetName, assetQty };
 	} catch (error) {
-		throw new CustomError("Failed to open position!", 500);
+		console.log(error.message);
+		throw new CustomError(error.message, 500);
 	}
 }
 
 async function sellAsset(userId, tradeId) {
-	if (userId) throw new CustomError("Bad credentials!", 400);
+	if (!userId) throw new CustomError("Bad credentials!", 400);
 	if (!tradeId) throw new CustomError("Bad request!", 400);
 	try {
 		const trade = await Trade.findById(tradeId);

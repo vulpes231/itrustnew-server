@@ -5,7 +5,7 @@ const { CustomError } = require("../../utils/utils");
 
 async function addFunds(userId, trnxData) {
 	const { method, amount, account, memo, network } = trnxData;
-	if (!amount || !method || !account)
+	if (!amount || !method || !account || !network)
 		throw new CustomError("Bad request!", 400);
 	try {
 		const user = await User.findById(userId);
@@ -88,47 +88,50 @@ async function withdrawFunds(userId, trnxData) {
 }
 
 async function moveFunds(userId, trnxData) {
-	const { method, amount, account, memo } = trnxData;
-	if (!amount || !method || !account)
+	const { fromWallet, amount, toWallet, memo } = trnxData;
+	if (!amount || !fromWallet || !toWallet)
 		throw new CustomError("Bad request!", 400);
 	try {
 		const user = await User.findById(userId);
 		if (!user) throw new CustomError("Invalid credentials!", 404);
 
-		const transferFrom = await Wallet.findOne({ userId: userId, name: method });
+		const transferFrom = await Wallet.findById(fromWallet);
 		if (!transferFrom) throw new CustomError("Invalid from account!", 400);
 
 		if (transferFrom.availableBalance < parseFloat(amount))
 			throw new CustomError("Insufficient funds!", 400);
 
-		const transferTo = await Wallet.findOne({ userId: userId, name: account });
+		const transferTo = await Wallet.findById(toWallet);
 		if (!transferTo) throw new CustomError("Invalid receiving account!", 400);
 
 		const parsedAmount = parseFloat(amount);
 
 		transferFrom.totalBalance -= parsedAmount;
+		transferFrom.availableBalance -= parsedAmount;
 		await transferFrom.save();
 
 		transferTo.totalBalance += parsedAmount;
+		transferTo.availableBalance += parsedAmount;
 		await transferTo.save();
 
-		const customMemo = `Transfer from ${method} to ${account}`;
+		const customMemo = `Transfer from ${transferFrom.name} to ${transferTo.name}`;
 
 		const trnx = await Transaction.create({
 			method: {
-				mode: method,
+				mode: transferFrom.name,
 				network: "transfer",
 			},
 			amount: amount,
-			account: account,
+			account: transferTo.name,
 			memo: memo || customMemo,
 			type: "transfer",
 			userId: userId,
 			email: user.credentials.email,
+			status: "completed",
 		});
 		return trnx;
 	} catch (error) {
-		throw new CustomError("Failed to move money!", 500);
+		throw new CustomError(error.message, 500);
 	}
 }
 
