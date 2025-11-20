@@ -118,7 +118,7 @@ if (process.env.NODE_ENV === "development") {
 	const devRouter = express.Router();
 
 	devRouter.get("/trigger/:timeframe", async (req, res) => {
-		await updatePorfolioChart(req.params.timeframe);
+		await updatePortfolioChart(req.params.timeframe);
 		res.json({ status: "completed" });
 	});
 

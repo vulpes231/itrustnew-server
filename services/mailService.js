@@ -1,119 +1,118 @@
 const User = require("../models/User");
 const { sendMail } = require("../utils/mailer");
 const {
-	buildEmailMsg,
-	buildTwoFaMsg,
-	buildWelcomeMsg,
+  buildEmailMsg,
+  buildTwoFaMsg,
+  buildWelcomeMsg,
 } = require("../utils/messages");
 const { generateOtp, CustomError } = require("../utils/utils");
 const bcrypt = require("bcryptjs");
 
 async function sendLoginCode(email) {
-	if (!email) throw new CustomError("Email required!", 400);
+  if (!email) throw new CustomError("Email required!", 400);
 
-	const otp = generateOtp();
-	const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+  const otp = generateOtp();
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-	const subject = "Your iTrust Investments Login Verification Code";
+  const subject = "Your iTrust Investments Login Verification Code";
 
-	const msg = buildTwoFaMsg(otp);
+  const msg = buildTwoFaMsg(otp);
 
-	try {
-		const user = await User.findOne({ email });
-		if (!user) return true;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return true;
 
-		const hashedOtp = await bcrypt.hash(otp, 10);
-		user.accountStatus.otp = hashedOtp;
-		user.accountStatus.otpExpires = otpExpires;
-		user.accountStatus.otpAttempts = 0;
-		user.accountStatus.otpBlockedUntil = null;
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    user.accountStatus.otp = hashedOtp;
+    user.accountStatus.otpExpires = otpExpires;
+    user.accountStatus.otpAttempts = 0;
+    user.accountStatus.otpBlockedUntil = null;
 
-		await user.save();
-		await sendMail(email, subject, twoFaMessage);
-		return true;
-	} catch (error) {
-		throw new CustomError("OTP send error!", 500);
-	}
+    await user.save();
+    await sendMail(email, subject, twoFaMessage);
+    return true;
+  } catch (error) {
+    throw new CustomError("OTP send error!", 500);
+  }
 }
 
 async function sendMailVerificationCode(email) {
-	console.log("📧 Email sending Initiated...");
-	if (!email) {
-		throw new CustomError("Email required!", 400);
-	}
+  if (!email) {
+    throw new CustomError("Email required!", 400);
+  }
 
-	const otp = generateOtp();
-	const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+  const otp = generateOtp();
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-	const subject = "Verify Your Email Address - iTrust Investments";
-	const msg = buildEmailMsg(otp);
+  const subject = "Verify Your Email Address - iTrust Investments";
+  const msg = buildEmailMsg(otp);
 
-	try {
-		const user = await User.findOne({ email });
-		if (!user) return true;
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return true;
 
-		const hashedOtp = await bcrypt.hash(otp, 10);
-		user.accountStatus.otp = hashedOtp;
-		user.accountStatus.otpExpires = otpExpires;
-		user.accountStatus.otpAttempts = 0;
-		user.accountStatus.otpBlockedUntil = null;
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    user.accountStatus.otp = hashedOtp;
+    user.accountStatus.otpExpires = otpExpires;
+    user.accountStatus.otpAttempts = 0;
+    user.accountStatus.otpBlockedUntil = null;
 
-		await user.save();
+    await user.save();
 
-		const emailResult = await sendMail(email, subject, msg);
-		console.log(
-			"📧 Email sending completed:",
-			emailResult ? "Success" : "Failed"
-		);
+    const emailResult = await sendMail(email, subject, msg);
+    console.log(
+      "📧 Email sending completed:",
+      emailResult ? "Success" : "Failed"
+    );
 
-		return true;
-	} catch (error) {
-		console.log("❌ Failed to send verification email:", error);
-		throw new CustomError(
-			"Failed to send email verification code! Please try again later.",
-			500
-		);
-	}
+    return true;
+  } catch (error) {
+    console.log("❌ Failed to send verification email:", error);
+    throw new CustomError(
+      "Failed to send email verification code! Please try again later.",
+      error.statusCode
+    );
+  }
 }
 
 async function sendWelcomeMessage(email, username) {
-	const subject = "Welcome to iTrust Investments - Get Started Today!";
-	const msg = buildWelcomeMsg(username);
-	try {
-		await sendMail(email, subject, msg);
-	} catch (error) {
-		throw new CustomError(
-			"Failed to send welcome message! Please contact support if you need assistance.",
-			500
-		);
-	}
+  const subject = "Welcome to iTrust Investments - Get Started Today!";
+  const msg = buildWelcomeMsg(username);
+  try {
+    await sendMail(email, subject, msg);
+  } catch (error) {
+    throw new CustomError(
+      "Failed to send welcome message! Please contact support if you need assistance.",
+      error.statusCode
+    );
+  }
 }
 
 async function sendDepositAlert(email, amount, paymentMethod, currency) {
-	// Map payment methods to their full names and icons
-	const paymentMethodDetails = {
-		btc: { name: "Bitcoin", icon: "🟠" },
-		eth: { name: "Ethereum", icon: "🔷" },
-		usdt: { name: "USDT", icon: "💲" },
-		bank: { name: "Bank Transfer", icon: "🏦" },
-	};
+  // Map payment methods to their full names and icons
+  const paymentMethodDetails = {
+    btc: { name: "Bitcoin", icon: "🟠" },
+    eth: { name: "Ethereum", icon: "🔷" },
+    usdt: { name: "USDT", icon: "💲" },
+    bank: { name: "Bank Transfer", icon: "🏦" },
+  };
 
-	// Currency symbols
-	const currencySymbols = {
-		usd: "$",
-		eur: "€",
-		gbp: "£",
-	};
+  // Currency symbols
+  const currencySymbols = {
+    usd: "$",
+    eur: "€",
+    gbp: "£",
+  };
 
-	const symbol = currencySymbols[currency.toLowerCase()] || currency;
-	const method = paymentMethodDetails[paymentMethod.toLowerCase()] || {
-		name: paymentMethod,
-		icon: "",
-	};
+  const symbol = currencySymbols[currency.toLowerCase()] || currency;
+  const method = paymentMethodDetails[paymentMethod.toLowerCase()] || {
+    name: paymentMethod,
+    icon: "",
+  };
 
-	const subject = `Deposit Successful - ${symbol}${amount} ${currency.toUpperCase()} Received`;
+  const subject = `Deposit Successful - ${symbol}${amount} ${currency.toUpperCase()} Received`;
 
-	const message = `
+  const message = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -144,8 +143,8 @@ async function sendDepositAlert(email, amount, paymentMethod, currency) {
             <p style="font-size: 18px; margin: 0;">
                 <span class="method-icon">${method.icon}</span>
                 <strong>${symbol}${amount} ${currency.toUpperCase()}</strong> via ${
-		method.name
-	}
+    method.name
+  }
             </p>
         </div>
         
@@ -169,40 +168,40 @@ async function sendDepositAlert(email, amount, paymentMethod, currency) {
     </html>
     `;
 
-	try {
-		await sendMail(email, subject, message);
-	} catch (error) {
-		throw new CustomError(
-			"Failed to send deposit alert. Your funds are safe - this is just a notification failure!",
-			500
-		);
-	}
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    throw new CustomError(
+      "Failed to send deposit alert. Your funds are safe - this is just a notification failure!",
+      500
+    );
+  }
 }
 
 async function sendWithdrawalAlert(email, amount, paymentMethod, currency) {
-	const subject = "Withdrawal completed.";
-	const message = ``;
-	try {
-		await sendMail(email, subject, message);
-	} catch (error) {
-		throw new CustomError("Failed to send withdrawal alert!", 500);
-	}
+  const subject = "Withdrawal completed.";
+  const message = ``;
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    throw new CustomError("Failed to send withdrawal alert!", 500);
+  }
 }
 
 async function sendTradeAlert(email, action, asset, quantity) {
-	// Validate and normalize input
-	action = action.toLowerCase();
+  // Validate and normalize input
+  action = action.toLowerCase();
 
-	const actionVerb =
-		{
-			bought: "purchased",
-			sold: "sold",
-			// Add more actions as needed
-		}[action] || action;
+  const actionVerb =
+    {
+      bought: "purchased",
+      sold: "sold",
+      // Add more actions as needed
+    }[action] || action;
 
-	const subject = `Trade Confirmation: You ${action} ${quantity} ${asset.name}`;
+  const subject = `Trade Confirmation: You ${action} ${quantity} ${asset.name}`;
 
-	const message = `
+  const message = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -214,16 +213,16 @@ async function sendTradeAlert(email, action, asset, quantity) {
             .trade-box { 
                 background-color: #f8f9fa; 
                 border-left: 4px solid ${
-									action === "bought" ? "#28a745" : "#dc3545"
-								};
+                  action === "bought" ? "#28a745" : "#dc3545"
+                };
                 padding: 15px;
                 margin: 20px 0;
                 border-radius: 4px;
             }
             .asset-icon { font-size: 24px; margin-right: 10px; vertical-align: middle; }
             .action-${action} { color: ${
-		action === "bought" ? "#28a745" : "#dc3545"
-	}; font-weight: bold; }
+    action === "bought" ? "#28a745" : "#dc3545"
+  }; font-weight: bold; }
         </style>
     </head>
     <body>
@@ -240,8 +239,8 @@ async function sendTradeAlert(email, action, asset, quantity) {
                 <span class="asset-icon">${asset.img}</span>
                 You <span class="action-${action}">${actionVerb}</span> 
                 <strong>${quantity} ${asset.symbol}${asset.name}</strong> (${
-		asset.name
-	})
+    asset.name
+  })
             </p>
         </div>
         
@@ -265,18 +264,18 @@ async function sendTradeAlert(email, action, asset, quantity) {
     </html>
     `;
 
-	try {
-		await sendMail(email, subject, message);
-	} catch (error) {
-		throw new CustomError("Failed to send trade alert!", 500);
-	}
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    throw new CustomError("Failed to send trade alert!", 500);
+  }
 }
 
 module.exports = {
-	sendDepositAlert,
-	sendWithdrawalAlert,
-	sendTradeAlert,
-	sendMailVerificationCode,
-	sendWelcomeMessage,
-	sendLoginCode,
+  sendDepositAlert,
+  sendWithdrawalAlert,
+  sendTradeAlert,
+  sendMailVerificationCode,
+  sendWelcomeMessage,
+  sendLoginCode,
 };

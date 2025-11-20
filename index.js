@@ -10,8 +10,26 @@ const { verifyJWT } = require("./middlewares/verifyJWT.js");
 const errorHandler = require("./middlewares/errorHandler.js");
 const { ROLES } = require("./utils/utils.js");
 const { requireRole } = require("./middlewares/requireRole.js");
+const workerService = require("./services/workerService.js");
+const queueService = require("./services/queueService.js");
 
-// Initialize cron jobs
+async function initializeServices() {
+  try {
+    await queueService.connect();
+    console.log("✅ Queue service connected");
+
+    await workerService.startEmailWorker();
+    console.log("✅ Email worker started");
+
+    // Start other workers if you have them
+    // await workerService.startTransactionWorker();
+    // await workerService.startNotificationWorker();
+  } catch (error) {
+    console.error("❌ Failed to initialize services:", error);
+    throw error;
+  }
+}
+
 initCronJobs();
 
 const app = express();
@@ -22,11 +40,10 @@ app.use(cors(corsOptions));
 connectDB();
 
 if (process.env.NODE_ENV === "development") {
-	app.use("/test-crons", devRouter);
+  app.use("/test-crons", devRouter);
 }
 
 // Middleware
-
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
@@ -64,7 +81,6 @@ const managePlansRoute = require("./routes/admin/manageplans.js");
 const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 
 // routes
-
 app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
 app.use("/signup", userRegisterRoute);
@@ -92,98 +108,92 @@ app.use("/savings", savingsRoute);
 //admin protected routes
 app.use("/manageadmin", manageAdminRoute);
 app.use(
-	"/manageuser",
-	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-	manageUserRoute
+  "/manageuser",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageUserRoute
 );
 app.use(
-	"/managetrans",
-	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-	manageTransactionRoute
+  "/managetrans",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageTransactionRoute
 );
 app.use(
-	"/managewallet",
-	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-	manageWalletRoute
+  "/managewallet",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageWalletRoute
 );
 app.use(
-	"/managetrade",
-	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-	manageTradeRoute
+  "/managetrade",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageTradeRoute
 );
 app.use(
-	"/managesavings",
-	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-	manageSavingsAccountRoute
+  "/managesavings",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageSavingsAccountRoute
 );
 app.use(
-	"/manageplans",
-	requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-	managePlansRoute
+  "/manageplans",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  managePlansRoute
 );
 
 let server;
-mongoose.connection.once("connected", () => {
-	server = app.listen(PORT, () =>
-		console.log(`Server started on http://localhost:${PORT}`)
-	);
+
+mongoose.connection.once("connected", async () => {
+  await initializeServices();
+  server = app.listen(PORT, () =>
+    console.log(`Server started on http://localhost:${PORT}`)
+  );
 });
 
 app.use(errorHandler);
 app.use(errorLogger);
 
 const shutdown = async (signal) => {
-	console.log(`\nReceived ${signal}, shutting down gracefully...`);
+  console.log(`\nReceived ${signal}, shutting down gracefully...`);
 
-	// Track if we've already started shutting down
-	if (global.isShuttingDown) return;
-	global.isShuttingDown = true;
+  if (global.isShuttingDown) return;
+  global.isShuttingDown = true;
 
-	const shutdownTimeout = setTimeout(() => {
-		console.error("Shutdown timeout forced");
-		process.exit(1);
-	}, 15000); // 15 second timeout
+  const shutdownTimeout = setTimeout(() => {
+    console.error("Shutdown timeout forced");
+    process.exit(1);
+  }, 15000);
 
-	try {
-		// 1. Stop accepting new connections
-		if (server) {
-			console.log("Closing HTTP server...");
-			await new Promise((resolve) => {
-				server.close((err) => {
-					if (err) console.error("HTTP server close error:", err);
-					resolve();
-				});
-				// Force close connections after 8 seconds
-				setTimeout(() => server.closeAllConnections(), 8000);
-			});
-			console.log("✅ HTTP server closed");
-		}
+  try {
+    if (server) {
+      console.log("Closing HTTP server...");
+      await new Promise((resolve) => {
+        server.close((err) => {
+          if (err) console.error("HTTP server close error:", err);
+          resolve();
+        });
 
-		// 2. Stop cron jobs
-		console.log("Stopping cron jobs...");
-		await shutdownCronJobs();
-		console.log("✅ Cron jobs stopped");
+        setTimeout(() => server.closeAllConnections(), 8000);
+      });
+      console.log("✅ HTTP server closed");
+    }
 
-		// 3. Close MongoDB connection
-		if (mongoose.connection.readyState === 1) {
-			console.log("Closing MongoDB connection...");
-			await mongoose.disconnect();
-			console.log("✅ MongoDB connection closed");
-		}
+    await shutdownCronJobs();
 
-		// 4. Close other resources (redis, etc.) if any
-		// await redisClient.quit();
+    await queueService.close();
 
-		console.log("🛑 Shutdown complete");
-		clearTimeout(shutdownTimeout);
-		process.exit(0);
-	} catch (err) {
-		console.error("❌ Shutdown error:", err);
-		clearTimeout(shutdownTimeout);
-		process.exit(1);
-	}
+    if (mongoose.connection.readyState === 1) {
+      console.log("Closing MongoDB connection...");
+      await mongoose.disconnect();
+      console.log("✅ MongoDB connection closed");
+    }
+
+    console.log("🛑 Shutdown complete");
+    clearTimeout(shutdownTimeout);
+    process.exit(0);
+  } catch (err) {
+    console.error("❌ Shutdown error:", err);
+    clearTimeout(shutdownTimeout);
+    process.exit(1);
+  }
 };
 
-// Handle signals
 process.on("SIGINT", () => shutdown("SIGINT"));
 process.on("SIGTERM", () => shutdown("SIGTERM"));
