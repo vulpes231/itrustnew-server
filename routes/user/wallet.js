@@ -1,7 +1,7 @@
 const { Router } = require("express");
 const {
-	getUserWallets,
-	getWalletAnalytics,
+  getUserWallets,
+  getWalletAnalytics,
 } = require("../../handlers/user/walletController");
 
 const router = Router();
