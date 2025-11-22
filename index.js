@@ -20,10 +20,6 @@ async function initializeServices() {
 
     await workerService.startEmailWorker();
     console.log("✅ Email worker started");
-
-    // Start other workers if you have them
-    // await workerService.startTransactionWorker();
-    // await workerService.startNotificationWorker();
   } catch (error) {
     console.error("❌ Failed to initialize services:", error);
     throw error;

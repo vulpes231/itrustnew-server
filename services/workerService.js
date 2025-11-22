@@ -2,10 +2,49 @@ const emailService = require("./mailService");
 const queueService = require("./queueService");
 
 class EmailWorkerService {
-  async startEmailWorker() {
-    console.log("Starting email worker...");
+  constructor() {
+    this.queueName = "email_queue";
+    this.isConsuming = false;
+  }
 
-    await queueService.consume("email_queue", async (emailData) => {
+  async startEmailWorker() {
+    if (this.isConsuming) {
+      console.log("Email worker already running");
+      return;
+    }
+
+    console.log("Starting email worker...");
+    this.isConsuming = true;
+
+    await this.consumeEmails();
+
+    queueService.connection?.on("close", () => {
+      console.warn(
+        "Email worker: RabbitMQ connection closed. Restarting consumer..."
+      );
+      this.restartConsumer();
+    });
+
+    queueService.channel?.on("close", () => {
+      console.warn(
+        "Email worker: RabbitMQ channel closed. Restarting consumer..."
+      );
+      this.restartConsumer();
+    });
+  }
+
+  async restartConsumer() {
+    if (!this.isConsuming) return;
+
+    // Delay to allow reconnection
+    setTimeout(() => {
+      console.log("Email worker reconnecting to queue...");
+      this.consumeEmails();
+    }, 3000);
+  }
+
+  async consumeEmails() {
+    await queueService.consume(this.queueName, async (emailData) => {
       try {
         console.log("Processing email:", emailData.type, "to:", emailData.to);
 
@@ -28,8 +67,8 @@ class EmailWorkerService {
 
         console.log(`${emailData.type} sent successfully to:`, emailData.to);
       } catch (error) {
-        console.error(`Failed to send ${emailData.type} email:`, error);
-        throw error;
+        console.error(`Failed to process email ${emailData.type}:`, error);
+        throw error; // triggers NACK auto-retry
       }
     });
   }
