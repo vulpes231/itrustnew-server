@@ -158,10 +158,28 @@ async function registerService(userData) {
       { expiresIn: "4d" }
     );
 
+    const userData = {
+      credentials: {
+        username: user.credentials.username,
+        email: email,
+      },
+      identityVerification: {
+        kycStatus: user.identityVerification.kycStatus,
+      },
+      accountStatus: {
+        status: user.accountStatus.status,
+        banned: user.accountStatus.banned,
+        emailVerified: user.accountStatus.emailVerified,
+        twoFaActivated: user.accountStatus.twoFaActivated,
+        twoFaVerified: user.accountStatus.twoFaVerified,
+        otp: user.accountStatus.otp,
+      },
+    };
+
     await session.commitTransaction();
     session.endSession();
     return {
-      username: user.credentials.username,
+      userInfo: userData,
       accessToken,
       refreshToken,
     };

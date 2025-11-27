@@ -16,12 +16,12 @@ const queueService = require("./services/queueService.js");
 async function initializeServices() {
   try {
     await queueService.connect();
-    console.log("✅ Queue service connected");
+    console.log("Queue service connected");
 
     await workerService.startEmailWorker();
-    console.log("✅ Email worker started");
+    console.log("Email worker started");
   } catch (error) {
-    console.error("❌ Failed to initialize services:", error);
+    console.error("Failed to initialize services:", error);
     throw error;
   }
 }
@@ -168,7 +168,7 @@ const shutdown = async (signal) => {
 
         setTimeout(() => server.closeAllConnections(), 8000);
       });
-      console.log("✅ HTTP server closed");
+      console.log("HTTP server closed");
     }
 
     await shutdownCronJobs();
@@ -185,7 +185,7 @@ const shutdown = async (signal) => {
     clearTimeout(shutdownTimeout);
     process.exit(0);
   } catch (err) {
-    console.error("❌ Shutdown error:", err);
+    console.error("Shutdown error:", err);
     clearTimeout(shutdownTimeout);
     process.exit(1);
   }

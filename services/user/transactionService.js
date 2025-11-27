@@ -159,7 +159,6 @@ async function getUserTrnxAnalytics(userId) {
   try {
     const transactions = await Transaction.find({ userId });
 
-    // Filter deposits/withdrawals (more efficient with single loop)
     let totalDeposit = 0;
     let totalWithdrawal = 0;
 
@@ -174,7 +173,7 @@ async function getUserTrnxAnalytics(userId) {
       netBalance: totalDeposit - totalWithdrawal,
     };
   } catch (error) {
-    throw new CustomError("Transaction analytics error:", 500);
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 

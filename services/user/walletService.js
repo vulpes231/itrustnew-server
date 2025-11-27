@@ -39,6 +39,10 @@ async function getUserFinancialSummary(userId) {
       (sum, wallet) => sum + (wallet.totalBalance || 0),
       0
     );
+    const availableBalnce = wallets.reduce(
+      (sum, wallet) => sum + (wallet.availableBalance || 0),
+      0
+    );
 
     const dailyProfit = wallets.reduce(
       (sum, wallet) => sum + (wallet.dailyProfit || 0),
@@ -68,12 +72,13 @@ async function getUserFinancialSummary(userId) {
       totalProfitPercent: Number(totalProfitPercent.toFixed(2)),
       totalInvested,
       totalProfit,
+      availableBalnce,
     };
   } catch (error) {
     if (error instanceof CustomError) {
       throw error;
     }
-    throw new CustomError(error.message, 500);
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 

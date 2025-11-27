@@ -10,7 +10,7 @@ const registerUser = async (req, res, next) => {
   try {
     const userData = req.body;
 
-    const { username, accessToken, refreshToken } =
+    const { userInfo, accessToken, refreshToken } =
       await authService.registerService(userData);
 
     await queueService.sendToQueue("email_queue", {
@@ -25,9 +25,9 @@ const registerUser = async (req, res, next) => {
     });
 
     res.status(201).json({
-      message: `${username} created successfully.`,
+      message: `${userInfo.credentials.username} created successfully.`,
       success: true,
-      data: null,
+      data: userInfo,
       token: accessToken,
     });
   } catch (error) {

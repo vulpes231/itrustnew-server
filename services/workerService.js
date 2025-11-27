@@ -68,7 +68,7 @@ class EmailWorkerService {
         console.log(`${emailData.type} sent successfully to:`, emailData.to);
       } catch (error) {
         console.error(`Failed to process email ${emailData.type}:`, error);
-        throw error; // triggers NACK auto-retry
+        throw error;
       }
     });
   }
