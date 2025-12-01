@@ -2,6 +2,89 @@ const verifyService = require("../../services/user/verifyService");
 const userService = require("../../services/user/userService");
 const queueService = require("../../services/queueService");
 
+const sharp = require("sharp");
+const path = require("path");
+const fs = require("fs").promises;
+const crypto = require("crypto");
+const { generateFileName } = require("../../utils/utils");
+
+const STORAGE_PATH = path.join(__dirname, "../../storage");
+const PUBLIC_STORAGE_PATH = "/storage";
+
+const submitDetails = async (req, res, next) => {
+  const { userId } = req.user;
+
+  try {
+    const reqData = req.body;
+
+    if (!req.files || req.files.length < 2) {
+      return res.status(400).json({
+        message: "Both front and back ID images are required.",
+        success: false,
+      });
+    }
+
+    const frontId = req.files[0];
+    const backId = req.files[1];
+
+    await fs.mkdir(STORAGE_PATH, { recursive: true });
+
+    // Process and save front ID image
+    const frontFileName = generateFileName(frontId.originalname, "front");
+    const frontFilePath = path.join(STORAGE_PATH, frontFileName);
+
+    await sharp(frontId.buffer)
+      .resize(800, 600, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 80 })
+      .toFile(frontFilePath);
+
+    // Process and save back ID image
+    const backFileName = generateFileName(backId.originalname, "back");
+    const backFilePath = path.join(STORAGE_PATH, backFileName);
+
+    await sharp(backId.buffer)
+      .resize(800, 600, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 80 })
+      .toFile(backFilePath);
+
+    let frontIdPath = `${PUBLIC_STORAGE_PATH}/${frontFileName}`;
+    let backIdPath = `${PUBLIC_STORAGE_PATH}/${backFileName}`;
+
+    const userData = {
+      ...reqData,
+      userId,
+      frontId: frontIdPath,
+      backId: backIdPath,
+      frontIdName: frontFileName,
+      backIdName: backFileName,
+    };
+
+    const isSubmitted = await verifyService.submitVerification(userData);
+
+    if (!isSubmitted)
+      return res
+        .status(500)
+        .json({ message: "Failed to submit.", success: false });
+
+    res.status(200).json({
+      message: "Verification request pending.",
+      data: {
+        frontId: frontIdPath,
+        backId: backIdPath,
+      },
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const verifyLoginCode = async (req, res, next) => {
   const authData = req.body;
   try {
@@ -50,6 +133,4 @@ const verifyEmailCode = async (req, res, next) => {
   }
 };
 
-const approveAccount = async (req, res, next) => {};
-
-module.exports = { verifyLoginCode, verifyEmailCode };
+module.exports = { verifyLoginCode, verifyEmailCode, submitDetails };

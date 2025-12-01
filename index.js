@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const { connectDB, corsOptions } = require("./configs/settings.js");
 const { errorLogger, reqLogger } = require("./middlewares/loggers.js");
 const { mongoose } = require("mongoose");
+const path = require("path");
 require("dotenv").config();
 const { shutdownCronJobs, devRouter, initCronJobs } = require("./jobs/jobs");
 const { verifyJWT } = require("./middlewares/verifyJWT.js");
@@ -42,6 +43,7 @@ if (process.env.NODE_ENV === "development") {
 // Middleware
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use("/storage", express.static(path.join(__dirname, "storage")));
 app.use(cookieParser());
 app.use(reqLogger);
 
@@ -64,6 +66,7 @@ const watchlistRoute = require("./routes/user/watchlist.js");
 const investPlanRoute = require("./routes/user/autoplan.js");
 const tradeRoute = require("./routes/user/trade.js");
 const savingsRoute = require("./routes/user/savings.js");
+const kycRoute = require("./routes/user/kyc.js");
 
 // admin routers
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
@@ -100,6 +103,7 @@ app.use("/transaction", transactionRoute);
 app.use("/watchlist", watchlistRoute);
 app.use("/trade", tradeRoute);
 app.use("/savings", savingsRoute);
+app.use("/kyc", kycRoute);
 
 //admin protected routes
 app.use("/manageadmin", manageAdminRoute);
