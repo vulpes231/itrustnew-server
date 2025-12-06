@@ -44,14 +44,14 @@ async function addFunds(userId, trnxData) {
 
 async function withdrawFunds(userId, trnxData) {
   const { method, amount, account, memo, network } = trnxData;
-  if (!amount || !method || !account)
+  if (!amount || !method || !account || !network)
     throw new CustomError("Bad request!", 400);
   try {
     const user = await User.findById(userId);
     if (!user) throw new CustomError("Invalid credentials!", 404);
 
     if (user.identityVerification.kycStatus !== "completed")
-      throw new CustomError("Account not verified!", 403);
+      throw new CustomError("Account not verified!", 400);
 
     const wallets = await Wallet.find({ userId });
     if (wallets.length < 1) {
@@ -83,7 +83,7 @@ async function withdrawFunds(userId, trnxData) {
     });
     return trnx;
   } catch (error) {
-    throw new CustomError("Failed to withdraw money!", 500);
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -131,7 +131,7 @@ async function moveFunds(userId, trnxData) {
     });
     return trnx;
   } catch (error) {
-    throw new CustomError(error.message, 500);
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -140,7 +140,7 @@ async function getUserLedger(userId) {
     const transactions = await Transaction.find({ userId }).lean();
     return transactions;
   } catch (error) {
-    throw new CustomError(error.message, 500);
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -151,7 +151,7 @@ async function cancelTransaction(transactionId) {
     await transaction.save();
     return transaction;
   } catch (error) {
-    throw new CustomError(error.message, 500);
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -185,7 +185,7 @@ async function fetchTransactionInfo(transactionId) {
 
     return transaction;
   } catch (error) {
-    throw new CustomError(error.message, 500);
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
