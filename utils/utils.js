@@ -1,4 +1,6 @@
 require("dotenv").config();
+const crypto = require("crypto");
+const path = require("path");
 
 const getClientIp = (req) => {
   // Destructure from headers first (for proxy servers)
@@ -38,7 +40,7 @@ const ROLES = {
   SUPER_USER: process.env.SUPER_USER_CODE,
 };
 
-const generateFileName = (originalName, type) => {
+const generateFileName = (originalName, type, userId) => {
   const timestamp = Date.now();
   const randomString = crypto.randomBytes(8).toString("hex");
   const ext = path.extname(originalName);

@@ -5,10 +5,6 @@ const verificationSchema = new Schema({
     type: String,
     required: true,
   },
-  dob: {
-    type: String,
-    required: true,
-  },
   idType: {
     type: String,
     required: true,

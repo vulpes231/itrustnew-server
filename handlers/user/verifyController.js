@@ -5,14 +5,15 @@ const queueService = require("../../services/queueService");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs").promises;
-const crypto = require("crypto");
+
 const { generateFileName } = require("../../utils/utils");
 
 const STORAGE_PATH = path.join(__dirname, "../../storage");
 const PUBLIC_STORAGE_PATH = "/storage";
 
 const submitDetails = async (req, res, next) => {
-  const { userId } = req.user;
+  const userId = req.user.userId;
+  console.log(userId);
 
   try {
     const reqData = req.body;
@@ -24,13 +25,27 @@ const submitDetails = async (req, res, next) => {
       });
     }
 
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
     const frontId = req.files[0];
     const backId = req.files[1];
 
+    if (
+      !allowedMimeTypes.includes(frontId.mimetype) ||
+      !allowedMimeTypes.includes(backId.mimetype)
+    ) {
+      return res.status(400).json({
+        message: "Only image files are allowed.",
+        success: false,
+      });
+    }
+
     await fs.mkdir(STORAGE_PATH, { recursive: true });
 
-    // Process and save front ID image
-    const frontFileName = generateFileName(frontId.originalname, "front");
+    const frontFileName = generateFileName(
+      frontId.originalname,
+      "front",
+      userId
+    );
     const frontFilePath = path.join(STORAGE_PATH, frontFileName);
 
     await sharp(frontId.buffer)
@@ -41,8 +56,7 @@ const submitDetails = async (req, res, next) => {
       .webp({ quality: 80 })
       .toFile(frontFilePath);
 
-    // Process and save back ID image
-    const backFileName = generateFileName(backId.originalname, "back");
+    const backFileName = generateFileName(backId.originalname, "back", userId);
     const backFilePath = path.join(STORAGE_PATH, backFileName);
 
     await sharp(backId.buffer)
@@ -58,7 +72,7 @@ const submitDetails = async (req, res, next) => {
 
     const userData = {
       ...reqData,
-      userId,
+      userId: userId,
       frontId: frontIdPath,
       backId: backIdPath,
       frontIdName: frontFileName,

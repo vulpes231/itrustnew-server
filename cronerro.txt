@@ -1,0 +1,39 @@
+[2025-12-08T09:00:00.117Z] Starting hourly update
+Starting trade performance update...
+Found 6 open trades to update.
+Fetching current prices for 5 assets...
+Fetching assets (attempt 1/3)...
+Attempt 1 failed: Cannot destructure property 'page' of 'queryData' as it is undefined.
+❌ hourly update failed after 0 users: MongoBulkWriteError: Resulting document after update is larger than 16777216
+    at OrderedBulkOperation.handleWriteError (/Users/Scoring/Desktop/migration/node_modules/mongoose/node_modules/mongodb/lib/bulk/common.js:804:19)
+    at executeCommands (/Users/Scoring/Desktop/migration/node_modules/mongoose/node_modules/mongodb/lib/bulk/common.js:346:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /Users/Scoring/Desktop/migration/node_modules/mongoose/node_modules/mongodb/lib/bulk/common.js:790:24
+    at async MongoClient.withSession (/Users/Scoring/Desktop/migration/node_modules/mongoose/node_modules/mongodb/lib/mongo_client.js:477:20)
+    at async OrderedBulkOperation.execute (/Users/Scoring/Desktop/migration/node_modules/mongoose/node_modules/mongodb/lib/bulk/common.js:789:20)
+    at async Collection.bulkWrite (/Users/Scoring/Desktop/migration/node_modules/mongoose/node_modules/mongodb/lib/collection.js:224:16)
+    at async Function.bulkWrite (/Users/Scoring/Desktop/migration/node_modules/mongoose/lib/model.js:3449:13)
+    at async updatePortfolioChart (/Users/Scoring/Desktop/migration/jobs/customJobs.js:162:22) {
+  errorLabelSet: Set(0) {},
+  errorResponse: {
+    message: 'Resulting document after update is larger than 16777216',
+    code: 17419,
+    writeErrors: [ [WriteError] ]
+  },
+  code: 17419,
+  writeErrors: [ WriteError { err: [Object] } ],
+  result: BulkWriteResult {
+    insertedCount: 0,
+    matchedCount: 0,
+    modifiedCount: 0,
+    deletedCount: 0,
+    upsertedCount: 0,
+    upsertedIds: {},
+    insertedIds: {}
+  }
+}
+Fetching assets (attempt 2/3)...
+Attempt 2 failed: Cannot destructure property 'page' of 'queryData' as it is undefined.
+Fetching assets (attempt 3/3)...
+Attempt 3 failed: Cannot destructure property 'page' of 'queryData' as it is undefined.
+Error fetching assets after retries: Cannot destructure property 'page' of 'queryData' as it is undefined.

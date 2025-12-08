@@ -150,13 +150,16 @@ async function submitVerification(userData) {
     userId,
     frontId,
     backId,
-    dob,
-    fullname,
+    lastname,
+    firstname,
     idType,
     idNumber,
     frontIdName,
-    backIdname,
+    backIdName,
   } = userData;
+
+  if (!idType || !idNumber || !firstname || !lastname || !userId)
+    throw new CustomError("Bad request!", 400);
   try {
     const user = await User.findById(userId);
     if (!user) throw new CustomError("User not found!", 404);
@@ -165,19 +168,18 @@ async function submitVerification(userData) {
       userId,
       frontId,
       backId,
-      dob,
-      fullname,
+      fullname: `${firstname} ${lastname}`,
       idType,
       idNumber,
       frontIdName,
-      backIdname,
-      fon,
+      backIdName,
     });
 
     user.identityVerification.kycStatus = "pending";
     await user.save();
     return true;
   } catch (error) {
+    console.log(error);
     throw new CustomError(error.message, error.statusCode);
   }
 }
