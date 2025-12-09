@@ -67,6 +67,7 @@ const investPlanRoute = require("./routes/user/autoplan.js");
 const tradeRoute = require("./routes/user/trade.js");
 const savingsRoute = require("./routes/user/savings.js");
 const kycRoute = require("./routes/user/kyc.js");
+const settingsRoute = require("./routes/user/settings.js");
 
 // admin routers
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
@@ -77,6 +78,7 @@ const manageTransactionRoute = require("./routes/admin/managetransaction.js");
 const manageWalletRoute = require("./routes/admin/managewallet.js");
 const manageTradeRoute = require("./routes/admin/managetrade.js");
 const managePlansRoute = require("./routes/admin/manageplans.js");
+const manageSettingsRoute = require("./routes/admin/managesettings.js");
 const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 
 // routes
@@ -104,6 +106,7 @@ app.use("/watchlist", watchlistRoute);
 app.use("/trade", tradeRoute);
 app.use("/savings", savingsRoute);
 app.use("/kyc", kycRoute);
+app.use("/settings", settingsRoute);
 
 //admin protected routes
 app.use("/manageadmin", manageAdminRoute);
@@ -136,6 +139,11 @@ app.use(
   "/manageplans",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
   managePlansRoute
+);
+app.use(
+  "/managesettings",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageSettingsRoute
 );
 
 let server;
