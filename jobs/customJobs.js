@@ -1,311 +1,22 @@
-// const mongoose = require("mongoose");
-// const cron = require("node-cron");
-const Chart = require("../models/Chart");
 const Wallet = require("../models/Wallet");
 const Trade = require("../models/Trade");
-const { fetchAssets } = require("../services/assetService");
 const User = require("../models/User");
 const { logEvent } = require("../middlewares/loggers");
 const axios = require("axios");
 const Asset = require("../models/Asset");
+const portFolioTracker = require("../services/user/chartService");
 
 const BATCH_SIZE = process.env.CRON_BATCH_SIZE || 50;
 const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
 const COIN_GECKO_API_URL = "https://api.coingecko.com/api/v3";
 const VS_CURRENCY = "usd";
-const REQUEST_DELAY = 6500; // 6.5 seconds between batches
-
-const updateTradePerformance = async () => {
-  try {
-    console.log("Starting trade performance update...");
-    const startTime = Date.now();
-
-    // Fetch all open trades
-    const openTrades = await Trade.find({ status: "open" })
-      .populate("userId", "name email")
-      .exec();
-
-    if (openTrades.length === 0) {
-      console.log("No open trades found.");
-      return;
-    }
-
-    console.log(`Found ${openTrades.length} open trades to update.`);
-
-    // Get all unique asset symbols from open trades
-    const assetSymbols = [
-      ...new Set(
-        openTrades
-          .filter((trade) => trade.asset && trade.asset.symbol)
-          .map((trade) => trade.asset.symbol.toUpperCase())
-      ),
-    ];
-
-    if (assetSymbols.length === 0) {
-      console.log("No assets found in open trades.");
-      return;
-    }
-
-    console.log(`Fetching current prices for ${assetSymbols.length} assets...`);
-
-    // Fetch current asset data with retry logic
-    let currentAssets;
-    try {
-      currentAssets = await fetchAssetsWithRetry(assetSymbols);
-    } catch (error) {
-      console.error("Error fetching assets after retries:", error.message);
-      return;
-    }
-
-    // Create a map for quick lookup: symbol -> current price
-    const assetPriceMap = {};
-    currentAssets.forEach((asset) => {
-      if (asset.symbol && asset.priceData && asset.priceData.current) {
-        assetPriceMap[asset.symbol.toUpperCase()] = asset.priceData.current;
-      }
-    });
-
-    // Process trades in batches to avoid overwhelming the database
-    const BATCH_SIZE = 50; // Adjust based on your system capacity
-    let successfulUpdates = 0;
-
-    for (let i = 0; i < openTrades.length; i += BATCH_SIZE) {
-      const batch = openTrades.slice(i, i + BATCH_SIZE);
-      console.log(
-        `Processing batch ${i / BATCH_SIZE + 1} of ${Math.ceil(
-          openTrades.length / BATCH_SIZE
-        )}`
-      );
-
-      const batchPromises = batch.map(async (trade) => {
-        return updateSingleTrade(trade, assetPriceMap);
-      });
-
-      try {
-        const batchResults = await Promise.all(batchPromises);
-        successfulUpdates += batchResults.filter(
-          (result) => result !== null
-        ).length;
-
-        // Small delay between batches to avoid overwhelming the system
-        if (i + BATCH_SIZE < openTrades.length) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-      } catch (error) {
-        console.error(`Error processing batch starting at index ${i}:`, error);
-      }
-    }
-
-    const duration = Date.now() - startTime;
-    console.log(
-      `Successfully updated ${successfulUpdates} trades in ${duration}ms.`
-    );
-  } catch (error) {
-    console.error("Error in updateTradePerformance:", error);
-  }
-};
-
-async function updatePortfolioChart(timeframe) {
-  const startTime = Date.now();
-  let usersProcessed = 0;
-
-  try {
-    console.log(`[${new Date().toISOString()}] Starting ${timeframe} update`);
-
-    let skip = 0;
-    let shouldContinue = true;
-
-    while (shouldContinue) {
-      const userIds = await Wallet.distinct(
-        "userId",
-        {},
-        { skip, limit: BATCH_SIZE }
-      );
-      if (userIds.length === 0) {
-        shouldContinue = false;
-        break;
-      }
-
-      const userBalances = await Wallet.aggregate([
-        { $match: { userId: { $in: userIds } } },
-        {
-          $group: {
-            _id: "$userId",
-            totalBalance: { $sum: "$totalBalance" },
-            walletCount: { $sum: 1 }, // For validation
-          },
-        },
-      ]);
-
-      // Validate we found all wallets
-      if (userBalances.some((u) => u.walletCount !== 3)) {
-        console.warn("Some users have missing wallets!");
-      }
-
-      const bulkOps = userBalances.map((user) => ({
-        updateOne: {
-          filter: { userId: user._id },
-          update: {
-            $push: {
-              [`history.${timeframe}`]: {
-                timestamp: new Date(),
-                balance: user.totalBalance,
-                metadata: { walletCount: user.walletCount },
-              },
-            },
-            $set: { lastUpdated: new Date() },
-          },
-          upsert: true,
-        },
-      }));
-
-      const result = await Chart.bulkWrite(bulkOps);
-      usersProcessed += userIds.length;
-      skip += BATCH_SIZE;
-
-      console.log(
-        `Processed batch: ${usersProcessed} users | ${result.modifiedCount} updated`
-      );
-
-      if (process.env.NODE_ENV === "development") {
-        // Faster iteration in dev
-        shouldContinue = false;
-      } else {
-        await new Promise((resolve) => setTimeout(resolve, CRON_DELAY_MS));
-      }
-    }
-
-    const msg = `✅ Completed ${timeframe} update for ${usersProcessed} users in ${
-      (Date.now() - startTime) / 1000
-    }s`;
-    logEvent(msg, "cron.txt\n");
-    console.log(msg);
-  } catch (error) {
-    console.error(
-      `❌ ${timeframe} update failed after ${usersProcessed} users:`,
-      error
-    );
-    // Consider adding retry logic here
-  }
-}
-
-async function updateWalletPerformance() {
-  console.log("Starting Wallet performance update...");
-  const startTime = Date.now();
-
-  try {
-    // Get all users
-    const users = await User.find().select("_id");
-
-    if (users.length === 0) {
-      console.log("No users found.");
-      return;
-    }
-
-    console.log(`Found ${users.length} users to update.`);
-
-    // Process users in batches
-    const BATCH_SIZE = 20;
-    let updatedWallets = 0;
-
-    for (let i = 0; i < users.length; i += BATCH_SIZE) {
-      const userBatch = users.slice(i, i + BATCH_SIZE);
-      console.log(
-        `Processing user batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(
-          users.length / BATCH_SIZE
-        )}`
-      );
-
-      for (const user of userBatch) {
-        try {
-          //  get wallets
-          const userWallets = await Wallet.find({ userId: user._id });
-
-          if (userWallets.length === 0) {
-            console.log(`No wallets found for user ${user._id}`);
-            continue;
-          }
-
-          // Get user open trades
-          const userTrades = await Trade.find({
-            userId: user._id,
-            status: "open",
-          });
-
-          if (userTrades.length === 0) {
-            console.log(`No open trades found for user ${user._id}`);
-            await resetWalletDailyProfits(userWallets);
-            continue;
-          }
-
-          // Calculate daily profit for each wallet
-          for (const wallet of userWallets) {
-            const walletTrades = userTrades.filter(
-              (trade) =>
-                trade.wallet.id &&
-                trade.wallet.id.toString() === wallet._id.toString()
-            );
-            // ?reset analytics
-            if (walletTrades.length === 0) {
-              await Wallet.findByIdAndUpdate(wallet._id, {
-                dailyProfit: 0,
-                dailyProfitPercent: 0,
-              });
-              continue;
-            }
-
-            const totalDailyProfit = walletTrades.reduce(
-              (sum, trade) => sum + (trade.performance.todayReturn || 0),
-              0
-            );
-
-            const totalInvestment = walletTrades.reduce(
-              (sum, trade) => sum + (trade.execution.amount || 0),
-              0
-            );
-
-            const dailyProfitPercent =
-              totalInvestment > 0
-                ? (totalDailyProfit / totalInvestment) * 100
-                : 0;
-
-            // Update wallet with calculated values
-            await Wallet.findByIdAndUpdate(wallet._id, {
-              dailyProfit: totalDailyProfit,
-              dailyProfitPercent: dailyProfitPercent,
-            });
-
-            updatedWallets++;
-          }
-        } catch (userError) {
-          console.error(
-            `Error processing user ${user._id}:`,
-            userError.message
-          );
-        }
-      }
-
-      // add batch delay
-      if (i + BATCH_SIZE < users.length) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-    }
-
-    const duration = Date.now() - startTime;
-
-    const msg = `Successfully updated ${updatedWallets} wallets in ${duration}ms.`;
-    logEvent(msg, "cron.txt\n");
-  } catch (error) {
-    console.error("Error in updateWalletPerformance:", error);
-  }
-}
+const REQUEST_DELAY = 6500;
 
 async function updateAssetsData() {
   console.log("Starting asset data update...");
   const startTime = Date.now();
 
   try {
-    // Get all active crypto assets from database
     const assets = await Asset.find({
       type: "crypto",
       isActive: true,
@@ -318,21 +29,31 @@ async function updateAssetsData() {
 
     console.log(`Updating ${assets.length} crypto assets...`);
 
-    // Extract symbols for batch processing
-    const symbols = assets.map((asset) =>
-      asset.symbol.replace("USD", "").toLowerCase()
-    );
+    const assetsByApiId = {};
+    assets.forEach((asset) => {
+      if (asset.apiId) {
+        assetsByApiId[asset.apiId] = asset;
+      }
+    });
 
-    // Process in batches to respect rate limits
+    const apiIds = Object.keys(assetsByApiId);
+
+    if (apiIds.length === 0) {
+      console.log("No assets with valid API IDs found");
+      return;
+    }
+
+    console.log(`Found ${apiIds.length} assets with API IDs`);
+
+    const BATCH_SIZE = 30;
     const batches = [];
-    for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
-      batches.push(symbols.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < apiIds.length; i += BATCH_SIZE) {
+      batches.push(apiIds.slice(i, i + BATCH_SIZE));
     }
 
     let updatedCount = 0;
     let errorCount = 0;
 
-    // Process each batch with delay
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       console.log(
@@ -342,11 +63,10 @@ async function updateAssetsData() {
       );
 
       try {
-        const batchResults = await processAssetBatch(batch);
+        const batchResults = await processAssetBatch(batch, assetsByApiId);
         updatedCount += batchResults.updatedCount;
         errorCount += batchResults.errorCount;
 
-        // Delay between batches (except for the last batch)
         if (i < batches.length - 1) {
           console.log(
             `Waiting ${REQUEST_DELAY / 1000} seconds before next batch...`
@@ -371,8 +91,7 @@ async function updateAssetsData() {
   }
 }
 
-async function processAssetBatch(symbols) {
-  const symbolIds = symbols.join(",");
+async function processAssetBatch(apiIds, assetsByApiId) {
   let updatedCount = 0;
   let errorCount = 0;
 
@@ -380,36 +99,59 @@ async function processAssetBatch(symbols) {
     const response = await axios.get(`${COIN_GECKO_API_URL}/coins/markets`, {
       params: {
         vs_currency: VS_CURRENCY,
-        ids: symbolIds,
+        ids: apiIds.join(","), // Use CoinGecko IDs, not symbols
         order: "market_cap_desc",
         price_change_percentage: "24h,7d,30d,1y",
+        sparkline: false,
       },
       timeout: 30000,
     });
 
     const marketData = response.data;
 
-    // Update each asset in the batch
-    for (const cryptoData of marketData) {
+    // Create a map for quick lookup
+    const marketDataMap = {};
+    marketData.forEach((item) => {
+      marketDataMap[item.id] = item;
+    });
+
+    // Process each asset in the batch
+    for (const apiId of apiIds) {
       try {
-        const symbol = cryptoData.symbol.toUpperCase() + "USD";
+        const asset = assetsByApiId[apiId];
+        const cryptoData = marketDataMap[apiId];
+
+        if (!cryptoData) {
+          console.warn(
+            `No market data found for ${apiId} (${asset?.symbol || "unknown"})`
+          );
+          errorCount++;
+          continue;
+        }
 
         const updateFields = {
           "priceData.current": cryptoData.current_price,
           "priceData.open": cryptoData.low_24h,
-          "priceData.previousClose": cryptoData.ath,
+          "priceData.previousClose": cryptoData.ath || cryptoData.current_price,
           "priceData.dayLow": cryptoData.low_24h,
           "priceData.dayHigh": cryptoData.high_24h,
           "priceData.change": cryptoData.price_change_24h,
           "priceData.changePercent": cryptoData.price_change_percentage_24h,
           "priceData.volume": cryptoData.total_volume,
           "priceData.avgVolume": cryptoData.total_volume,
-          "historical.yearLow": cryptoData.low_24h,
-          "historical.yearHigh": cryptoData.high_24h,
           "fundamentals.marketCap": cryptoData.market_cap,
           lastUpdated: new Date(),
         };
 
+        // Only update historical data if we have meaningful values
+        if (cryptoData.atl) {
+          updateFields["historical.yearLow"] = cryptoData.atl;
+        }
+        if (cryptoData.ath) {
+          updateFields["historical.yearHigh"] = cryptoData.ath;
+        }
+
+        // Clean null/undefined values
         Object.keys(updateFields).forEach((key) => {
           if (updateFields[key] === null || updateFields[key] === undefined) {
             delete updateFields[key];
@@ -417,142 +159,64 @@ async function processAssetBatch(symbols) {
         });
 
         const result = await Asset.updateOne(
-          { symbol: symbol },
+          { _id: asset._id }, // Use _id for more reliable updates
           { $set: updateFields }
         );
 
         if (result.modifiedCount > 0) {
           updatedCount++;
-          console.log(`Updated ${symbol} - $${cryptoData.current_price}`);
+          console.log(
+            `Updated ${asset.symbol} - $${
+              cryptoData.current_price?.toFixed(2) || "N/A"
+            }`
+          );
         } else {
-          console.log(`No changes for ${symbol}`);
+          console.log(`No changes for ${asset.symbol}`);
         }
       } catch (assetError) {
-        console.error(
-          `Error updating ${cryptoData.symbol}:`,
-          assetError.message
-        );
+        console.error(`Error updating ${apiId}:`, assetError.message);
         errorCount++;
       }
     }
 
-    const returnedSymbols = marketData.map((item) => item.symbol.toLowerCase());
-    const missingSymbols = symbols.filter(
-      (symbol) => !returnedSymbols.includes(symbol)
+    // Log missing assets that were in the batch but not returned
+    const returnedApiIds = marketData.map((item) => item.id);
+    const missingApiIds = apiIds.filter(
+      (apiId) => !returnedApiIds.includes(apiId)
     );
 
-    for (const missingSymbol of missingSymbols) {
-      console.warn(`No market data found for ${missingSymbol.toUpperCase()}`);
+    for (const missingApiId of missingApiIds) {
+      const asset = assetsByApiId[missingApiId];
+      console.warn(
+        `No market data returned for ${missingApiId} (${
+          asset?.symbol || "unknown"
+        })`
+      );
       errorCount++;
     }
   } catch (error) {
     console.error("Batch API call failed:", error.message);
 
-    errorCount += symbols.length;
+    if (error.response?.status === 429) {
+      console.log("Rate limited, waiting 30 seconds before retry...");
+      await delay(30000);
+      // Optionally retry this batch
+      return processAssetBatch(apiIds, assetsByApiId);
+    }
+
+    errorCount += apiIds.length;
     throw error;
   }
 
   return { updatedCount, errorCount };
 }
 
-async function updateAssetsDataIndividual() {
-  console.log("Starting individual asset data update...");
-  const startTime = Date.now();
-
-  try {
-    const assets = await Asset.find({
-      type: "crypto",
-      isActive: true,
-    }).limit(250);
-
-    if (assets.length === 0) {
-      console.log("No active crypto assets found to update");
-      return;
-    }
-
-    console.log(`Updating ${assets.length} crypto assets individually...`);
-
-    let updatedCount = 0;
-    let errorCount = 0;
-
-    for (const asset of assets) {
-      try {
-        const symbolId = asset.symbol.replace("USD", "").toLowerCase();
-
-        await delay(2000);
-
-        const response = await axios.get(
-          `${COIN_GECKO_API_URL}/coins/markets`,
-          {
-            params: {
-              vs_currency: VS_CURRENCY,
-              ids: symbolId,
-              price_change_percentage: "24h",
-            },
-            timeout: 10000,
-          }
-        );
-
-        if (response.data.length === 0) {
-          console.warn(`No data found for ${asset.symbol}`);
-          errorCount++;
-          continue;
-        }
-
-        const cryptoData = response.data[0];
-
-        const updateFields = {
-          "priceData.current": cryptoData.current_price,
-          "priceData.dayLow": cryptoData.low_24h,
-          "priceData.dayHigh": cryptoData.high_24h,
-          "priceData.change": cryptoData.price_change_24h,
-          "priceData.changePercent": cryptoData.price_change_percentage_24h,
-          "priceData.volume": cryptoData.total_volume,
-          "fundamentals.marketCap": cryptoData.market_cap,
-          lastUpdated: new Date(),
-        };
-
-        await Asset.updateOne({ symbol: asset.symbol }, { $set: updateFields });
-
-        updatedCount++;
-        console.log(`Updated ${asset.symbol} - $${cryptoData.current_price}`);
-      } catch (error) {
-        console.error(`Error updating ${asset.symbol}:`, error.message);
-        errorCount++;
-      }
-    }
-
-    const endTime = Date.now();
-    const duration = ((endTime - startTime) / 1000).toFixed(2);
-
-    console.log(
-      `Individual update completed in ${duration}s: ${updatedCount} updated, ${errorCount} errors`
-    );
-  } catch (error) {
-    console.error("Individual asset update failed:", error.message);
-    throw error;
-  }
-}
-
-// Helper functions
-async function resetWalletDailyProfits(wallets) {
-  const updatePromises = wallets.map((wallet) =>
-    Wallet.findByIdAndUpdate(wallet._id, {
-      dailyProfit: 0,
-      dailyProfitPercent: 0,
-    })
-  );
-
-  await Promise.all(updatePromises);
-}
-
 async function fetchAssetsWithRetry(assetSymbols, maxRetries = 3) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(`Fetching assets (attempt ${attempt}/${maxRetries})...`);
-      const assets = await fetchAssets(); // Your existing service function
+      const assets = await Asset.find();
 
-      // Verify we got data for all requested symbols
       const fetchedSymbols = assets
         .map((a) => a.symbol?.toUpperCase())
         .filter(Boolean);
@@ -580,62 +244,421 @@ async function fetchAssetsWithRetry(assetSymbols, maxRetries = 3) {
   }
 }
 
-async function updateSingleTrade(trade, assetPriceMap) {
+async function updateWalletPerformance() {
+  console.log("Starting optimized Wallet performance update...");
+  const startTime = Date.now();
+
   try {
-    if (!trade.asset || !trade.asset.symbol) {
-      console.log(`Trade ${trade._id} has no asset symbol, skipping.`);
-      return null;
-    }
-
-    const symbol = trade.asset.symbol.toUpperCase();
-    const currentPrice = assetPriceMap[symbol];
-
-    if (!currentPrice) {
-      console.log(
-        `No current price found for ${symbol}, skipping trade ${trade._id}`
-      );
-      return null;
-    }
-
-    // Calculate performance metrics
-    const executionPrice = trade.execution.price;
-    const quantity = trade.execution.quantity;
-
-    // Calculate current value
-    const currentValue = currentPrice * quantity;
-
-    // Calculate total return (current value - initial investment)
-    const totalReturn = currentValue - trade.execution.amount;
-
-    // Calculate total return percentage
-    const totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
-
-    // For today's return, we need to compare with previous close
-    // This would require storing yesterday's price or fetching historical data
-    // For simplicity, we'll use the same calculation as total return
-    const todayReturn = totalReturn;
-    const todayReturnPercent = totalReturnPercent;
-
-    // Update trade performance
-    await Trade.findByIdAndUpdate(
-      trade._id,
+    const walletUpdates = await Trade.aggregate([
       {
-        $set: {
-          "performance.totalReturn": totalReturn,
-          "performance.totalReturnPercent": totalReturnPercent,
-          "performance.todayReturn": todayReturn,
-          "performance.todayReturnPercent": todayReturnPercent,
-          "performance.currentValue": currentValue,
-          updatedAt: new Date(),
+        $match: {
+          status: "open",
+          "wallet.id": { $ne: null },
         },
       },
-      { new: true }
+      {
+        $lookup: {
+          from: "wallets",
+          localField: "wallet.id",
+          foreignField: "_id",
+          as: "walletInfo",
+        },
+      },
+      {
+        $unwind: {
+          path: "$walletInfo",
+          preserveNullAndEmptyArrays: false,
+        },
+      },
+      {
+        $group: {
+          _id: "$wallet.id",
+          userId: { $first: "$userId" },
+          totalTodayReturn: { $sum: "$performance.todayReturn" },
+          totalInvestment: { $sum: "$execution.amount" },
+          tradeCount: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          walletId: "$_id",
+          userId: 1,
+          totalTodayReturn: 1,
+          totalInvestment: 1,
+          tradeCount: 1,
+          dailyProfitPercent: {
+            $cond: {
+              if: { $gt: ["$totalInvestment", 0] },
+              then: {
+                $multiply: [
+                  { $divide: ["$totalTodayReturn", "$totalInvestment"] },
+                  100,
+                ],
+              },
+              else: 0,
+            },
+          },
+        },
+      },
+    ]);
+
+    console.log(`Processing ${walletUpdates.length} wallets with trades`);
+
+    if (walletUpdates.length === 0) {
+      // No wallets with trades, reset all
+      await Wallet.updateMany(
+        {},
+        {
+          $set: {
+            dailyProfit: 0,
+            dailyProfitPercent: 0,
+          },
+        }
+      );
+    } else {
+      // Prepare bulk operations
+      const bulkOps = walletUpdates.map((item) => ({
+        updateOne: {
+          filter: {
+            _id: item.walletId,
+            userId: item.userId,
+          },
+          update: {
+            $set: {
+              dailyProfit: item.totalTodayReturn,
+              dailyProfitPercent: item.dailyProfitPercent,
+            },
+          },
+        },
+      }));
+
+      // Execute bulk write
+      const bulkResult = await Wallet.bulkWrite(bulkOps, { ordered: false });
+
+      // Reset wallets without trades
+      const walletIdsUpdated = walletUpdates.map((item) => item.walletId);
+      const resetResult = await Wallet.updateMany(
+        {
+          _id: { $nin: walletIdsUpdated },
+        },
+        {
+          $set: {
+            dailyProfit: 0,
+            dailyProfitPercent: 0,
+          },
+        }
+      );
+
+      console.log(
+        `Updated ${bulkResult.modifiedCount} wallets, reset ${resetResult.modifiedCount} wallets`
+      );
+    }
+
+    const duration = Date.now() - startTime;
+    const msg = `Optimized update completed in ${duration}ms.`;
+    logEvent(msg, "cron.txt");
+  } catch (error) {
+    console.error("Error in optimized updateWalletPerformance:", error);
+    throw error;
+  }
+}
+
+const updateTradePerformance = async () => {
+  try {
+    console.log("Starting trade performance update...");
+    const startTime = Date.now();
+
+    const openTrades = await Trade.find(
+      { status: "open", "asset.symbol": { $exists: true, $ne: null } },
+      {
+        "asset.symbol": 1,
+        "execution.price": 1,
+        "execution.quantity": 1,
+        "execution.amount": 1,
+        "execution.leverage": 1,
+        "performance.totalReturn": 1,
+        "performance.todayReturn": 1,
+        "performance.currentValue": 1,
+        "targets.takeProfit": 1,
+        "targets.stopLoss": 1,
+        orderType: 1,
+        extra: 1,
+        "wallet.id": 1,
+        createdAt: 1,
+        userId: 1,
+      }
+    ).lean();
+
+    if (openTrades.length === 0) {
+      console.log("No open trades found.");
+      return;
+    }
+
+    console.log(`Found ${openTrades.length} open trades to update.`);
+
+    const assetSymbols = [];
+    const symbolSet = new Set();
+
+    for (const trade of openTrades) {
+      if (trade.asset?.symbol) {
+        const symbol = trade.asset.symbol.toUpperCase();
+        if (!symbolSet.has(symbol)) {
+          symbolSet.add(symbol);
+          assetSymbols.push(symbol);
+        }
+      }
+    }
+
+    if (assetSymbols.length === 0) {
+      console.log("No assets found in open trades.");
+      return;
+    }
+
+    console.log(`Fetching current prices for ${assetSymbols.length} assets...`);
+
+    let currentAssets;
+    try {
+      currentAssets = await fetchAssetsWithRetry(assetSymbols);
+    } catch (error) {
+      console.error("Error fetching assets after retries:", error.message);
+      return;
+    }
+
+    const assetPriceMap = new Map();
+    for (const asset of currentAssets) {
+      if (asset?.symbol && asset?.priceData?.current) {
+        assetPriceMap.set(asset.symbol.toUpperCase(), asset.priceData.current);
+      }
+    }
+
+    const tradeUpdates = [];
+    const tradesToClose = []; // Trades that hit TP/SL
+    const now = new Date();
+
+    for (const trade of openTrades) {
+      const symbol = trade.asset?.symbol?.toUpperCase();
+      if (!symbol) continue;
+
+      const currentPrice = assetPriceMap.get(symbol);
+      if (!currentPrice) continue;
+
+      const entryPrice = trade.execution?.price || 0;
+      const quantity = trade.execution?.quantity || 0;
+      const investedAmount = trade.execution?.amount || 0;
+      const leverage = trade.execution?.leverage || 1;
+      const extraBonus = trade.extra || 0;
+
+      if (quantity === 0 || entryPrice === 0) continue;
+
+      // Calculate current value based on order type
+      let currentValue;
+      if (trade.orderType === "buy") {
+        currentValue = quantity * currentPrice * leverage;
+      } else if (trade.orderType === "sell") {
+        currentValue = investedAmount - quantity * currentPrice * leverage;
+      } else {
+        currentValue = quantity * currentPrice;
+      }
+
+      const totalCurrentValue = currentValue + extraBonus;
+      const totalReturn = totalCurrentValue - investedAmount;
+      const totalReturnPercent =
+        investedAmount > 0 ? (totalReturn / investedAmount) * 100 : 0;
+
+      const previousCurrentValue =
+        trade.performance?.currentValue || totalCurrentValue;
+      const todayReturn = totalCurrentValue - previousCurrentValue;
+      const todayReturnPercent =
+        previousCurrentValue > 0
+          ? (todayReturn / previousCurrentValue) * 100
+          : 0;
+
+      // Check if trade should be closed by TP/SL
+      const shouldCloseByTP =
+        trade.targets?.takeProfit &&
+        totalReturnPercent >= trade.targets.takeProfit;
+      const shouldCloseBySL =
+        trade.targets?.stopLoss && totalReturnPercent <= trade.targets.stopLoss;
+
+      if (shouldCloseByTP || shouldCloseBySL) {
+        tradesToClose.push({
+          trade,
+          currentValue: totalCurrentValue,
+          totalReturn,
+          totalReturnPercent,
+          closeReason: shouldCloseByTP ? "take_profit" : "stop_loss",
+        });
+      }
+
+      tradeUpdates.push({
+        updateOne: {
+          filter: { _id: trade._id },
+          update: {
+            $set: {
+              "performance.totalReturn": parseFloat(totalReturn.toFixed(4)),
+              "performance.totalReturnPercent": parseFloat(
+                totalReturnPercent.toFixed(4)
+              ),
+              "performance.todayReturn": parseFloat(todayReturn.toFixed(4)),
+              "performance.todayReturnPercent": parseFloat(
+                todayReturnPercent.toFixed(4)
+              ),
+              "performance.currentValue": parseFloat(
+                totalCurrentValue.toFixed(4)
+              ),
+              updatedAt: now,
+            },
+          },
+        },
+      });
+    }
+
+    // Process trade updates in batches
+    if (tradeUpdates.length > 0) {
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < tradeUpdates.length; i += BATCH_SIZE) {
+        const batch = tradeUpdates.slice(i, i + BATCH_SIZE);
+        try {
+          await Trade.bulkWrite(batch, { ordered: false });
+          console.log(
+            `Updated ${batch.length} trades in batch ${
+              Math.floor(i / BATCH_SIZE) + 1
+            }`
+          );
+        } catch (batchError) {
+          console.error(
+            `Error in batch ${Math.floor(i / BATCH_SIZE) + 1}:`,
+            batchError.message
+          );
+        }
+      }
+    }
+
+    // Process trades that need to be closed
+    if (tradesToClose.length > 0) {
+      console.log(`Closing ${tradesToClose.length} trades (TP/SL reached)`);
+      await closeTradesInBatch(tradesToClose, now);
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`Trade performance update completed in ${duration}ms.`);
+  } catch (error) {
+    console.error("Error in updateTradePerformance:", error);
+    throw error;
+  }
+};
+
+async function closeTradesInBatch(tradesToClose, closeTime) {
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    const closePromises = tradesToClose.map(
+      async ({ trade, currentValue, totalReturn, closeReason }) => {
+        try {
+          await Trade.updateOne(
+            { _id: trade._id },
+            {
+              $set: {
+                status: "closed",
+                closedAt: closeTime,
+                closeReason: closeReason,
+                "targets.exitPoint":
+                  trade.performance?.currentValue || currentValue,
+              },
+            },
+            { session }
+          );
+
+          if (trade.wallet?.id) {
+            await Wallet.updateOne(
+              { _id: trade.wallet.id },
+              {
+                $inc: {
+                  availableBalance: currentValue,
+                  totalBalance: totalReturn,
+                },
+              },
+              { session }
+            );
+          }
+
+          await recordTradeInPortfolio(
+            trade.userId,
+            totalReturn,
+            `Trade closed (${closeReason}): ${trade.asset.symbol} ${
+              trade.orderType
+            } - ${totalReturn >= 0 ? "Profit" : "Loss"} of $${Math.abs(
+              totalReturn
+            ).toFixed(2)}`
+          );
+
+          return { tradeId: trade._id, success: true };
+        } catch (error) {
+          console.error(`Error closing trade ${trade._id}:`, error.message);
+          return { tradeId: trade._id, success: false, error: error.message };
+        }
+      }
     );
 
-    return trade._id; // Return the ID to count successful updates
+    const results = await Promise.all(closePromises);
+    const successful = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+
+    console.log(`Closed ${successful} trades successfully, ${failed} failed`);
+
+    await session.commitTransaction();
+
+    const failedTrades = results.filter((r) => !r.success);
+    if (failedTrades.length > 0) {
+      console.log(
+        "Failed trades:",
+        failedTrades.map((ft) => ft.tradeId)
+      );
+
+      await queueFailedTradeClosures(failedTrades);
+    }
   } catch (error) {
-    console.error(`Error updating trade ${trade._id}:`, error.message);
-    return null;
+    await session.abortTransaction();
+    console.error("Error in batch trade closure:", error);
+    throw error;
+  } finally {
+    session.endSession();
+  }
+}
+
+async function recordTradeInPortfolio(userId, pnl, description) {
+  const MAX_RETRIES = 3;
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await portFolioTracker.recordTrade(userId, pnl, description);
+      console.log(`Portfolio recorded for user ${userId}: $${pnl.toFixed(2)}`);
+      return true;
+    } catch (error) {
+      console.error(
+        `Attempt ${attempt} failed to record portfolio for user ${userId}:`,
+        error.message
+      );
+
+      if (attempt === MAX_RETRIES) {
+        // Log to monitoring and queue for later
+        await queuePortfolioRetry({
+          userId,
+          pnl,
+          description,
+          timestamp: new Date(),
+          retryCount: 0,
+        });
+        return false;
+      }
+
+      // Exponential backoff
+      await new Promise((resolve) =>
+        setTimeout(resolve, 1000 * Math.pow(2, attempt))
+      );
+    }
   }
 }
 
@@ -643,78 +666,8 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Optional: Function to update a single user's wallet performance
-// async function updateSingleUserWalletPerformance(userId) {
-// 	try {
-// 		console.log(`Updating wallet performance for user ${userId}`);
-
-// 		// Get user wallets
-// 		const userWallets = await Wallet.find({ userId });
-
-// 		if (userWallets.length === 0) {
-// 			console.log(`No wallets found for user ${userId}`);
-// 			return;
-// 		}
-
-// 		// Get user's open trades
-// 		const userTrades = await Trade.find({
-// 			userId,
-// 			status: "open",
-// 		});
-
-// 		if (userTrades.length === 0) {
-// 			console.log(`No open trades found for user ${userId}`);
-// 			await resetWalletDailyProfits(userWallets);
-// 			return;
-// 		}
-
-// 		// Update each wallet
-// 		for (const wallet of userWallets) {
-// 			const walletTrades = userTrades.filter(
-// 				(trade) =>
-// 					trade.wallet.id &&
-// 					trade.wallet.id.toString() === wallet._id.toString()
-// 			);
-
-// 			if (walletTrades.length === 0) {
-// 				await Wallet.findByIdAndUpdate(wallet._id, {
-// 					dailyProfit: 0,
-// 					dailyProfitPercent: 0,
-// 				});
-// 				continue;
-// 			}
-
-// 			const totalDailyProfit = walletTrades.reduce(
-// 				(sum, trade) => sum + (trade.performance.todayReturn || 0),
-// 				0
-// 			);
-
-// 			const totalInvestment = walletTrades.reduce(
-// 				(sum, trade) => sum + (trade.execution.amount || 0),
-// 				0
-// 			);
-
-// 			const dailyProfitPercent =
-// 				totalInvestment > 0 ? (totalDailyProfit / totalInvestment) * 100 : 0;
-
-// 			await Wallet.findByIdAndUpdate(wallet._id, {
-// 				dailyProfit: totalDailyProfit,
-// 				dailyProfitPercent: dailyProfitPercent,
-// 			});
-// 		}
-
-// 		console.log(`Successfully updated wallets for user ${userId}`);
-// 	} catch (error) {
-// 		console.error(
-// 			`Error updating wallet performance for user ${userId}:`,
-// 			error
-// 		);
-// 	}
-// }
-
 module.exports = {
   updateTradePerformance,
-  updatePortfolioChart,
   updateWalletPerformance,
   updateAssetsData,
 };

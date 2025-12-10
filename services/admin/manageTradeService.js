@@ -3,317 +3,387 @@ const Trade = require("../../models/Trade");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
+const portFolioTracker = require("../user/chartService");
 
 async function createTrade(tradeData) {
-	const {
-		userId,
-		assetId,
-		planId,
-		orderType,
-		walletId,
-		amount,
-		leverage,
-		sl,
-		tp,
-		entry,
-		exit,
-		interval,
-	} = tradeData;
+  const {
+    userId,
+    assetId,
+    planId,
+    orderType,
+    walletId,
+    amount,
+    leverage,
+    sl,
+    tp,
+    entry,
+    exit,
+    interval,
+  } = tradeData;
 
-	if (!userId || !assetId || !walletId || !amount || !orderType) {
-		throw new CustomError("Fill in the required field!", 400);
-	}
+  if (!userId || !assetId || !walletId || !amount || !orderType) {
+    throw new CustomError("Fill in the required field!", 400);
+  }
 
-	try {
-		const parsedAmt = parseFloat(amount);
+  try {
+    const parsedAmt = parseFloat(amount);
 
-		const user = await User.findById(userId);
-		if (!user) {
-			throw new CustomError("Invalid request!", 404);
-		}
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new CustomError("Invalid request!", 404);
+    }
 
-		const wallet = await Wallet.findById(walletId);
-		if (!wallet) {
-			throw new CustomError("Invalid wallet!", 404);
-		}
+    const wallet = await Wallet.findById(walletId);
+    if (!wallet) {
+      throw new CustomError("Invalid wallet!", 404);
+    }
 
-		const asset = await Asset.findById(assetId);
-		if (!asset) {
-			throw new CustomError("Asset not found!", 404);
-		}
+    const asset = await Asset.findById(assetId);
+    if (!asset) {
+      throw new CustomError("Asset not found!", 404);
+    }
 
-		const qty = parsedAmt / asset.priceData.current;
+    const qty = parsedAmt / asset.priceData.current;
 
-		const initialCurrentValue = parsedAmt;
+    const initialCurrentValue = parsedAmt;
 
-		const newTrade = {
-			userId: userId,
-			asset: {
-				assetId: asset._id,
-				name: asset.name,
-				symbol: asset.symbol,
-				img: asset.imageUrl,
-			},
-			planId: planId || null,
-			assetType: asset.type,
-			orderType: orderType,
-			wallet: {
-				id: wallet._id,
-				name: wallet.name,
-			},
-			execution: {
-				price: asset.priceData.current,
-				quantity: qty,
-				amount: parsedAmt,
-				leverage: leverage || 1,
-				interval: interval || null,
-			},
-			targets: {
-				takeProfit: tp || null,
-				stopLoss: sl || null,
-				entryPoint: entry || null,
-				exitPoint: exit || null,
-			},
-			performance: {
-				currentValue: initialCurrentValue,
-				profitLoss: 0,
-				profitLossPercentage: 0,
-			},
-			status: "open",
-		};
+    const newTrade = {
+      userId: userId,
+      asset: {
+        assetId: asset._id,
+        name: asset.name,
+        symbol: asset.symbol,
+        img: asset.imageUrl,
+      },
+      planId: planId || null,
+      assetType: asset.type,
+      orderType: orderType,
+      wallet: {
+        id: wallet._id,
+        name: wallet.name,
+      },
+      execution: {
+        price: asset.priceData.current,
+        quantity: qty,
+        amount: parsedAmt,
+        leverage: leverage || 1,
+        interval: interval || null,
+      },
+      targets: {
+        takeProfit: tp || null,
+        stopLoss: sl || null,
+        entryPoint: entry || null,
+        exitPoint: exit || null,
+      },
+      performance: {
+        currentValue: initialCurrentValue,
+        profitLoss: 0,
+        profitLossPercentage: 0,
+      },
+      status: "open",
+    };
 
-		if (wallet.availableBalance < parsedAmt) {
-			throw new CustomError("Insufficient funds!", 400);
-		}
+    if (wallet.availableBalance < parsedAmt) {
+      throw new CustomError("Insufficient funds!", 400);
+    }
 
-		wallet.availableBalance -= parsedAmt;
-		await wallet.save();
+    wallet.availableBalance -= parsedAmt;
+    await wallet.save();
 
-		const createdTrade = await Trade.create(newTrade);
-		return createdTrade;
-	} catch (error) {
-		throw new CustomError(error.message, 500);
-	}
+    const createdTrade = await Trade.create(newTrade);
+    return createdTrade;
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
 }
 
 async function closeTrade(tradeId) {
-	if (!tradeId) {
-		throw new CustomError("Invalid trade!", 400);
-	}
-	try {
-		const trade = await Trade.findById(tradeId);
-		if (!trade) {
-			throw new CustomError("Invalid trade!", 404);
-		}
+  if (!tradeId) {
+    throw new CustomError("Invalid trade!", 400);
+  }
 
-		if (trade.status === "closed") {
-			throw new CustomError("Trade is already closed!", 400);
-		}
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-		const wallet = await Wallet.findById(trade.wallet.id);
-		if (!wallet) {
-			throw new CustomError("Invalid wallet!", 404);
-		}
+  try {
+    const trade = await Trade.findById(tradeId).session(session);
+    if (!trade) {
+      throw new CustomError("Invalid trade!", 404);
+    }
 
-		const asset = await Asset.findById(trade.asset.assetId);
-		if (!asset) {
-			throw new CustomError("Asset not found!", 404);
-		}
+    if (trade.status === "closed") {
+      throw new CustomError("Trade is already closed!", 400);
+    }
 
-		const currentPrice = asset.priceData.current;
-		const entryPrice = trade.execution.price;
-		const quantity = trade.execution.quantity;
-		const leverage = trade.execution.leverage || 1;
-		const extraBonus = trade.extra || 0;
+    const wallet = await Wallet.findById(trade.wallet.id).session(session);
+    if (!wallet) {
+      throw new CustomError("Invalid wallet!", 404);
+    }
 
-		let currentValue, totalReturn, totalReturnPercent;
+    const asset = await Asset.findById(trade.asset.assetId).session(session);
+    if (!asset) {
+      throw new CustomError("Asset not found!", 404);
+    }
 
-		if (trade.orderType === "buy") {
-			currentValue = quantity * currentPrice * leverage;
-			totalReturn = currentValue - trade.execution.amount;
-			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
-		} else if (trade.orderType === "sell") {
-			currentValue =
-				trade.execution.amount - quantity * currentPrice * leverage;
-			totalReturn = currentValue - trade.execution.amount;
-			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
-		} else {
-			currentValue = quantity * currentPrice;
-			totalReturn = currentValue - trade.execution.amount;
-			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
-		}
+    const currentPrice = asset.priceData.current;
+    const entryPrice = trade.execution.price;
+    const quantity = trade.execution.quantity;
+    const leverage = trade.execution.leverage || 1;
+    const extraBonus = trade.extra || 0;
 
-		const totalCurrentValue = currentValue + extraBonus;
-		const totalProfitLoss = totalReturn + extraBonus;
-		const totalProfitLossPercentage =
-			(totalProfitLoss / trade.execution.amount) * 100;
+    let currentValue, totalReturn, totalReturnPercent;
 
-		trade.performance.currentValue = totalCurrentValue;
-		trade.performance.totalReturn = totalProfitLoss;
-		trade.performance.totalReturnPercent = totalProfitLossPercentage;
+    if (trade.orderType === "buy") {
+      currentValue = quantity * currentPrice * leverage;
+      totalReturn = currentValue - trade.execution.amount;
+      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+    } else if (trade.orderType === "sell") {
+      currentValue =
+        trade.execution.amount - quantity * currentPrice * leverage;
+      totalReturn = currentValue - trade.execution.amount;
+      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+    } else {
+      currentValue = quantity * currentPrice;
+      totalReturn = currentValue - trade.execution.amount;
+      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+    }
 
-		wallet.availableBalance += totalCurrentValue;
-		wallet.totalBalance += totalProfitLoss;
+    const totalCurrentValue = currentValue + extraBonus;
+    const totalProfitLoss = totalReturn + extraBonus;
+    const totalProfitLossPercentage =
+      (totalProfitLoss / trade.execution.amount) * 100;
 
-		await wallet.save();
+    trade.performance.currentValue = totalCurrentValue;
+    trade.performance.totalReturn = totalProfitLoss;
+    trade.performance.totalReturnPercent = totalProfitLossPercentage;
 
-		trade.targets.exitPoint = currentPrice;
-		trade.status = "closed";
-		trade.closedAt = new Date();
-		trade.closeReason = "manual_close";
+    wallet.availableBalance += totalCurrentValue;
+    wallet.totalBalance += totalProfitLoss;
 
-		await trade.save();
-		return trade;
-	} catch (error) {
-		throw new CustomError(error.message, 500);
-	}
+    await wallet.save({ session });
+
+    trade.targets.exitPoint = currentPrice;
+    trade.status = "closed";
+    trade.closedAt = new Date();
+    trade.closeReason = "manual_close";
+
+    await trade.save({ session });
+
+    await portFolioTracker.recordTrade(
+      trade.userId,
+      totalProfitLoss,
+      `Trade closed (manual): ${trade.asset.symbol} ${trade.orderType} - ${
+        totalProfitLoss >= 0 ? "Profit" : "Loss"
+      } of $${Math.abs(totalProfitLoss).toFixed(2)}`
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return trade;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw new CustomError(error.message, 500);
+  }
 }
 
 async function updateTradePerformance(tradeId) {
-	try {
-		const trade = await Trade.findById(tradeId);
-		if (!trade || trade.status !== "open")
-			throw new CustomError("Cannot update closed trade!", 400);
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-		const asset = await Asset.findById(trade.asset.assetId);
-		if (!asset) return null;
+  try {
+    const trade = await Trade.findById(tradeId).session(session);
+    if (!trade || trade.status !== "open")
+      throw new CustomError("Cannot update closed trade!", 400);
 
-		const currentPrice = asset.priceData.current;
-		const entryPrice = trade.execution.price;
-		const quantity = trade.execution.quantity;
-		const leverage = trade.execution.leverage || 1;
-		const extraBonus = trade.extra || 0;
+    const asset = await Asset.findById(trade.asset.assetId).session(session);
+    if (!asset) return null;
 
-		let currentValue, totalReturn, totalReturnPercent;
+    const currentPrice = asset.priceData.current;
+    const entryPrice = trade.execution.price;
+    const quantity = trade.execution.quantity;
+    const leverage = trade.execution.leverage || 1;
+    const extraBonus = trade.extra || 0;
 
-		if (trade.orderType === "buy") {
-			currentValue = quantity * currentPrice * leverage;
-			totalReturn = currentValue - trade.execution.amount;
-			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
-		} else if (trade.orderType === "sell") {
-			currentValue =
-				trade.execution.amount - quantity * currentPrice * leverage;
-			totalReturn = currentValue - trade.execution.amount;
-			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
-		} else {
-			currentValue = quantity * currentPrice;
-			totalReturn = currentValue - trade.execution.amount;
-			totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
-		}
+    let currentValue, totalReturn, totalReturnPercent;
 
-		const totalCurrentValue = currentValue + extraBonus;
-		const totalProfitLoss = totalReturn + extraBonus;
-		const totalProfitLossPercentage =
-			(totalProfitLoss / trade.execution.amount) * 100;
+    if (trade.orderType === "buy") {
+      currentValue = quantity * currentPrice * leverage;
+      totalReturn = currentValue - trade.execution.amount;
+      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+    } else if (trade.orderType === "sell") {
+      currentValue =
+        trade.execution.amount - quantity * currentPrice * leverage;
+      totalReturn = currentValue - trade.execution.amount;
+      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+    } else {
+      currentValue = quantity * currentPrice;
+      totalReturn = currentValue - trade.execution.amount;
+      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+    }
 
-		trade.performance.currentValue = totalCurrentValue;
-		trade.performance.totalReturn = totalProfitLoss;
-		trade.performance.totalReturnPercent = totalProfitLossPercentage;
+    const totalCurrentValue = currentValue + extraBonus;
+    const totalProfitLoss = totalReturn + extraBonus;
+    const totalProfitLossPercentage =
+      (totalProfitLoss / trade.execution.amount) * 100;
 
-		// trade.performance.todayReturn = someValue;
-		// trade.performance.todayReturnPercent = somePercentage;
+    trade.performance.currentValue = totalCurrentValue;
+    trade.performance.totalReturn = totalProfitLoss;
+    trade.performance.totalReturnPercent = totalProfitLossPercentage;
 
-		if (
-			trade.targets.takeProfit &&
-			totalReturnPercent >= trade.targets.takeProfit
-		) {
-			trade.status = "closed";
-			trade.closedAt = new Date();
-			trade.closeReason = "take_profit";
-		} else if (
-			trade.targets.stopLoss &&
-			totalReturnPercent <= trade.targets.stopLoss
-		) {
-			trade.status = "closed";
-			trade.closedAt = new Date();
-			trade.closeReason = "stop_loss";
-		}
+    let tradeClosed = false;
+    let closeReason = "";
 
-		trade.markModified("performance"); // Ensure nested object changes are saved
-		await trade.save();
+    if (
+      trade.targets.takeProfit &&
+      totalReturnPercent >= trade.targets.takeProfit
+    ) {
+      trade.status = "closed";
+      trade.closedAt = new Date();
+      trade.closeReason = "take_profit";
+      tradeClosed = true;
+      closeReason = "Take Profit";
+    } else if (
+      trade.targets.stopLoss &&
+      totalReturnPercent <= trade.targets.stopLoss
+    ) {
+      trade.status = "closed";
+      trade.closedAt = new Date();
+      trade.closeReason = "stop_loss";
+      tradeClosed = true;
+      closeReason = "Stop Loss";
+    }
 
-		return trade;
-	} catch (error) {
-		console.error("Error in updateTradePerformance:", error);
-		throw new CustomError(error.message, 500);
-	}
+    trade.markModified("performance");
+    await trade.save({ session });
+
+    if (tradeClosed) {
+      const wallet = await Wallet.findById(trade.wallet.id).session(session);
+      if (wallet) {
+        wallet.availableBalance += totalCurrentValue;
+        wallet.totalBalance += totalProfitLoss;
+        await wallet.save({ session });
+      }
+
+      await portFolioTracker.recordTrade(
+        trade.userId,
+        totalProfitLoss,
+        `Trade closed (${closeReason}): ${trade.asset.symbol} ${
+          trade.orderType
+        } - ${totalProfitLoss >= 0 ? "Profit" : "Loss"} of $${Math.abs(
+          totalProfitLoss
+        ).toFixed(2)}`
+      );
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return trade;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error("Error in updateTradePerformance:", error);
+    throw new CustomError(error.message, 500);
+  }
 }
 
 async function editTradeData(tradeData) {
-	const { extra, leverage, sl, tp, tradeId } = tradeData;
-	if (!tradeId) {
-		throw new CustomError("Invalid trade!", 400);
-	}
-	try {
-		const trade = await Trade.findById(tradeId);
-		if (!trade || trade.status !== "open")
-			throw new CustomError("Cannot update closed trade!", 400);
-		const parsedExtra = parseFloat(extra);
-		if (extra) trade.extra += parsedExtra;
-		if (leverage) trade.execution.leverage = leverage;
-		if (sl) trade.targets.stopLoss = sl;
-		if (tp) trade.targets.takeProfit = tp;
+  const { extra, leverage, sl, tp, tradeId } = tradeData;
+  if (!tradeId) {
+    throw new CustomError("Invalid trade!", 400);
+  }
 
-		await trade.save();
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-		await updateTradePerformance(tradeId);
+  try {
+    const trade = await Trade.findById(tradeId).session(session);
+    if (!trade || trade.status !== "open")
+      throw new CustomError("Cannot update closed trade!", 400);
 
-		return trade;
-	} catch (error) {
-		throw new CustomError(error.message, 500);
-	}
+    const parsedExtra = parseFloat(extra);
+
+    if (extra && parsedExtra > 0) {
+      await portFolioTracker.recordDeposit(
+        trade.userId,
+        parsedExtra,
+        `Extra bonus added to trade: ${trade.asset.symbol}`
+      );
+
+      trade.extra += parsedExtra;
+    }
+
+    if (leverage) trade.execution.leverage = leverage;
+    if (sl) trade.targets.stopLoss = sl;
+    if (tp) trade.targets.takeProfit = tp;
+
+    await trade.save({ session });
+
+    await updateTradePerformance(tradeId);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return trade;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw new CustomError(error.message, 500);
+  }
 }
 
 async function fetchAllTrades(queryData) {
-	const { sortBy, filterBy, limit, page } = queryData;
-	try {
-		const sort = {};
-		if (sortBy) sort[sortBy] = -1;
+  const { sortBy, filterBy, limit, page } = queryData;
+  try {
+    const sort = {};
+    if (sortBy) sort[sortBy] = -1;
 
-		const trades = await Trade.find()
-			.sort(sort)
-			.skip(page - 1, limit)
-			.limit(limit);
+    const trades = await Trade.find()
+      .sort(sort)
+      .skip(page - 1, limit)
+      .limit(limit);
 
-		const totalItems = await Trade.countDocuments();
-		const totalPages = Math.ceil(totalItems / limit);
+    const totalItems = await Trade.countDocuments();
+    const totalPages = Math.ceil(totalItems / limit);
 
-		return { trades, totalItems, totalPages, currentPage: page };
-	} catch (error) {
-		throw new CustomError(error.message, 500);
-	}
+    return { trades, totalItems, totalPages, currentPage: page };
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
 }
 
 async function getTradeById(tradeId) {
-	if (!tradeId) {
-		throw new CustomError("Invalid trade!", 400);
-	}
-	try {
-		const trade = await Trade.findById(tradeId).lean();
-		if (!trade) throw new CustomError("Trade not found!", 404);
+  if (!tradeId) {
+    throw new CustomError("Invalid trade!", 400);
+  }
+  try {
+    const trade = await Trade.findById(tradeId).lean();
+    if (!trade) throw new CustomError("Trade not found!", 404);
 
-		return trade;
-	} catch (error) {
-		throw new CustomError(error.message, 500);
-	}
+    return trade;
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
 }
 
 async function deleteTrade(tradeId) {
-	if (!tradeId) {
-		throw new CustomError("Invalid trade!", 400);
-	}
-	try {
-	} catch (error) {
-		throw new CustomError(error.message, 500);
-	}
+  if (!tradeId) {
+    throw new CustomError("Invalid trade!", 400);
+  }
+  try {
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
 }
 
 module.exports = {
-	createTrade,
-	editTradeData,
-	// deleteTrade,
-	closeTrade,
-	updateTradePerformance,
-	fetchAllTrades,
-	getTradeById,
+  createTrade,
+  editTradeData,
+  // deleteTrade,
+  closeTrade,
+  updateTradePerformance,
+  fetchAllTrades,
+  getTradeById,
 };

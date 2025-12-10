@@ -1,93 +1,108 @@
 const {
-	fetchAdmins,
-	fetchAdminInfo,
-	deleteAdmin,
-	updateAdminRole,
-	logoutAdmin,
+  fetchAdmins,
+  fetchAdminInfo,
+  deleteAdmin,
+  updateAdminRole,
+  logoutAdmin,
+  manualSystemUpdate,
 } = require("../../services/admin/adminService");
 
 const getAdmins = async (req, res, next) => {
-	try {
-		const admins = await fetchAdmins();
-		res.status(200).json({
-			message: `Admins retrieved successfully.`,
-			success: true,
-			data: admins,
-		});
-	} catch (error) {
-		next(error);
-	}
+  try {
+    const admins = await fetchAdmins();
+    res.status(200).json({
+      message: `Admins retrieved successfully.`,
+      success: true,
+      data: admins,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const getAdminInfo = async (req, res, next) => {
-	const adminId = req.user.adminId;
-	try {
-		const admin = await fetchAdminInfo(adminId);
-		res.status(200).json({
-			message: `Admin info retrieved successfully.`,
-			success: true,
-			data: admin,
-		});
-	} catch (error) {
-		next(error);
-	}
+  const adminId = req.user.adminId;
+  try {
+    const admin = await fetchAdminInfo(adminId);
+    res.status(200).json({
+      message: `Admin info retrieved successfully.`,
+      success: true,
+      data: admin,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const updateRole = async (req, res, next) => {
-	const { adminId, action } = req.body;
-	try {
-		await updateAdminRole(adminId, action);
-		res.status(200).json({
-			message:
-				action == "addsu"
-					? `New role assigned successfully.`
-					: `New removed assigned successfully.`,
-			success: true,
-			data: null,
-		});
-	} catch (error) {
-		next(error);
-	}
+  const { adminId, action } = req.body;
+  try {
+    await updateAdminRole(adminId, action);
+    res.status(200).json({
+      message:
+        action == "addsu"
+          ? `New role assigned successfully.`
+          : `New removed assigned successfully.`,
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const removeAdmin = async (req, res, next) => {
-	const { adminId } = req.body;
+  const { adminId } = req.body;
 
-	console.log(req.body);
-	try {
-		await deleteAdmin(adminId);
-		res.status(200).json({
-			message: `Admin removed successfully.`,
-			success: true,
-			data: null,
-		});
-	} catch (error) {
-		next(error);
-	}
+  console.log(req.body);
+  try {
+    await deleteAdmin(adminId);
+    res.status(200).json({
+      message: `Admin removed successfully.`,
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const logoutAdminSession = async (req, res, next) => {
-	const adminId = req.user.adminId;
-	try {
-		await logoutAdmin(adminId);
-		res.clearCookie("jwt", {
-			httpOnly: true,
-			maxAge: 24 * 60 * 60 * 1000,
-		});
-		res.status(200).json({
-			message: `Admin logged out successfully.`,
-			success: true,
-			data: null,
-		});
-	} catch (error) {
-		next(error);
-	}
+  const adminId = req.user.adminId;
+  try {
+    await logoutAdmin(adminId);
+    res.clearCookie("jwt", {
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+    res.status(200).json({
+      message: `Admin logged out successfully.`,
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateSystem = async (req, res, next) => {
+  const adminId = req.user.adminId;
+  try {
+    await manualSystemUpdate();
+    res.json({
+      success: true,
+      message: "All manual updates completed successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 module.exports = {
-	updateRole,
-	getAdmins,
-	getAdminInfo,
-	removeAdmin,
-	logoutAdminSession,
+  updateRole,
+  getAdmins,
+  getAdminInfo,
+  removeAdmin,
+  logoutAdminSession,
+  updateSystem,
 };

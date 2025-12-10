@@ -2,7 +2,6 @@ const cron = require("node-cron");
 const {
   updateTradePerformance,
   updateWalletPerformance,
-  updatePortfolioChart,
   updateAssetsData,
 } = require("./customJobs");
 require("dotenv").config();
@@ -10,14 +9,13 @@ require("dotenv").config();
 const activeJobs = new Set();
 const lastRunTimestamps = new Map();
 
-// Centralized flag
 const enableCrons =
   process.env.NODE_ENV === "production" || process.env.ENABLE_CRONS === "1";
 
 function initCronJobs() {
   if (!enableCrons) {
     console.log(
-      "⏸️  Cron jobs disabled (NODE_ENV=development and ENABLE_CRONS !== 1)"
+      "Cron jobs disabled (NODE_ENV=development and ENABLE_CRONS !== 1)"
     );
     return;
   }
@@ -26,14 +24,7 @@ function initCronJobs() {
     assetUpdate: process.env.CRON_ASSET_UPDATE || "0 9,13,17 * * *",
     walletPerformance: process.env.CRON_WALLET_PERFORMANCE || "0 1 * * *",
     tradePerformance: process.env.CRON_TRADE_PERFORMANCE || "0 * * * *",
-    portfolioHourly: process.env.CRON_HOURLY || "0 * * * *",
-    portfolioDaily: process.env.CRON_DAILY || "0 0 * * *",
-    portfolioWeekly: process.env.CRON_WEEKLY || "0 0 * * 0",
-    portfolioMonthly: process.env.CRON_MONTHLY || "0 0 1 * *",
-    portfolioYearly: process.env.CRON_YEARLY || "0 0 1 1 *",
   };
-
-  // asset update job
 
   const assetUpdateJob = cron.schedule(
     schedules.assetUpdate,
@@ -68,7 +59,6 @@ function initCronJobs() {
 
   activeJobs.add(assetUpdateJob);
 
-  // Wallet performance job
   const walletJob = cron.schedule(
     schedules.walletPerformance,
     async () => {
@@ -78,7 +68,6 @@ function initCronJobs() {
   );
   activeJobs.add(walletJob);
 
-  // Trade performance job
   const tradeJob = cron.schedule(
     schedules.tradePerformance,
     async () => {
@@ -103,27 +92,8 @@ function initCronJobs() {
   );
   activeJobs.add(tradeJob);
 
-  // Portfolio chart jobs
-  Object.entries(schedules).forEach(([timeframe, schedule]) => {
-    if (
-      timeframe === "tradePerformance" ||
-      timeframe === "walletPerformance" ||
-      timeframe === "assetUpdate"
-    )
-      return;
-
-    const job = cron.schedule(
-      schedule,
-      () => {
-        updatePortfolioChart(timeframe.replace("portfolio", "").toLowerCase());
-      },
-      { scheduled: enableCrons }
-    );
-    activeJobs.add(job);
-  });
-
   console.log(
-    `🟢 Initialized ${activeJobs.size} cron jobs in ${
+    `Initialized ${activeJobs.size} cron jobs in ${
       process.env.NODE_ENV
     } mode (ENABLE_CRONS=${process.env.ENABLE_CRONS || "unset"})`
   );
@@ -147,21 +117,9 @@ function shutdownCronJobs() {
   console.log("✅ All cron jobs stopped");
 }
 
-// manual try
-function manuallyTriggerTradePerformance() {
-  console.log("Manually triggering trade performance update");
-  updateTradePerformance().catch(console.error);
-}
-
-// Handle manual triggers in development
 if (process.env.NODE_ENV === "development") {
   const express = require("express");
   const devRouter = express.Router();
-
-  devRouter.get("/trigger/:timeframe", async (req, res) => {
-    await updatePortfolioChart(req.params.timeframe);
-    res.json({ status: "completed" });
-  });
 
   devRouter.get("/performance", async (req, res) => {
     await updateTradePerformance();
@@ -172,12 +130,10 @@ if (process.env.NODE_ENV === "development") {
     initCronJobs,
     shutdownCronJobs,
     devRouter,
-    manuallyTriggerTradePerformance,
   };
 } else {
   module.exports = {
     initCronJobs,
     shutdownCronJobs,
-    manuallyTriggerTradePerformance,
   };
 }

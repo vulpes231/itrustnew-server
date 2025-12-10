@@ -15,6 +15,7 @@ const { sendLoginCode } = require("../mailService");
 const Usersetting = require("../../models/Usersetting");
 const { CustomError } = require("../../utils/utils");
 const { default: mongoose } = require("mongoose");
+const portFolioTracker = require("../user/chartService");
 
 async function registerService(userData) {
   const {
@@ -59,18 +60,25 @@ async function registerService(userData) {
   session.startTransaction();
 
   try {
-    const existingUser = await User.findOne({ username }).session(session);
+    const [existingUser, existingEmail] = await Promise.all([
+      User.findOne({ username }).session(session),
+      User.findOne({ email }).session(session),
+    ]);
+
     if (existingUser) {
-      throw new CustomError("User already exist!", 409);
+      throw new CustomError("Username already exists!", 409);
     }
-    const existingMail = await User.findOne({ username });
-    if (existingMail) {
+    if (existingEmail) {
       throw new CustomError("Email already in use!", 409);
     }
-    const countryInfo = await getCountryById(countryId);
-    const stateInfo = await getStateById(stateId);
-    const nationInfo = await getNationById(nationalityId);
-    const currencyInfo = await getCurrencyById(currencyId);
+
+    const [countryInfo, stateInfo, nationInfo, currencyInfo] =
+      await Promise.all([
+        getCountryById(countryId),
+        getStateById(stateId),
+        getNationById(nationalityId),
+        getCurrencyById(currencyId),
+      ]);
 
     const hashPassword = await bcrypt.hash(password, 10);
 
@@ -131,13 +139,28 @@ async function registerService(userData) {
     const newUser = await User.create([userInfo], { session });
     const userId = newUser[0]._id;
 
-    const [cashWallet, investWallet, brokerageWallet] = await Promise.all([
-      Wallet.create([{ name: "cash", userId }], { session }),
-      Wallet.create([{ name: "automated investing", userId }], { session }),
-      Wallet.create([{ name: "brokerage", userId }], { session }),
+    const wallets = await Promise.all([
+      Wallet.create([{ name: "cash", userId, totalBalance: 0 }], { session }),
+      Wallet.create(
+        [{ name: "automated investing", userId, totalBalance: 0 }],
+        { session }
+      ),
+      Wallet.create([{ name: "brokerage", userId, totalBalance: 0 }], {
+        session,
+      }),
     ]);
 
     await Usersetting.create([{ userId }], { session });
+
+    try {
+      await portFolioTracker.initializeUser(userId);
+    } catch (trackerError) {
+      console.warn(
+        `Portfolio tracker initialization failed for user ${userId}:`,
+        trackerError.message
+      );
+      // Continue with registration - this is non-critical
+    }
 
     const user = await getUserById(userId, session);
 
@@ -177,7 +200,9 @@ async function registerService(userData) {
     };
 
     await session.commitTransaction();
-    session.endSession();
+
+    console.log(`User registered successfully: ${username} (${userId})`);
+
     return {
       userInfo: userData,
       accessToken,
@@ -185,8 +210,13 @@ async function registerService(userData) {
     };
   } catch (error) {
     await session.abortTransaction();
+
+    throw new CustomError(
+      error.message || "Registration failed",
+      error.statusCode || 500
+    );
+  } finally {
     session.endSession();
-    throw new CustomError(error.message, error.statusCode);
   }
 }
 
