@@ -38,6 +38,7 @@ async function registerService(userData) {
     currencyId,
   } = userData;
 
+  // Validation checks
   if (!firstname || !lastname) {
     throw new CustomError("Fullname required!", 400);
   }
@@ -57,18 +58,27 @@ async function registerService(userData) {
   }
 
   const session = await mongoose.startSession();
-  session.startTransaction();
 
   try {
+    await session.startTransaction({
+      readConcern: { level: "snapshot" },
+      writeConcern: { w: "majority" },
+      maxTimeMS: 10000,
+    });
+
     const [existingUser, existingEmail] = await Promise.all([
       User.findOne({ username }).session(session),
       User.findOne({ email }).session(session),
     ]);
 
     if (existingUser) {
+      await session.abortTransaction();
+      session.endSession();
       throw new CustomError("Username already exists!", 409);
     }
     if (existingEmail) {
+      await session.abortTransaction();
+      session.endSession();
       throw new CustomError("Email already in use!", 409);
     }
 
@@ -139,17 +149,13 @@ async function registerService(userData) {
     const newUser = await User.create([userInfo], { session });
     const userId = newUser[0]._id;
 
-    const wallets = await Promise.all([
-      Wallet.create([{ name: "cash", userId, totalBalance: 0 }], { session }),
-      Wallet.create(
-        [{ name: "automated investing", userId, totalBalance: 0 }],
-        { session }
-      ),
-      Wallet.create([{ name: "brokerage", userId, totalBalance: 0 }], {
-        session,
-      }),
-    ]);
+    const walletData = [
+      { name: "cash", userId, totalBalance: 0 },
+      { name: "automated investing", userId, totalBalance: 0 },
+      { name: "brokerage", userId, totalBalance: 0 },
+    ];
 
+    await Wallet.insertMany(walletData, { session });
     await Usersetting.create([{ userId }], { session });
 
     try {
@@ -159,7 +165,6 @@ async function registerService(userData) {
         `Portfolio tracker initialization failed for user ${userId}:`,
         trackerError.message
       );
-      // Continue with registration - this is non-critical
     }
 
     const user = await getUserById(userId, session);
@@ -172,6 +177,7 @@ async function registerService(userData) {
       process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: "1d" }
     );
+
     const refreshToken = jwt.sign(
       {
         username: user.credentials.username,
@@ -180,6 +186,8 @@ async function registerService(userData) {
       process.env.REFRESH_TOKEN_SECRET,
       { expiresIn: "4d" }
     );
+
+    await session.commitTransaction();
 
     const userData = {
       credentials: {
@@ -199,8 +207,6 @@ async function registerService(userData) {
       },
     };
 
-    await session.commitTransaction();
-
     console.log(`User registered successfully: ${username} (${userId})`);
 
     return {
@@ -209,7 +215,13 @@ async function registerService(userData) {
       refreshToken,
     };
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      try {
+        await session.abortTransaction();
+      } catch (abortError) {
+        console.error("Error aborting transaction:", abortError.message);
+      }
+    }
 
     throw new CustomError(
       error.message || "Registration failed",
