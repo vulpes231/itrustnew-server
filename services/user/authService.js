@@ -245,9 +245,7 @@ async function completeRegister(userData, userId) {
           experience: experience || null,
           employment: employment || null,
         },
-        accountStatus: {
-          isProfileComplete: true,
-        },
+        "accountStatus.isProfileComplete": true,
       },
     };
 
