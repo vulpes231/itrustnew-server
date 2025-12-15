@@ -1,4 +1,5 @@
 const Trade = require("../../models/Trade");
+const Usersetting = require("../../models/Usersetting");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 
@@ -6,10 +7,18 @@ const tradeService = require("../user/tradeService");
 
 async function fetchUserWallets(userId) {
   try {
-    const wallets = await Wallet.find({ userId: userId }).lean();
+    const user = await Usersetting.findOne({ userId });
+    const allWallets = await Wallet.find({ userId: userId }).lean();
+
+    const filteredWallets = allWallets.filter(
+      (wallet) => wallet.name !== "margin"
+    );
+    const wallets = user.trading.isOptionsEnabled
+      ? allWallets
+      : filteredWallets;
     return wallets;
   } catch (error) {
-    throw new CustomError("Failed to fetch user wallets!", 500);
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -27,6 +36,7 @@ async function getUserFinancialSummary(userId) {
     if (wallets.length === 0 && userTrades.length === 0) {
       return {
         totalBalance: 0,
+        availableBalance: 0,
         dailyProfit: 0,
         dailyProfitPercent: 0,
         totalProfitPercent: 0,
@@ -39,7 +49,7 @@ async function getUserFinancialSummary(userId) {
       (sum, wallet) => sum + (wallet.totalBalance || 0),
       0
     );
-    const availableBalnce = wallets.reduce(
+    const availableBalance = wallets.reduce(
       (sum, wallet) => sum + (wallet.availableBalance || 0),
       0
     );
@@ -67,12 +77,12 @@ async function getUserFinancialSummary(userId) {
 
     return {
       totalBalance,
+      availableBalance,
       dailyProfit,
       dailyProfitPercent: Number(dailyProfitPercent.toFixed(2)),
+      totalProfit,
       totalProfitPercent: Number(totalProfitPercent.toFixed(2)),
       totalInvested,
-      totalProfit,
-      availableBalnce,
     };
   } catch (error) {
     if (error instanceof CustomError) {
@@ -83,5 +93,3 @@ async function getUserFinancialSummary(userId) {
 }
 
 module.exports = { fetchUserWallets, getUserFinancialSummary };
-
-// totalInvested, totalProfit, totalProfitPercent,

@@ -18,46 +18,17 @@ const { default: mongoose } = require("mongoose");
 const portFolioTracker = require("../user/chartService");
 
 async function registerService(userData) {
-  const {
-    firstname,
-    lastname,
-    username,
-    email,
-    password,
-    phone,
-    street,
-    city,
-    zipCode,
-    countryId,
-    stateId,
-    nationalityId,
-    dob,
-    ssn,
-    experience,
-    employment,
-    currencyId,
-  } = userData;
+  const { firstname, lastname, username, email, password } = userData;
 
-  // Validation checks
   if (!firstname || !lastname) {
     throw new CustomError("Fullname required!", 400);
   }
-  if (!username || !password) {
-    throw new CustomError("Username and password required!", 400);
-  }
-  if (
-    !email ||
-    !phone ||
-    !dob ||
-    !countryId ||
-    !stateId ||
-    !nationalityId ||
-    !currencyId
-  ) {
-    throw new CustomError("Contact information required!", 400);
+  if (!username || !password || !email) {
+    throw new CustomError("Username, password and email required!", 400);
   }
 
   const session = await mongoose.startSession();
+  let transactionCommitted = false;
 
   try {
     await session.startTransaction({
@@ -67,33 +38,18 @@ async function registerService(userData) {
     });
 
     const [existingUser, existingEmail] = await Promise.all([
-      User.findOne({ username }).session(session),
-      User.findOne({ email }).session(session),
+      User.findOne({ "credentials.username": username }).session(session),
+      User.findOne({ "credentials.email": email }).session(session),
     ]);
 
     if (existingUser) {
-      await session.abortTransaction();
-      session.endSession();
       throw new CustomError("Username already exists!", 409);
     }
     if (existingEmail) {
-      await session.abortTransaction();
-      session.endSession();
       throw new CustomError("Email already in use!", 409);
     }
 
-    const [countryInfo, stateInfo, nationInfo, currencyInfo] =
-      await Promise.all([
-        getCountryById(countryId),
-        getStateById(stateId),
-        getNationById(nationalityId),
-        getCurrencyById(currencyId),
-      ]);
-
     const hashPassword = await bcrypt.hash(password, 10);
-
-    const [day, month, year] = dob.split("/");
-    const formattedDob = new Date(`${year}-${month}-${day}`);
 
     const userInfo = {
       name: {
@@ -105,54 +61,16 @@ async function registerService(userData) {
         password: hashPassword,
         email: email,
       },
-      contactInfo: {
-        phone: phone,
-        address: {
-          street: street,
-          city: city,
-          zipCode: zipCode,
-        },
-      },
-      locationDetails: {
-        country: {
-          countryId: countryInfo._id,
-          name: countryInfo.name,
-          phoneCode: countryInfo.phoneCode,
-        },
-        state: {
-          stateId: stateInfo._id,
-          name: stateInfo.name,
-        },
-        nationality: {
-          id: nationInfo._id,
-          name: nationInfo.name,
-        },
-        currency: {
-          id: currencyInfo._id,
-          name: currencyInfo.name,
-          symbol: currencyInfo.symbol,
-          sign: currencyInfo.sign,
-          rate: currencyInfo.rate,
-          fees: currencyInfo.fees,
-        },
-      },
-      personalDetails: {
-        dob: formattedDob,
-        ssn: ssn || null,
-      },
-      professionalInfo: {
-        experience: experience,
-        employment: employment,
-      },
     };
 
     const newUser = await User.create([userInfo], { session });
     const userId = newUser[0]._id;
 
     const walletData = [
-      { name: "cash", userId, totalBalance: 0 },
-      { name: "automated investing", userId, totalBalance: 0 },
-      { name: "brokerage", userId, totalBalance: 0 },
+      { name: "cash", userId },
+      { name: "automated investing", userId },
+      { name: "brokerage", userId },
+      { name: "margin", userId },
     ];
 
     await Wallet.insertMany(walletData, { session });
@@ -165,6 +83,7 @@ async function registerService(userData) {
         `Portfolio tracker initialization failed for user ${userId}:`,
         trackerError.message
       );
+      // Don't throw - this is a non-critical service
     }
 
     const user = await getUserById(userId, session);
@@ -188,31 +107,181 @@ async function registerService(userData) {
     );
 
     await session.commitTransaction();
+    transactionCommitted = true;
 
-    const userData = {
-      credentials: {
-        username: user.credentials.username,
-        email: email,
-      },
-      identityVerification: {
-        kycStatus: user.identityVerification.kycStatus,
-      },
-      accountStatus: {
-        status: user.accountStatus.status,
-        banned: user.accountStatus.banned,
-        emailVerified: user.accountStatus.emailVerified,
-        twoFaActivated: user.accountStatus.twoFaActivated,
-        twoFaVerified: user.accountStatus.twoFaVerified,
-        otp: user.accountStatus.otp,
+    return {
+      accessToken,
+      refreshToken,
+    };
+  } catch (error) {
+    if (session.inTransaction() && !transactionCommitted) {
+      try {
+        await session.abortTransaction();
+      } catch (abortError) {
+        console.error("Error aborting transaction:", abortError.message);
+      }
+    }
+
+    if (error.code === 11000 || error.code === 11001) {
+      const field = error.keyPattern?.username
+        ? "Username"
+        : error.keyPattern?.email
+        ? "Email"
+        : "Field";
+      throw new CustomError(`${field} already exists!`, 409);
+    }
+
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(
+      error.message || "Registration failed",
+      error.statusCode || 500
+    );
+  } finally {
+    if (!session.hasEnded) {
+      try {
+        await session.endSession();
+      } catch (sessionError) {
+        console.error("Error ending session:", sessionError.message);
+      }
+    }
+  }
+}
+
+async function completeRegister(userData, userId) {
+  const {
+    phone,
+    street,
+    city,
+    zipCode,
+    countryId,
+    stateId,
+    nationalityId,
+    dob,
+    ssn,
+    experience,
+    employment,
+    currencyId,
+  } = userData;
+
+  if (
+    !phone ||
+    !dob ||
+    !countryId ||
+    !stateId ||
+    !nationalityId ||
+    !currencyId
+  ) {
+    throw new CustomError("Contact information required!", 400);
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    await session.startTransaction();
+
+    const user = await User.findById(userId).session(session);
+
+    if (!user) {
+      await session.abortTransaction();
+      await session.endSession();
+      throw new CustomError("User not found!", 404);
+    }
+
+    const [countryInfo, stateInfo, nationInfo, currencyInfo] =
+      await Promise.all([
+        getCountryById(countryId),
+        getStateById(stateId),
+        getNationById(nationalityId),
+        getCurrencyById(currencyId),
+      ]);
+
+    const [day, month, year] = dob.split("/");
+    const formattedDob = new Date(`${year}-${month}-${day}`);
+
+    if (isNaN(formattedDob.getTime())) {
+      throw new CustomError("Invalid date format. Use DD/MM/YYYY", 400);
+    }
+
+    const updateData = {
+      $set: {
+        contactInfo: {
+          phone: phone,
+          address: {
+            street: street || null,
+            city: city || null,
+            zipCode: zipCode || null,
+          },
+        },
+        locationDetails: {
+          country: {
+            countryId: countryInfo._id,
+            name: countryInfo.name,
+            phoneCode: countryInfo.phoneCode,
+          },
+          state: {
+            stateId: stateInfo._id,
+            name: stateInfo.name,
+          },
+          nationality: {
+            id: nationInfo._id,
+            name: nationInfo.name,
+          },
+          currency: {
+            id: currencyInfo._id,
+            name: currencyInfo.name,
+            symbol: currencyInfo.symbol,
+            sign: currencyInfo.sign,
+            rate: currencyInfo.rate,
+          },
+        },
+        personalDetails: {
+          dob: formattedDob,
+          ssn: ssn || null,
+        },
+        professionalInfo: {
+          experience: experience || null,
+          employment: employment || null,
+        },
+        accountStatus: {
+          isProfileComplete: true,
+        },
       },
     };
 
-    console.log(`User registered successfully: ${username} (${userId})`);
+    await User.findByIdAndUpdate(user._id, updateData, {
+      runValidators: true,
+      session,
+      new: true,
+    });
+
+    await session.commitTransaction();
+
+    const updatedUser = await User.findById(userId);
+
+    const userDataResponse = {
+      credentials: {
+        username: updatedUser.credentials.username,
+        email: updatedUser.credentials.email,
+      },
+      identityVerification: {
+        kycStatus: updatedUser.identityVerification.kycStatus,
+      },
+      accountStatus: {
+        status: updatedUser.accountStatus.status,
+        banned: updatedUser.accountStatus.banned,
+        emailVerified: updatedUser.accountStatus.emailVerified,
+        twoFaActivated: updatedUser.accountStatus.twoFaActivated,
+        twoFaVerified: updatedUser.accountStatus.twoFaVerified,
+        otp: updatedUser.accountStatus.otp,
+        isProfileComplete: updatedUser.accountStatus.isProfileComplete,
+      },
+    };
 
     return {
-      userInfo: userData,
-      accessToken,
-      refreshToken,
+      userInfo: userDataResponse,
     };
   } catch (error) {
     if (session.inTransaction()) {
@@ -223,12 +292,16 @@ async function registerService(userData) {
       }
     }
 
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
     throw new CustomError(
-      error.message || "Registration failed",
+      error.message || "Complete Account failed",
       error.statusCode || 500
     );
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 }
 
@@ -272,6 +345,7 @@ async function loginService(loginData) {
           twoFaActivated: user.accountStatus.twoFaActivated,
           twoFaVerified: user.accountStatus.twoFaVerified,
           otp: user.accountStatus.otp,
+          isProfileComplete: user.accountStatus.isProfileComplete,
         },
       };
 
@@ -310,6 +384,7 @@ async function loginService(loginData) {
           banned: user.accountStatus.banned,
           emailVerified: user.accountStatus.emailVerified,
           twoFaActivated: user.accountStatus.twoFaActivated,
+          isProfileComplete: user.accountStatus.isProfileComplete,
         },
       };
 
@@ -341,4 +416,9 @@ async function logoutService(userId) {
   }
 }
 
-module.exports = { registerService, loginService, logoutService };
+module.exports = {
+  registerService,
+  loginService,
+  logoutService,
+  completeRegister,
+};

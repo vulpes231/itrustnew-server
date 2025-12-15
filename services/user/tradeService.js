@@ -18,8 +18,9 @@ async function buyAsset(userId, assetData) {
     sl,
     entry,
     exit,
+    executiontype,
   } = assetData;
-  if (!assetId || !orderType || !walletId || !amount)
+  if (!assetId || !orderType || !walletId || !amount || !executiontype)
     throw new CustomError("Bad request!", 400);
   try {
     const asset = await fetchAssetById(assetId);
@@ -63,6 +64,7 @@ async function buyAsset(userId, assetData) {
         quantity: qty,
         amount: parsedAmount,
         interval: interval || null,
+        type: executiontype,
       },
       targets: {
         takeProfit: tp || null,

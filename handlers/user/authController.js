@@ -10,8 +10,9 @@ const registerUser = async (req, res, next) => {
   try {
     const userData = req.body;
 
-    const { userInfo, accessToken, refreshToken } =
-      await authService.registerService(userData);
+    const { accessToken, refreshToken } = await authService.registerService(
+      userData
+    );
 
     await queueService.sendToQueue("email_queue", {
       type: "VERIFICATION_EMAIL",
@@ -25,10 +26,29 @@ const registerUser = async (req, res, next) => {
     });
 
     res.status(201).json({
-      message: `${userInfo.credentials.username} created successfully.`,
+      message: `Account created successfully.`,
+      success: true,
+      data: null,
+      token: accessToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const finishRegistration = async (req, res, next) => {
+  if (!req.body) return res.status(400).json({ message: "Bad request!" });
+  const userId = req.user.userId;
+
+  try {
+    const userData = req.body;
+
+    const { userInfo } = await authService.completeRegister(userData, userId);
+
+    res.status(200).json({
+      message: `Account updated successfully.`,
       success: true,
       data: userInfo,
-      token: accessToken,
     });
   } catch (error) {
     next(error);
@@ -87,4 +107,4 @@ const logoutUser = async (req, res, next) => {
   }
 };
 
-module.exports = { registerUser, loginUser, logoutUser };
+module.exports = { registerUser, loginUser, logoutUser, finishRegistration };
