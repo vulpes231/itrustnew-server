@@ -363,6 +363,62 @@ async function updateWalletPerformance() {
   }
 }
 
+const calculateTradeValue = (trade, currentPrice) => {
+  const entryPrice = trade.execution?.price || 0;
+  const quantity = parseFloat(trade.execution?.quantity) || 0;
+  const marginAmount = parseFloat(trade.execution?.amount) || 0;
+  const positionAmount =
+    parseFloat(trade.execution?.positionAmount) || marginAmount;
+
+  const leverage = parseFloat(trade.execution?.leverage) || 1;
+  const isLeveraged = leverage > 1;
+
+  if (quantity === 0 || entryPrice === 0 || marginAmount === 0) {
+    return {
+      currentValue: marginAmount,
+      totalReturn: 0,
+      totalReturnPercent: 0,
+    };
+  }
+
+  let currentValue;
+
+  if (isLeveraged) {
+    // For leveraged trades: current value = position size × price change + margin
+    const priceChangePercent =
+      trade.orderType === "buy"
+        ? ((currentPrice - entryPrice) / entryPrice) * 100
+        : ((entryPrice - currentPrice) / entryPrice) * 100;
+
+    // Profit/loss on the POSITION (not just margin)
+    const positionReturn = (priceChangePercent / 100) * positionAmount;
+    currentValue = marginAmount + positionReturn; // Start with margin, add position P/L
+  } else {
+    // Non-leveraged calculation
+    if (trade.orderType === "buy") {
+      currentValue = quantity * currentPrice;
+    } else if (trade.orderType === "sell") {
+      const priceDifference = entryPrice - currentPrice;
+      const profit = priceDifference * quantity;
+      currentValue = marginAmount + profit;
+    } else {
+      currentValue = quantity * currentPrice;
+    }
+  }
+
+  // Add extra bonus if any
+  const totalCurrentValue = currentValue + (trade.extra || 0);
+  const totalReturn = totalCurrentValue - marginAmount; // Compare to margin invested
+  const totalReturnPercent =
+    marginAmount > 0 ? (totalReturn / marginAmount) * 100 : 0;
+
+  return {
+    currentValue: totalCurrentValue,
+    totalReturn,
+    totalReturnPercent,
+  };
+};
+
 const updateTradePerformance = async () => {
   try {
     console.log("Starting trade performance update...");
@@ -376,6 +432,7 @@ const updateTradePerformance = async () => {
         "execution.quantity": 1,
         "execution.amount": 1,
         "execution.leverage": 1,
+        "execution.type": 1,
         "performance.totalReturn": 1,
         "performance.todayReturn": 1,
         "performance.currentValue": 1,
@@ -432,7 +489,7 @@ const updateTradePerformance = async () => {
     }
 
     const tradeUpdates = [];
-    const tradesToClose = []; // Trades that hit TP/SL
+    const tradesToClose = [];
     const now = new Date();
 
     for (const trade of openTrades) {
@@ -442,28 +499,10 @@ const updateTradePerformance = async () => {
       const currentPrice = assetPriceMap.get(symbol);
       if (!currentPrice) continue;
 
-      const entryPrice = trade.execution?.price || 0;
-      const quantity = trade.execution?.quantity || 0;
-      const investedAmount = trade.execution?.amount || 0;
-      const leverage = trade.execution?.leverage || 1;
-      const extraBonus = trade.extra || 0;
-
-      if (quantity === 0 || entryPrice === 0) continue;
-
-      // Calculate current value based on order type
-      let currentValue;
-      if (trade.orderType === "buy") {
-        currentValue = quantity * currentPrice * leverage;
-      } else if (trade.orderType === "sell") {
-        currentValue = investedAmount - quantity * currentPrice * leverage;
-      } else {
-        currentValue = quantity * currentPrice;
-      }
-
-      const totalCurrentValue = currentValue + extraBonus;
-      const totalReturn = totalCurrentValue - investedAmount;
-      const totalReturnPercent =
-        investedAmount > 0 ? (totalReturn / investedAmount) * 100 : 0;
+      const result = calculateTradeValue(trade, currentPrice);
+      const totalCurrentValue = result.currentValue;
+      const totalReturn = result.totalReturn;
+      const totalReturnPercent = result.totalReturnPercent;
 
       const previousCurrentValue =
         trade.performance?.currentValue || totalCurrentValue;
@@ -473,7 +512,6 @@ const updateTradePerformance = async () => {
           ? (todayReturn / previousCurrentValue) * 100
           : 0;
 
-      // Check if trade should be closed by TP/SL
       const shouldCloseByTP =
         trade.targets?.takeProfit &&
         totalReturnPercent >= trade.targets.takeProfit;
@@ -513,7 +551,6 @@ const updateTradePerformance = async () => {
       });
     }
 
-    // Process trade updates in batches
     if (tradeUpdates.length > 0) {
       const BATCH_SIZE = 500;
       for (let i = 0; i < tradeUpdates.length; i += BATCH_SIZE) {
@@ -534,7 +571,6 @@ const updateTradePerformance = async () => {
       }
     }
 
-    // Process trades that need to be closed
     if (tradesToClose.length > 0) {
       console.log(`Closing ${tradesToClose.length} trades (TP/SL reached)`);
       await closeTradesInBatch(tradesToClose, now);

@@ -1,11 +1,14 @@
+const { default: mongoose } = require("mongoose");
 const Trade = require("../../models/Trade");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 const { fetchAssetById } = require("../assetService");
 const { fetchPlanById } = require("./autoPlanService");
+const Asset = require("../../models/Asset");
 
 async function buyAsset(userId, assetData) {
   if (!userId) throw new CustomError("Bad credentials!", 400);
+
   const {
     assetId,
     planId,
@@ -18,30 +21,88 @@ async function buyAsset(userId, assetData) {
     sl,
     entry,
     exit,
-    executiontype,
+    executionType,
   } = assetData;
-  if (!assetId || !orderType || !walletId || !amount || !executiontype)
+
+  if (!assetId || !orderType || !walletId || !amount || !executionType)
     throw new CustomError("Bad request!", 400);
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const asset = await fetchAssetById(assetId);
-    if (!asset) throw new CustomError("Asset not found!", 404);
-
-    const userWallet = await Wallet.findById(walletId);
-    if (!userWallet) throw new CustomError("Wallet not found!", 404);
-
-    const parsedAmount = parseFloat(amount);
-    const qty = parseFloat(parsedAmount / asset.priceData.current).toFixed(6);
-
-    if (userWallet.availableBalance <= parsedAmount)
-      throw new CustomError("Insufficient funds!", 400);
-
-    let plan;
-
-    if (planId) {
-      plan = await fetchPlanById(planId);
+    const asset = await Asset.findById(assetId).session(session);
+    if (!asset) {
+      await session.abortTransaction();
+      throw new CustomError("Asset not found!", 404);
     }
 
-    userWallet.availableBalance -= parsedAmount;
+    const userWallet = await Wallet.findById(walletId).session(session);
+    if (!userWallet) {
+      await session.abortTransaction();
+      throw new CustomError("Wallet not found!", 404);
+    }
+
+    const parsedAmount = parseFloat(amount);
+    const currentPrice = asset.priceData.current;
+
+    if (userWallet.availableBalance < parsedAmount) {
+      await session.abortTransaction();
+      throw new CustomError("Insufficient funds!", 400);
+    }
+
+    let plan;
+    if (planId) {
+      plan = await fetchPlanById(planId).session(session);
+      if (!plan) {
+        await session.abortTransaction();
+        throw new CustomError("Plan not found!", 404);
+      }
+    }
+
+    let leverageMultiplier = 1;
+    let positionAmount = parsedAmount;
+    let marginAmount = parsedAmount;
+
+    if (executionType === "leverage" || executionType === "stoploss") {
+      const parsedLeverage = parseFloat(leverage);
+
+      if (leverage && parsedLeverage > 1) {
+        leverageMultiplier = parsedLeverage;
+
+        if (leverageMultiplier > 10 || leverageMultiplier < 1) {
+          await session.abortTransaction();
+          throw new CustomError("Invalid leverage amount!", 400);
+        }
+
+        positionAmount = parsedAmount * leverageMultiplier;
+        marginAmount = parsedAmount;
+
+        if (userWallet.availableBalance < marginAmount) {
+          await session.abortTransaction();
+          throw new CustomError("Insufficient funds for leveraged trade!", 400);
+        }
+      }
+    }
+
+    const qty = parseFloat(positionAmount / currentPrice).toFixed(6);
+
+    let currentValue;
+    let totalReturn;
+    let totalReturnPercent;
+
+    if (orderType === "buy") {
+      currentValue = positionAmount;
+      totalReturn = 0;
+      totalReturnPercent = 0;
+    }
+    {
+      currentValue = positionAmount;
+      totalReturn = 0;
+      totalReturnPercent = 0;
+    }
+
+    userWallet.availableBalance -= marginAmount;
     await userWallet.save();
 
     const tradeData = {
@@ -55,16 +116,29 @@ async function buyAsset(userId, assetData) {
       planId: plan?._id || null,
       assetType: asset.type,
       orderType: orderType,
+      leverage:
+        executionType === "leverage" || executionType === "stoploss"
+          ? leverageMultiplier
+          : null,
       wallet: {
         id: userWallet._id,
         name: userWallet.name,
       },
       execution: {
-        price: asset.priceData.current,
-        quantity: qty,
-        amount: parsedAmount,
+        price: currentPrice,
+        quantity: qty, // Quantity based on $250 position
+        amount: marginAmount, // Store $50 as the actual invested amount
+        positionAmount: positionAmount, // Store $250 as the position size
         interval: interval || null,
-        type: executiontype,
+        type: executionType,
+      },
+      performance: {
+        // ADD INITIAL PERFORMANCE VALUES
+        currentValue: parseFloat(currentValue.toFixed(4)),
+        totalReturn: parseFloat(totalReturn.toFixed(4)),
+        totalReturnPercent: parseFloat(totalReturnPercent.toFixed(4)),
+        todayReturn: 0,
+        todayReturnPercent: 0,
       },
       targets: {
         takeProfit: tp || null,
@@ -74,13 +148,29 @@ async function buyAsset(userId, assetData) {
       },
     };
 
-    const trade = await Trade.create(tradeData);
-    const assetName = trade.asset.name;
-    const assetQty = trade.execution.quantity;
-    return { assetName, assetQty };
+    const trade = await Trade.create([tradeData], { session });
+    await session.commitTransaction();
+
+    const assetName = trade[0].asset.name;
+    const assetQty = trade[0].execution.quantity;
+
+    return {
+      assetName,
+      assetQty,
+    };
   } catch (error) {
-    console.log(error.message);
-    throw new CustomError(error.message, 500);
+    await session.abortTransaction();
+
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(
+      error.message || "Failed to process trade",
+      error.statusCode || 500
+    );
+  } finally {
+    session.endSession();
   }
 }
 

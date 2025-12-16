@@ -40,6 +40,7 @@ const tradeSchema = new Schema(
       leverage: { type: Number, default: null },
       interval: { type: String, default: null },
       type: { type: String, default: null },
+      positionAmount: { type: Number, default: null },
     },
     targets: {
       takeProfit: { type: Number, default: null },
