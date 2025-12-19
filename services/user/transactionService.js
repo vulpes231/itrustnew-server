@@ -161,19 +161,72 @@ async function getUserTrnxAnalytics(userId) {
 
     let totalDeposit = 0;
     let totalWithdrawal = 0;
+    let pendingDeposit = 0;
+    let pendingWithdrawal = 0;
+    let monthlyDeposit = 0;
+    let monthlyWithdrawal = 0;
+
+    const now = new Date();
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const monthEnd = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
 
     transactions.forEach((trnx) => {
-      if (trnx.type === "deposit") totalDeposit += trnx.amount;
-      if (trnx.type === "withdraw") totalWithdrawal += trnx.amount;
+      const amount = trnx.amount;
+      const type = trnx.type;
+      const status = trnx.status;
+      const createdAt = new Date(trnx.createdAt);
+
+      // Total completed deposits/withdrawals
+      if (type === "deposit" && status === "completed") {
+        totalDeposit += amount;
+      }
+      if (type === "withdraw" && status === "completed") {
+        totalWithdrawal += amount;
+      }
+
+      // Pending transactions
+      if (type === "deposit" && status === "pending") {
+        pendingDeposit += amount;
+      }
+      if (type === "withdraw" && status === "pending") {
+        pendingWithdrawal += amount;
+      }
+
+      // Monthly completed transactions (current month only)
+      if (
+        status === "completed" &&
+        createdAt >= monthStart &&
+        createdAt <= monthEnd
+      ) {
+        if (type === "deposit") {
+          monthlyDeposit += amount;
+        } else if (type === "withdraw") {
+          monthlyWithdrawal += amount;
+        }
+      }
     });
 
     return {
       totalDeposit,
       totalWithdrawal,
+      pendingDeposit,
+      pendingWithdrawal,
+      monthlyDeposit,
+      monthlyWithdrawal,
       netBalance: totalDeposit - totalWithdrawal,
     };
   } catch (error) {
-    throw new CustomError(error.message, error.statusCode);
+    throw new CustomError(error.message, error.statusCode || 500);
   }
 }
 
