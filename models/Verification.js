@@ -9,6 +9,11 @@ const verificationSchema = new Schema({
     type: String,
     required: true,
   },
+  status: {
+    type: String,
+    required: true,
+    default: "pending",
+  },
   idNumber: {
     type: String,
     required: true,

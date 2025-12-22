@@ -138,7 +138,9 @@ async function moveFunds(userId, trnxData) {
 async function getUserLedger(userId) {
   try {
     const transactions = await Transaction.find({ userId }).lean();
-    return transactions;
+
+    const filteredTrans = transactions.filter((trx) => trx.type !== "savings");
+    return filteredTrans;
   } catch (error) {
     throw new CustomError(error.message, error.statusCode);
   }

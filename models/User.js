@@ -150,11 +150,18 @@ const userSchema = new Schema(
     savingsAccounts: [
       {
         name: { type: String },
+        symbol: { type: String },
+        title: { type: String },
+        tag: { type: String },
+        rate: { type: Number },
+        canTrade: { type: Boolean },
         accountId: { type: Schema.Types.ObjectId, ref: "Savingsaccount" },
         analytics: {
           totalReturn: { type: Number, default: 0 },
           dailyChange: { type: Number, default: 0 },
           balance: { type: Number, default: 0 },
+          contributions: { type: Number, default: 0 },
+          withdrawals: { type: Number, default: 0 },
         },
       },
     ],

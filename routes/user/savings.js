@@ -1,10 +1,10 @@
 const { Router } = require("express");
 const {
-	getSavingsAccounts,
-	getSavingsHistory,
-	createSavingsAccounts,
-	cashoutSavings,
-	contributeSavings,
+  getSavingsAccounts,
+  getSavingsHistory,
+  createSavingsAccounts,
+  cashoutSavings,
+  contributeSavings,
 } = require("../../handlers/user/savingsController");
 
 const router = Router();

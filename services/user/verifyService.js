@@ -184,4 +184,21 @@ async function submitVerification(userData) {
   }
 }
 
-module.exports = { authUser, verifyMail, submitVerification };
+async function getUserVerifyInfo(userId) {
+  if (!userId) throw new CustomError("Bad request!", 400);
+  try {
+    const verifyInfo = await Verification.findOne({ userId }).lean();
+    if (!verifyInfo) throw new CustomError("Data not found!", 404);
+    return verifyInfo;
+  } catch (error) {
+    console.log(error);
+    throw new CustomError(error.message, error.statusCode);
+  }
+}
+
+module.exports = {
+  authUser,
+  verifyMail,
+  submitVerification,
+  getUserVerifyInfo,
+};

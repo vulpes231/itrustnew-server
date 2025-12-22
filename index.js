@@ -43,7 +43,7 @@ if (process.env.NODE_ENV === "development") {
 // Middleware
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
-app.use("/storage", express.static(path.join(__dirname, "storage")));
+
 app.use(cookieParser());
 app.use(reqLogger);
 
@@ -79,6 +79,7 @@ const manageWalletRoute = require("./routes/admin/managewallet.js");
 const manageTradeRoute = require("./routes/admin/managetrade.js");
 const managePlansRoute = require("./routes/admin/manageplans.js");
 const manageSettingsRoute = require("./routes/admin/managesettings.js");
+const manageVerifyRoute = require("./routes/admin/manageverify.js");
 const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 
 // routes
@@ -95,6 +96,7 @@ app.use("/", rootRoute);
 // admin unproteted routes
 app.use("/login", loginAdminRoute);
 app.use("/register", enrollAdminRoute);
+app.use("/storage", express.static(path.join(__dirname, "storage")));
 
 // user protected routes
 app.use(verifyJWT);
@@ -144,6 +146,11 @@ app.use(
   "/managesettings",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
   manageSettingsRoute
+);
+app.use(
+  "/manageverify",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageVerifyRoute
 );
 
 let server;
