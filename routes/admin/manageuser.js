@@ -6,13 +6,14 @@ const {
   removeUser,
   getUser,
   connectWallet,
-  getVerifyData,
+  getUserConfiguration,
 } = require("../../handlers/admin/manageUserHandler");
 
 const router = Router();
 
 router.route("/").get(getAllUsers);
-router.route("/verify-data/:userId").get(getVerifyData);
+
+router.route("/settings/:userId").get(getUserConfiguration);
 router
   .route("/:userId")
   .get(getUser)

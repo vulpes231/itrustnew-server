@@ -1,3 +1,4 @@
+const Usersetting = require("../../models/Usersetting");
 const {
   fetchAllUsers,
   completeVerification,
@@ -5,6 +6,7 @@ const {
   deleteUser,
   fetchUser,
   approveWalletConnection,
+  getUserSettings,
 } = require("../../services/admin/manageUserService");
 const { getUserVerifyInfo } = require("../../services/user/verifyService");
 
@@ -92,6 +94,22 @@ const connectWallet = async (req, res, next) => {
   }
 };
 
+const getUserConfiguration = async (req, res, next) => {
+  const { userId } = req.params;
+
+  try {
+    const settings = await Usersetting.findOne({ userId });
+
+    res.status(200).json({
+      data: settings,
+      success: true,
+      message: "User settings fetched succesfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const suspendAccount = async (req, res, next) => {
   const { userId } = req.params;
   try {
@@ -128,4 +146,5 @@ module.exports = {
   getUser,
   connectWallet,
   getVerifyData,
+  getUserConfiguration,
 };

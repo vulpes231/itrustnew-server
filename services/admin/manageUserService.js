@@ -1,3 +1,4 @@
+const { default: mongoose } = require("mongoose");
 const Chart = require("../../models/Chart");
 const Trade = require("../../models/Trade");
 const User = require("../../models/User");
@@ -202,9 +203,24 @@ async function approveWalletConnection(userId) {
     const user = await Usersetting.findOne({ userId });
     if (!user) throw new CustomError("User not found!", 404);
 
+    if (user.wallet.isConnected === true) {
+      throw new CustomError("Wallet Approved already!!", 400);
+    }
+
     user.wallet.isConnected = true;
     await user.save();
     return true;
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function getUserSettings(userId) {
+  try {
+    const user = await Usersetting.findOne({ userId });
+    if (!user) throw new CustomError("User not found!", 404);
+
+    return user;
   } catch (error) {
     throw new CustomError(error.message, 500);
   }
@@ -217,4 +233,5 @@ module.exports = {
   deleteUser,
   fetchUser,
   approveWalletConnection,
+  getUserSettings,
 };
