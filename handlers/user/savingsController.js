@@ -96,10 +96,10 @@ const getSavingAnalytics = async (req, res, next) => {
   const userId = req.user.userId;
 
   try {
-    const acctName = await fetchSavingsAnalytics(userId);
+    const savingAnalytics = await fetchSavingsAnalytics(userId);
     res.status(200).json({
       message: `Saving Accounts Analytics Fetched Successfully.`,
-      data: null,
+      data: savingAnalytics,
       success: true,
     });
   } catch (error) {
