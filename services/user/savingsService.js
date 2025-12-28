@@ -292,22 +292,48 @@ async function withdrawSavings(userId, withdrawData) {
   }
 }
 
-// async function fetchSavingsAnalytics(userId) {
-// 	if (!userId) throw new CustomError("Bad request", 400);
-// 	try {
-// 		const user = await User.findById(userId);
-// 		if (!user) throw new CustomError("Invalid credentials!", 404);
+async function fetchSavingsAnalytics(userId) {
+  if (!userId) throw new CustomError("Bad request", 400);
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw new CustomError("Invalid credentials!", 404);
 
-// 		const userSavingsAccount = user.savingsAccounts;
-// 		return userSavingsAccount;
-// 	} catch (error) {
-// 		throw new CustomError( "Failed to fetch savings analytics", 500);
-// 	}
-// }
+    const userSavingsAccount = user.savingsAccounts || [];
+
+    const retirementAccts = userSavingsAccount.filter(
+      (acct) => acct.category === "retirement"
+    );
+    const savingsAccts = userSavingsAccount.filter(
+      (acct) => acct.category === "savings"
+    );
+
+    const saveBal = savingsAccts.reduce((total, value) => {
+      return total + (value.analytics?.balance || 0);
+    }, 0);
+
+    const retireBal = retirementAccts.reduce((total, value) => {
+      return total + (value.analytics?.balance || 0);
+    }, 0);
+
+    const analytics = {
+      savingAcctLength: savingsAccts.length,
+      retireAcctLength: retirementAccts.length,
+      savingBalance: saveBal,
+      retirementBalance: retireBal,
+    };
+
+    return analytics;
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError("Failed to fetch savings analytics", 500);
+  }
+}
 
 module.exports = {
   fetchAvailableSavings,
-  // fetchSavingsAnalytics,
+  fetchSavingsAnalytics,
   fetchUserSavingsAccount,
   fetchUserSavingsHistory,
   addSavingsAccount,
