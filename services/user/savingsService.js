@@ -26,17 +26,20 @@ async function addSavingsAccount(userId, accountId) {
 
     const userCountryId = user.locationDetails.country.countryId;
 
+    console.log("user", userCountryId);
+    console.log("acct", acct.eligibleCountries);
+
     const canOpenAccount = acct.eligibleCountries.find(
-      (countryId) => countryId === userCountryId
+      (countryId) => countryId.toString() === userCountryId.toString()
     );
+
     if (!canOpenAccount)
-      throw new CustomError("Account not available in your location!", {
-        statusCode: 400,
-      });
+      throw new CustomError("Account not available in your location!", 400);
 
     const acctExistsInUserSavings = user.savingsAccounts.find(
-      (acct) => acct.accountId === acct._id
+      (userAcct) => userAcct.accountId.toString() === acct._id.toString()
     );
+
     if (acctExistsInUserSavings)
       throw new CustomError("Account exist already!", 409);
 
@@ -62,6 +65,10 @@ async function addSavingsAccount(userId, accountId) {
 
     return newAccountData.name;
   } catch (error) {
+    console.log(error);
+    if (error instanceof CustomError) {
+      throw error;
+    }
     throw new CustomError("Failed to open savings account. Try again", 500);
   }
 }
@@ -111,9 +118,9 @@ async function fetchUserSavingsHistory(userId, queryData) {
 }
 
 async function fundSavings(userId, fundData) {
-  const { amount, accountId, walletId, memo } = fundData;
+  const { amount, accountId, memo } = fundData;
 
-  if (!amount || !accountId || !walletId) {
+  if (!amount || !accountId) {
     throw new CustomError("Bad request!", 400);
   }
 
@@ -127,7 +134,7 @@ async function fundSavings(userId, fundData) {
       throw new CustomError("Invalid credentials!", 401);
     }
 
-    const wallet = await Wallet.findOne({ _id: walletId, userId }).session(
+    const wallet = await Wallet.findOne({ name: "cash", userId }).session(
       session
     );
     if (!wallet) {
@@ -175,6 +182,7 @@ async function fundSavings(userId, fundData) {
           memo: memo || `Cash contribution to ${account.name}`,
           amount: parsedAmount,
           status: "completed",
+          email: user.credentials.email,
         },
       ],
       { session }
@@ -300,11 +308,13 @@ async function fetchSavingsAnalytics(userId) {
 
     const userSavingsAccount = user.savingsAccounts || [];
 
+    // console.log(userSavingsAccount);
+
     const retirementAccts = userSavingsAccount.filter(
-      (acct) => acct.category === "retirement"
+      (acct) => acct.tag === "retirement"
     );
     const savingsAccts = userSavingsAccount.filter(
-      (acct) => acct.category === "savings"
+      (acct) => acct.tag === "savings"
     );
 
     const saveBal = savingsAccts.reduce((total, value) => {
@@ -321,6 +331,8 @@ async function fetchSavingsAnalytics(userId) {
       savingBalance: saveBal,
       retirementBalance: retireBal,
     };
+
+    console.log(analytics);
 
     return analytics;
   } catch (error) {

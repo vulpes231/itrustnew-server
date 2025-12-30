@@ -13,7 +13,7 @@ const router = Router();
 router.route("/").get(getSavingsAccounts).post(createSavingsAccounts);
 router.route("/analytics").get(getSavingAnalytics);
 router.route("/history").get(getSavingsHistory);
-router.route("/contribute").get(contributeSavings);
+router.route("/contribute").post(contributeSavings);
 router.route("/cashout").post(cashoutSavings);
 
 module.exports = router;

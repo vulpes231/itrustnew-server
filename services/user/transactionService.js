@@ -140,7 +140,7 @@ async function getUserLedger(userId) {
     const transactions = await Transaction.find({ userId }).lean();
 
     const filteredTrans = transactions.filter((trx) => trx.type !== "savings");
-    return filteredTrans;
+    return transactions;
   } catch (error) {
     throw new CustomError(error.message, error.statusCode);
   }
