@@ -47,10 +47,28 @@ const generateFileName = (originalName, type, userId) => {
   return `${userId}_${type}_${timestamp}_${randomString}${ext}`;
 };
 
+function getDurationInMs(milestone, duration) {
+  const day = 24 * 60 * 60 * 1000;
+
+  switch (duration) {
+    case "day":
+      return milestone * day;
+    case "week":
+      return milestone * 7 * day;
+    case "month":
+      return milestone * 30 * day;
+    case "year":
+      return milestone * 365 * day;
+    default:
+      throw new Error("Invalid duration type");
+  }
+}
+
 module.exports = {
   getClientIp,
   generateOtp,
   CustomError,
   ROLES,
   generateFileName,
+  getDurationInMs,
 };

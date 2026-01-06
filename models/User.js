@@ -165,6 +165,25 @@ const userSchema = new Schema(
         },
       },
     ],
+    activePlans: [
+      {
+        name: { type: String },
+        title: { type: String },
+        status: { type: String },
+        aum: { type: String },
+        min: { type: String },
+        image: { type: String },
+        duration: { type: String },
+        start: { type: Date },
+        end: { type: Date },
+        planId: { type: Schema.Types.ObjectId, ref: "Autoplan" },
+        analytics: {
+          dailyReturn: { type: Number },
+          expectedReturn: { type: Number },
+          winRate: { type: Number },
+        },
+      },
+    ],
     role: {
       type: String,
       enum: ["0000"],

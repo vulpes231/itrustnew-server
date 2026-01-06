@@ -90,7 +90,6 @@ app.use("/signin", userLoginRoute);
 app.use("/code", otpVerificationRoute);
 app.use("/mail", mailRoute);
 app.use("/asset", assetRoute);
-app.use("/plan", investPlanRoute);
 app.use("/", rootRoute);
 
 // admin unproteted routes
@@ -109,6 +108,7 @@ app.use("/trade", tradeRoute);
 app.use("/savings", savingsRoute);
 app.use("/kyc", kycRoute);
 app.use("/settings", settingsRoute);
+app.use("/invest", investPlanRoute);
 
 //admin protected routes
 app.use("/manageadmin", manageAdminRoute);
