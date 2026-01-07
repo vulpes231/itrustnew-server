@@ -60,6 +60,7 @@ async function activatePlan(planId, userId) {
       start: Date.now(),
       end: endDate,
       planId: plan._id,
+      type: plan.planType,
       analytics: {
         dailyReturn: plan.performance.dailyReturnPercent,
         expectedReturn: plan.performance.expectedReturnPercent,

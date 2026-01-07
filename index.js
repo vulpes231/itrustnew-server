@@ -95,7 +95,6 @@ app.use("/", rootRoute);
 // admin unproteted routes
 app.use("/login", loginAdminRoute);
 app.use("/register", enrollAdminRoute);
-app.use("/storage", express.static(path.join(__dirname, "storage")));
 
 // user protected routes
 app.use(verifyJWT);
@@ -109,6 +108,7 @@ app.use("/savings", savingsRoute);
 app.use("/kyc", kycRoute);
 app.use("/settings", settingsRoute);
 app.use("/invest", investPlanRoute);
+app.use("/storage", express.static(path.join(__dirname, "storage")));
 
 //admin protected routes
 app.use("/manageadmin", manageAdminRoute);
