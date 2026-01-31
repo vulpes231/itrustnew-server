@@ -41,8 +41,10 @@ if (process.env.NODE_ENV === "development") {
 }
 
 // Middleware
+
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+app.use("/storage", express.static(path.join(__dirname, "./storage")));
 
 app.use(cookieParser());
 app.use(reqLogger);
@@ -83,6 +85,7 @@ const manageVerifyRoute = require("./routes/admin/manageverify.js");
 const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 
 // routes
+
 app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
 app.use("/signup", userRegisterRoute);
@@ -108,7 +111,6 @@ app.use("/savings", savingsRoute);
 app.use("/kyc", kycRoute);
 app.use("/settings", settingsRoute);
 app.use("/invest", investPlanRoute);
-app.use("/storage", express.static(path.join(__dirname, "storage")));
 
 //admin protected routes
 app.use("/manageadmin", manageAdminRoute);
