@@ -1,3 +1,4 @@
+const { default: mongoose } = require("mongoose");
 const Asset = require("../../models/Asset");
 const Trade = require("../../models/Trade");
 const User = require("../../models/User");
