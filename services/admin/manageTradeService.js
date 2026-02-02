@@ -189,9 +189,11 @@ async function closeTrade(tradeId) {
   }
 }
 
-async function updateTradePerformance(tradeId) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+async function updateTradePerformance(tradeId, externalSession = null) {
+  const session = externalSession || (await mongoose.startSession());
+  const ownsSession = !externalSession;
+
+  if (ownsSession) session.startTransaction();
 
   try {
     const trade = await Trade.findById(tradeId).session(session);
@@ -278,15 +280,18 @@ async function updateTradePerformance(tradeId) {
       );
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    if (ownsSession) {
+      await session.commitTransaction();
+      session.endSession();
+    }
 
     return trade;
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error("Error in updateTradePerformance:", error);
-    throw new CustomError(error.message, 500);
+    if (ownsSession) {
+      await session.abortTransaction();
+      session.endSession();
+    }
+    throw error;
   }
 }
 
@@ -322,7 +327,8 @@ async function editTradeData(tradeData) {
 
     await trade.save({ session });
 
-    await updateTradePerformance(tradeId);
+    // await updateTradePerformance(tradeId);
+    await updateTradePerformance(tradeId, session);
 
     await session.commitTransaction();
     session.endSession();
