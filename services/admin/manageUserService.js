@@ -162,8 +162,12 @@ async function suspendUser(userId) {
   try {
     const user = await getUserById(userId);
 
-    user.accountStatus.banned = true ? false : true;
+    console.log(user.accountStatus.banned, "before");
+
+    user.accountStatus.banned = !user.accountStatus.banned;
     await user.save();
+
+    console.log(user.accountStatus.banned, "after");
 
     return user;
   } catch (error) {

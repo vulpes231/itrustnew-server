@@ -97,7 +97,6 @@ app.use("/", rootRoute);
 
 // admin unproteted routes
 app.use("/login", loginAdminRoute);
-app.use("/register", enrollAdminRoute);
 
 // user protected routes
 app.use(verifyJWT);
@@ -113,6 +112,7 @@ app.use("/settings", settingsRoute);
 app.use("/invest", investPlanRoute);
 
 //admin protected routes
+app.use("/register", enrollAdminRoute);
 app.use("/manageadmin", manageAdminRoute);
 app.use(
   "/manageuser",
