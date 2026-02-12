@@ -77,38 +77,34 @@ async function editWallets(data) {
 }
 
 async function editLimit(data) {
-  const { method, type, min, max } = data;
+  const {
+    minCryptoDeposit,
+    minBankDeposit,
+    maxCryptoDeposit,
+    maxBankDeposit,
+    minCryptoWithdrawal,
+    minBankWithdrawal,
+    maxCryptoWithdrawal,
+    maxBankWithdrawal,
+  } = data;
 
-  if (!method || !type || !min || !max)
-    throw new CustomError("Bad request", 400);
   try {
     const settings = await WalletSetting.findOne({ name: "global" });
 
-    if (method === "deposit") {
-      if (type === "bank") {
-        settings.depositLimits.bank.min = min;
-        settings.depositLimits.bank.max = max;
-        await settings.save();
-      }
-      if (type === "crypto") {
-        settings.depositLimits.crypto.min = min;
-        settings.depositLimits.crypto.max = max;
-        await settings.save();
-      }
-    } else if (method === "withdrawal") {
-      if (type === "bank") {
-        settings.withdrawalLimits.bank.min = min;
-        settings.withdrawalLimits.bank.max = max;
-        await settings.save();
-      }
-      if (type === "crypto") {
-        settings.withdrawalLimits.crypto.min = min;
-        settings.withdrawalLimits.crypto.max = max;
-        await settings.save();
-      }
-    } else {
-      throw new CustomError("Unknown operation!", 400);
-    }
+    if (minCryptoDeposit) settings.depositLimits.crypto.min = minCryptoDeposit;
+    if (maxCryptoDeposit) settings.depositLimits.crypto.max = maxCryptoDeposit;
+    if (minBankDeposit) settings.depositLimits.bank.min = minBankDeposit;
+    if (maxBankDeposit) settings.depositLimits.bank.max = maxBankDeposit;
+    if (minCryptoWithdrawal)
+      settings.withdrawalLimits.crypto.min = minCryptoWithdrawal;
+    if (maxCryptoWithdrawal)
+      settings.withdrawalLimits.crypto.max = maxCryptoWithdrawal;
+    if (minBankWithdrawal)
+      settings.withdrawalLimits.bank.min = minBankWithdrawal;
+    if (maxBankWithdrawal)
+      settings.withdrawalLimits.bank.max = maxBankWithdrawal;
+
+    await settings.save();
     return settings;
   } catch (error) {
     throw new CustomError(error.message, error.statusCode);

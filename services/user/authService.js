@@ -83,7 +83,6 @@ async function registerService(userData) {
         `Portfolio tracker initialization failed for user ${userId}:`,
         trackerError.message
       );
-      // Don't throw - this is a non-critical service
     }
 
     const user = await getUserById(userId, session);
