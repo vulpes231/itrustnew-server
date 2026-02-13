@@ -55,12 +55,24 @@ const userSettingSchema = new Schema(
 
     limits: {
       deposit: {
-        bank: { min: { type: Number }, max: { type: Number } },
-        crypto: { min: { type: Number }, max: { type: Number } },
+        bank: {
+          min: { type: Number, default: 100 },
+          max: { type: Number, default: 1000 },
+        },
+        crypto: {
+          min: { type: Number, default: 100 },
+          max: { type: Number, default: 1000 },
+        },
       },
       withdrawal: {
-        bank: { min: { type: Number }, max: { type: Number } },
-        crypto: { min: { type: Number }, max: { type: Number } },
+        bank: {
+          min: { type: Number, default: 100 },
+          max: { type: Number, default: 1000 },
+        },
+        crypto: {
+          min: { type: Number, default: 100 },
+          max: { type: Number, default: 1000 },
+        },
       },
     },
     cryptoWallets: {
