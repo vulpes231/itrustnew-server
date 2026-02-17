@@ -13,16 +13,27 @@ async function getUserById(userId, session = null) {
   try {
     let user;
     if (session) {
-      user = await User.findById(userId).session(session);
+      user = await User.findById(userId)
+        .select("-credentials.password -credentials.refreshToken")
+        .session(session);
     } else {
-      user = await User.findById(userId);
+      user = await User.findById(userId).select(
+        "-credentials.password -credentials.refreshToken"
+      );
     }
 
     if (!user) {
       throw new CustomError("User not found!", 404);
     }
 
-    return user;
+    const userSettings = await Usersetting.findOne({ userId: user._id });
+
+    const userData = {
+      ...user.toObject(),
+      settings: userSettings ? userSettings.toObject() : null,
+    };
+
+    return userData;
   } catch (error) {
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);

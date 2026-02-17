@@ -57,9 +57,8 @@ async function fetchUser(userId) {
 
     const userSettings = await Usersetting.findOne({ userId: user._id });
 
-    // Convert both to plain objects and combine
     const userData = {
-      ...user.toObject(), // Convert Mongoose document to plain object
+      ...user.toObject(),
       settings: userSettings ? userSettings.toObject() : null,
     };
 
