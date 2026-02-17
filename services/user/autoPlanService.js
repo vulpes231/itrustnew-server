@@ -27,7 +27,10 @@ async function fetchPlanById(planId) {
     if (!plan) throw new CustomError("Plan not found!", 404);
     return plan;
   } catch (error) {
-    throw new CustomError("Failed to get plan! Try again.", 500);
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
   }
 }
 

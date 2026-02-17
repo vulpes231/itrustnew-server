@@ -5,6 +5,7 @@ const { CustomError } = require("../../utils/utils");
 const { fetchAssetById } = require("../assetService");
 const { fetchPlanById } = require("./autoPlanService");
 const Asset = require("../../models/Asset");
+const User = require("../../models/User");
 
 async function buyAsset(userId, assetData) {
   if (!userId) throw new CustomError("Bad credentials!", 400);
@@ -31,6 +32,11 @@ async function buyAsset(userId, assetData) {
   session.startTransaction();
 
   try {
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      await session.abortTransaction();
+      throw new CustomError("User not found!", 404);
+    }
     const asset = await Asset.findById(assetId).session(session);
     if (!asset) {
       await session.abortTransaction();
@@ -126,14 +132,13 @@ async function buyAsset(userId, assetData) {
       },
       execution: {
         price: currentPrice,
-        quantity: qty, // Quantity based on $250 position
-        amount: marginAmount, // Store $50 as the actual invested amount
-        positionAmount: positionAmount, // Store $250 as the position size
+        quantity: qty,
+        amount: marginAmount,
+        positionAmount: positionAmount,
         interval: interval || null,
         type: executionType,
       },
       performance: {
-        // ADD INITIAL PERFORMANCE VALUES
         currentValue: parseFloat(currentValue.toFixed(4)),
         totalReturn: parseFloat(totalReturn.toFixed(4)),
         totalReturnPercent: parseFloat(totalReturnPercent.toFixed(4)),
@@ -146,6 +151,7 @@ async function buyAsset(userId, assetData) {
         entryPoint: entry || null,
         exitPoint: exit || null,
       },
+      fullname: user.fullName,
     };
 
     const trade = await Trade.create([tradeData], { session });
@@ -192,7 +198,8 @@ async function sellAsset(userId, tradeId) {
 
     return trade;
   } catch (error) {
-    throw new CustomError("Failed to close position!", 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -229,6 +236,7 @@ async function fetchUserTrades(userId, queryData) {
       currentPage: page,
     };
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }
@@ -279,6 +287,7 @@ async function getTradedata(userId) {
 
     return tradeInsight;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }

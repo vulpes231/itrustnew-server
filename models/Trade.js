@@ -64,6 +64,10 @@ const tradeSchema = new Schema(
       type: Number,
       default: 0,
     },
+    fullname: {
+      type: String,
+      required: true,
+    },
   },
   {
     timestamps: true,

@@ -18,6 +18,7 @@ async function fetchUserWallets(userId) {
       : filteredWallets;
     return wallets;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }

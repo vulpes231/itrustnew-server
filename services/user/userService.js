@@ -24,6 +24,7 @@ async function getUserById(userId, session = null) {
 
     return user;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);
   }
 }
@@ -39,6 +40,7 @@ async function fetchUserSettings(userId) {
 
     return userSetting;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);
   }
 }
@@ -107,7 +109,8 @@ async function updateUserProfile(userId, userData) {
     await user.save();
     return user;
   } catch (error) {
-    throw new CustomError("Failed to update user!", 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -129,7 +132,8 @@ async function updatePassword(userId, userData) {
     await user.save();
     return user;
   } catch (error) {
-    throw new CustomError("Failed to update password!", 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -188,7 +192,8 @@ async function updateBeneficiary(userId, userData) {
     await settings.save();
     return settings;
   } catch (error) {
-    throw new CustomError("Failed to update beneficiary!", 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -205,7 +210,8 @@ async function updateTwoFactorAuth(userId) {
     await user.save();
     return user;
   } catch (error) {
-    throw new CustomError("Failed to update two factor!", 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -227,7 +233,8 @@ async function connectWallet(walletData) {
 
     return userSetting;
   } catch (error) {
-    throw new CustomError("Failed to submit documents!", 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 

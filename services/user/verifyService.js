@@ -91,7 +91,8 @@ async function authUser(authData) {
 
     return { accessToken, refreshToken, userInfo };
   } catch (error) {
-    throw new CustomError("Failed to verify login code!", 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -141,6 +142,7 @@ async function verifyMail() {
     await user.save();
     return true;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }
@@ -179,7 +181,7 @@ async function submitVerification(userData) {
     await user.save();
     return true;
   } catch (error) {
-    console.log(error);
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }
@@ -191,7 +193,7 @@ async function getUserVerifyInfo(userId) {
     if (!verifyInfo) throw new CustomError("Data not found!", 404);
     return verifyInfo;
   } catch (error) {
-    console.log(error);
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }

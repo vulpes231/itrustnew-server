@@ -6,7 +6,10 @@ async function getSettings() {
     const settings = await WalletSetting.findOne({ name: "global" }).lean();
     return settings;
   } catch (error) {
-    throw new CustomError(error.message, error.statusCode);
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
   }
 }
 

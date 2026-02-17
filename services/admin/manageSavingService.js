@@ -4,33 +4,36 @@ const { CustomError } = require("../../utils/utils");
 const { fetchAvailableSavings } = require("../user/savingsService");
 
 async function newSavingsAccount(accountData) {
-  console.log("Correct Add Savings api");
   const {
     name,
     title,
-    notes,
-    symbol,
-    subTitle,
-    category,
+    details,
+    slug,
+    information,
+    tag,
     canTrade,
     interestRate,
+    designTag,
+    maxSavingsYearly,
+    maxSavingsTotal,
+    jointMaxSelection,
     minDeposit,
     maxDeposit,
     minWithdrawal,
     maxWithdrawal,
     eligibleCountries,
+    apy,
   } = accountData;
-
-  console.log(accountData);
 
   if (
     !name ||
     !title ||
-    !notes ||
-    !subTitle ||
+    !details ||
+    !information ||
     !canTrade ||
-    !category ||
-    !symbol ||
+    !tag ||
+    !slug ||
+    !designTag ||
     !interestRate ||
     !eligibleCountries ||
     !Array.isArray(eligibleCountries)
@@ -59,12 +62,12 @@ async function newSavingsAccount(accountData) {
     const newAccount = {
       name,
       title,
-      note: notes,
+      details: notes,
       interestRate,
-      symbol,
-      subTitle,
+      slug,
+      information,
       canTrade,
-      category,
+      tag,
       contributionLimits: {
         min: minDeposit ?? 1,
         max: maxDeposit ?? 1000,
@@ -73,7 +76,13 @@ async function newSavingsAccount(accountData) {
         min: minWithdrawal ?? 1,
         max: maxWithdrawal ?? 1000,
       },
+      maxSavings: {
+        total: maxSavingsTotal ?? 1000,
+        yearly: maxSavingsYearly ?? 500,
+      },
       eligibleCountries,
+      jointMaxSelection: jointMaxSelection ?? 0,
+      yearlyAPY: apy ?? 0,
     };
 
     const savedAccount = await SavingsAccount.create(newAccount);
@@ -91,32 +100,29 @@ async function editSavingsAccount(accountData) {
     accountId,
     name,
     title,
-    note,
+    details,
     interestRate,
     minDeposit,
     maxDeposit,
     minWithdrawal,
     maxWithdrawal,
-    eligibleCountries, // Now expects { add: [], remove: [] }
+    eligibleCountries,
     status,
   } = accountData;
 
-  // Validate required ID
   if (!accountId || !mongoose.Types.ObjectId.isValid(accountId)) {
     throw new CustomError("Invalid or missing account ID", 400);
   }
 
-  // Check if account exists
   const existingAccount = await SavingsAccount.findById(accountId);
   if (!existingAccount) {
     throw new CustomError("Savings account not found", 404);
   }
 
-  // Validate provided fields
   if (
     (name !== undefined && !name) ||
     (title !== undefined && !title) ||
-    (note !== undefined && !note) ||
+    (details !== undefined && !details) ||
     (interestRate !== undefined &&
       (!interestRate ||
         isNaN(interestRate) ||
@@ -126,7 +132,6 @@ async function editSavingsAccount(accountData) {
     throw new CustomError("Invalid or missing required fields", 400);
   }
 
-  // Validate eligibleCountries
   if (eligibleCountries) {
     if (
       (!eligibleCountries.add || !Array.isArray(eligibleCountries.add)) &&
@@ -151,7 +156,6 @@ async function editSavingsAccount(accountData) {
     }
   }
 
-  // Validate numeric fields
   if (
     (minDeposit !== undefined && (isNaN(minDeposit) || minDeposit < 0)) ||
     (maxDeposit !== undefined && (isNaN(maxDeposit) || maxDeposit < 0)) ||
@@ -162,7 +166,6 @@ async function editSavingsAccount(accountData) {
     throw new CustomError("Invalid numeric values for limits", 400);
   }
 
-  // Validate status if provided
   if (status !== undefined && !["active", "inactive"].includes(status)) {
     throw new CustomError("Invalid status value", 400);
   }
@@ -172,7 +175,7 @@ async function editSavingsAccount(accountData) {
       $set: {
         ...(name && { name }),
         ...(title && { title }),
-        ...(note && { note }),
+        ...(details && { details }),
         ...(interestRate !== undefined && { interestRate }),
         ...(status && { status }),
         ...(minDeposit !== undefined && {

@@ -35,10 +35,12 @@ async function addFunds(userId, trnxData) {
       type: "deposit",
       userId: userId,
       email: user.credentials.email,
+      fullname: user.fullName,
     });
     return trnx;
   } catch (error) {
-    throw new CustomError("Failed to add money!", 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -80,9 +82,11 @@ async function withdrawFunds(userId, trnxData) {
       type: "withdraw",
       userId: userId,
       email: user.credentials.email,
+      fullname: user.fullName,
     });
     return trnx;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }
@@ -128,9 +132,11 @@ async function moveFunds(userId, trnxData) {
       userId: userId,
       email: user.credentials.email,
       status: "completed",
+      fullname: user.fullName,
     });
     return trnx;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }
@@ -142,6 +148,7 @@ async function getUserLedger(userId) {
     const filteredTrans = transactions.filter((trx) => trx.type !== "savings");
     return transactions;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }
@@ -153,6 +160,7 @@ async function cancelTransaction(transactionId) {
     await transaction.save();
     return transaction;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }
@@ -204,7 +212,7 @@ async function getUserTrnxAnalytics(userId) {
         pendingWithdrawal += amount;
       }
 
-      // Monthly completed transactions (current month only)
+      // Monthly completed transaction
       if (
         status === "completed" &&
         createdAt >= monthStart &&
@@ -228,7 +236,8 @@ async function getUserTrnxAnalytics(userId) {
       netBalance: totalDeposit - totalWithdrawal,
     };
   } catch (error) {
-    throw new CustomError(error.message, error.statusCode || 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, error.statusCode);
   }
 }
 
@@ -240,6 +249,7 @@ async function fetchTransactionInfo(transactionId) {
 
     return transaction;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
   }
 }

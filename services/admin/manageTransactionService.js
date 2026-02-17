@@ -156,6 +156,7 @@ async function createTransaction(transactionData) {
       type: type,
       userId: userId,
       email: user.credentials.email,
+      fullname: user.fullName,
     });
     return trnx;
   } catch (error) {

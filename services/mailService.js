@@ -81,10 +81,10 @@ async function sendWelcomeMessage(email, username) {
   try {
     await sendMail(email, subject, msg);
   } catch (error) {
-    throw new CustomError(
-      "Failed to send welcome message! Please contact support if you need assistance.",
-      error.statusCode
-    );
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -171,10 +171,10 @@ async function sendDepositAlert(email, amount, paymentMethod, currency) {
   try {
     await sendMail(email, subject, message);
   } catch (error) {
-    throw new CustomError(
-      "Failed to send deposit alert. Your funds are safe - this is just a notification failure!",
-      500
-    );
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -184,12 +184,14 @@ async function sendWithdrawalAlert(email, amount, paymentMethod, currency) {
   try {
     await sendMail(email, subject, message);
   } catch (error) {
-    throw new CustomError("Failed to send withdrawal alert!", 500);
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
   }
 }
 
 async function sendTradeAlert(email, action, asset, quantity) {
-  // Validate and normalize input
   action = action.toLowerCase();
 
   const actionVerb =
@@ -267,7 +269,10 @@ async function sendTradeAlert(email, action, asset, quantity) {
   try {
     await sendMail(email, subject, message);
   } catch (error) {
-    throw new CustomError("Failed to send trade alert!", 500);
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
   }
 }
 

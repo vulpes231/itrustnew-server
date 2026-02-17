@@ -58,8 +58,6 @@ class PortfolioTracker {
         $set: { lastActivity: new Date() },
       }
     );
-
-    console.log(`Deposit recorded for ${userId}: +$${amount}`);
   }
 
   async recordWithdrawal(userId, amount) {

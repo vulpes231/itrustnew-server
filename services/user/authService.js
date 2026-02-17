@@ -70,7 +70,7 @@ async function registerService(userData) {
       { name: "cash", userId },
       { name: "automated investing", userId },
       { name: "brokerage", userId },
-      { name: "margin", userId },
+      // { name: "margin", userId },
     ];
 
     await Wallet.insertMany(walletData, { session });

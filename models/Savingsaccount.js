@@ -22,21 +22,42 @@ const savingsAccountSchema = new Schema(
       type: String,
       required: true,
     },
-    subTitle: {
+    slug: {
       type: String,
       required: true,
     },
-    symbol: {
+    information: {
+      type: String,
+      required: true,
+    },
+    tag: {
+      type: String,
+      enum: ["retirement", "savings", "investment"],
+    },
+    designTag: {
       type: String,
     },
-    note: {
+    details: {
       type: [String],
       required: true,
     },
     interestRate: {
       type: String,
-      required: true,
+      // required: true,
     },
+    yearlyAPY: {
+      type: Number,
+      default: 0,
+    },
+    jointMaxSelection: {
+      type: Number,
+      default: 0,
+    },
+    maxSavings: {
+      total: { type: Number, default: 1000 },
+      yearly: { type: Number, default: 500 },
+    },
+
     contributionLimits: {
       min: {
         type: Number,
@@ -86,11 +107,6 @@ const savingsAccountSchema = new Schema(
       type: String,
       enum: ["active", "inactive"],
       default: "active",
-    },
-    category: {
-      type: String,
-      enum: ["retirement", "savings"],
-      required: true,
     },
     canTrade: {
       type: Boolean,

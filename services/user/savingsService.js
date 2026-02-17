@@ -10,7 +10,10 @@ async function fetchAvailableSavings() {
     const savingsAccounts = await SavingsAccount.find().lean();
     return savingsAccounts;
   } catch (error) {
-    throw new CustomError("Failed to get savings accounts! Try again.", 500);
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -183,6 +186,7 @@ async function fundSavings(userId, fundData) {
           amount: parsedAmount,
           status: "completed",
           email: user.credentials.email,
+          fullname: user.fullName,
         },
       ],
       { session }
@@ -206,8 +210,6 @@ async function fundSavings(userId, fundData) {
     if (error instanceof CustomError) {
       throw error;
     }
-
-    console.error("Error funding savings account:", error);
     throw new CustomError(error.message || "Transaction failed", 500);
   } finally {
     await session.endSession();
@@ -280,6 +282,7 @@ async function withdrawSavings(userId, withdrawData) {
           memo: memo || `Cash withdrawal from ${account.name}`,
           amount: parsedAmount,
           status: "completed",
+          fullname: user.fullName,
         },
       ],
       { session }
@@ -292,8 +295,6 @@ async function withdrawSavings(userId, withdrawData) {
     if (error instanceof CustomError) {
       throw error;
     }
-
-    console.error("Withdrawal error:", error);
     throw new CustomError(error.message || "Transaction failed", 500);
   } finally {
     await session.endSession();
@@ -307,8 +308,6 @@ async function fetchSavingsAnalytics(userId) {
     if (!user) throw new CustomError("Invalid credentials!", 404);
 
     const userSavingsAccount = user.savingsAccounts || [];
-
-    // console.log(userSavingsAccount);
 
     const retirementAccts = userSavingsAccount.filter(
       (acct) => acct.tag === "retirement"
@@ -339,7 +338,7 @@ async function fetchSavingsAnalytics(userId) {
     if (error instanceof CustomError) {
       throw error;
     }
-    throw new CustomError("Failed to fetch savings analytics", 500);
+    throw new CustomError(error.message, 500);
   }
 }
 

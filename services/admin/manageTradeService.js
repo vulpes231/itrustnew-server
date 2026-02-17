@@ -82,6 +82,7 @@ async function createTrade(tradeData) {
         profitLossPercentage: 0,
       },
       status: "open",
+      fullname: user.fullName,
     };
 
     if (wallet.availableBalance < parsedAmt) {
