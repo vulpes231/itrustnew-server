@@ -160,7 +160,13 @@ async function updateUserProfile(userId, userData) {
     setIfDefined(investmentInfo, "retiring", retiring);
 
     if (objectives !== undefined) {
-      investmentInfo.objectives = Array.isArray(objectives) ? objectives : [];
+      if (!Array.isArray(objectives)) {
+        throw new Error("Objectives must be an array");
+      }
+
+      investmentInfo.objectives = [
+        ...new Set([...(investmentInfo.objectives || []), ...objectives]),
+      ];
     }
 
     await user.save();

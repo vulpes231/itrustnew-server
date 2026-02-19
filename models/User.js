@@ -50,8 +50,9 @@ const userSchema = new Schema(
           type: String,
         },
         isVerified: {
-          type: Boolean,
-          default: false,
+          type: String,
+          default: "not verified",
+          enum: ["not verified", "pending", "verified"],
         },
       },
     },
