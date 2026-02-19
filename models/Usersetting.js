@@ -33,12 +33,22 @@ const userSettingSchema = new Schema(
       },
       isDripEnabled: { type: Boolean, default: false },
       isOptionsEnabled: { type: Boolean, default: false },
+      isMarginEnabled: { type: Boolean, default: false },
+    },
+    notification: {
+      priceAlert: { type: Boolean, default: false },
+      emailAlert: { type: Boolean, default: false },
+      deviceLoginAlert: { type: Boolean, default: false },
+      purchaseAlert: { type: Boolean, default: false },
     },
 
     beneficiary: {
       firstName: { type: String },
       lastName: { type: String },
-      nationality: { type: String },
+      nationality: {
+        name: { type: String },
+        id: { type: Schema.Types.ObjectId, ref: "Nationality" },
+      },
       dob: { type: Date },
       contact: {
         email: { type: String },
@@ -47,8 +57,15 @@ const userSettingSchema = new Schema(
       address: {
         street: { type: String },
         city: { type: String },
-        state: { type: String },
-        country: { type: String },
+        state: {
+          name: { type: String },
+          id: { type: Schema.Types.ObjectId, ref: "State" },
+        },
+        country: {
+          name: { type: String },
+          phoneCode: { type: String },
+          id: { type: Schema.Types.ObjectId, ref: "Country" },
+        },
         zipCode: { type: String },
       },
     },

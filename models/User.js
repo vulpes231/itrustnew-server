@@ -31,6 +31,9 @@ const userSchema = new Schema(
       refreshToken: {
         type: String,
       },
+      passUpdatedAt: {
+        type: Date,
+      },
     },
     contactInfo: {
       phone: {
@@ -45,6 +48,10 @@ const userSchema = new Schema(
         },
         zipCode: {
           type: String,
+        },
+        isVerified: {
+          type: Boolean,
+          default: false,
         },
       },
     },
@@ -87,6 +94,20 @@ const userSchema = new Schema(
       },
       employment: {
         type: String,
+      },
+      employmentInfo: {
+        employerName: { type: String },
+        position: { type: String },
+        taxBracket: { type: String },
+        liquidNet: { type: String },
+        estimatedNet: { type: String },
+        annualIncome: { type: String },
+        expYears: { type: String },
+      },
+      investmentInfo: {
+        riskTolerance: { type: String },
+        objectives: { type: [String] },
+        retiring: { type: String },
       },
     },
     identityVerification: {

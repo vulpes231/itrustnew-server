@@ -24,7 +24,10 @@ const getUserInfo = async (req, res, next) => {
 };
 
 const editUserInfo = async (req, res, next) => {
+  console.log("updating user...");
   const userId = req.user.userId;
+
+  console.log(userId);
   try {
     const userData = req.body;
     await updateUserProfile(userId, userData);

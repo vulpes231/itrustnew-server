@@ -57,66 +57,112 @@ async function fetchUserSettings(userId) {
 }
 
 async function updateUserProfile(userId, userData) {
-  const {
-    firstName,
-    lastName,
-    nationalityId,
-    dob,
-    email,
-    phone,
-    street,
-    city,
-    stateId,
-    countryId,
-    zipCode,
-  } = userData;
+  if (!userId) throw new CustomError("Bad request!", 400);
   try {
-    const user = await User.findOne({ userId: userId });
+    const user = await User.findById(userId);
     if (!user) {
-      throw new CustomError("user not found", 404);
+      throw new CustomError("User not found", 404);
     }
 
-    const nation = await getNationById(nationalityId);
-    const country = await getCountryById(countryId);
-    const state = await getStateById(stateId);
+    const {
+      firstName,
+      lastName,
+      username,
+      nationalityId,
+      dob,
+      email,
+      phone,
+      street,
+      city,
+      stateId,
+      countryId,
+      zipCode,
+      employerName,
+      position,
+      taxBracket,
+      liquidNet,
+      estimatedNet,
+      riskTolerance,
+      retiring,
+      objectives,
+      employment,
+      experience,
+      annualIncome,
+      expYears,
+    } = userData;
 
-    if (firstName) {
-      user.name.firstName = firstName;
+    const [nation, country, state] = await Promise.all([
+      nationalityId ? getNationById(nationalityId) : null,
+      countryId ? getCountryById(countryId) : null,
+      stateId ? getStateById(stateId) : null,
+    ]);
+
+    const setIfDefined = (obj, key, value) => {
+      if (value !== undefined) obj[key] = value;
+    };
+
+    setIfDefined(user.name, "firstName", firstName);
+    setIfDefined(user.name, "lastName", lastName);
+    setIfDefined(user.credentials, "email", email);
+    setIfDefined(user.credentials, "username", username);
+    setIfDefined(user.contactInfo, "phone", phone);
+
+    if (dob !== undefined) {
+      const formattedDob = new Date(dob);
+      if (isNaN(formattedDob.getTime())) {
+        throw new CustomError("Invalid date format", 400);
+      }
+      user.personalDetails.dob = formattedDob;
     }
-    if (lastName) {
-      user.name.lastName = lastName;
+
+    if (nation && nationalityId) {
+      user.locationDetails.nationality = {
+        id: nation._id,
+        name: nation.name,
+      };
     }
-    if (nationalityId) {
-      user.locationDetails.nationality.id = nation._id;
-      user.locationDetails.nationality.name = nation.name;
+
+    if (country && countryId) {
+      user.locationDetails.country = {
+        countryId: country._id,
+        name: country.name,
+        phoneCode: country.phoneCode,
+      };
     }
-    if (dob) {
-      user.personalDetails.dob = dob;
+
+    if (stateId && state) {
+      user.locationDetails.state = {
+        stateId: state._id,
+        name: state.name,
+      };
     }
-    if (email) {
-      user.credentials.email = email;
+
+    setIfDefined(user.contactInfo.address, "street", street);
+    setIfDefined(user.contactInfo.address, "city", city);
+    setIfDefined(user.contactInfo.address, "zipCode", zipCode);
+
+    setIfDefined(user.professionalInfo, "experience", experience);
+    setIfDefined(user.professionalInfo, "employment", employment);
+
+    const employmentInfo = user.professionalInfo.employmentInfo;
+
+    setIfDefined(employmentInfo, "employerName", employerName);
+    setIfDefined(employmentInfo, "annualIncome", annualIncome);
+    setIfDefined(employmentInfo, "expYears", expYears);
+    setIfDefined(employmentInfo, "position", position);
+    setIfDefined(employmentInfo, "taxBracket", taxBracket);
+    setIfDefined(employmentInfo, "estimatedNet", estimatedNet);
+    setIfDefined(employmentInfo, "liquidNet", liquidNet);
+
+    const investmentInfo = user.professionalInfo.investmentInfo;
+
+    setIfDefined(investmentInfo, "riskTolerance", riskTolerance);
+    setIfDefined(investmentInfo, "retiring", retiring);
+
+    if (objectives !== undefined) {
+      investmentInfo.objectives = Array.isArray(objectives) ? objectives : [];
     }
-    if (phone) {
-      user.contactInfo.phone = phone;
-    }
-    if (street) {
-      user.contactInfo.address.street = street;
-    }
-    if (city) {
-      user.contactInfo.address.city = city;
-    }
-    if (state) {
-      user.locationDetails.state.stateId = state._id;
-      user.locationDetails.state.name = state.name;
-    }
-    if (country) {
-      user.locationDetails.country.countryId = country._id;
-      user.locationDetails.country.name = country.name;
-      user.locationDetails.country.phoneCode = country.phoneCode;
-    }
-    if (zipCode) {
-      user.contactInfo.address.zipCode = zipCode;
-    }
+
     await user.save();
     return user;
   } catch (error) {
@@ -140,6 +186,8 @@ async function updatePassword(userId, userData) {
     const newHashedPass = await bcrypt.hash(newPassword, 10);
     user.credentials.password = newHashedPass;
 
+    user.credentials.passUpdatedAt = Date.now();
+
     await user.save();
     return user;
   } catch (error) {
@@ -152,14 +200,14 @@ async function updateBeneficiary(userId, userData) {
   const {
     firstName,
     lastName,
-    nationality,
+    nationalityId,
     dob,
     email,
     phone,
     street,
     city,
-    state,
-    country,
+    stateId,
+    countryId,
     zipCode,
   } = userData;
   try {
@@ -167,39 +215,54 @@ async function updateBeneficiary(userId, userData) {
     if (!settings) {
       throw new CustomError("settings not found", 404);
     }
-    if (firstName) {
-      settings.beneficiary.firstName = firstName;
+
+    const [nation, country, state] = await Promise.all([
+      nationalityId ? getNationById(nationalityId) : null,
+      countryId ? getCountryById(countryId) : null,
+      stateId ? getStateById(stateId) : null,
+    ]);
+
+    const setIfDefined = (obj, key, value) => {
+      if (value !== undefined) obj[key] = value;
+    };
+
+    setIfDefined(settings.beneficiary, "firstName", firstName);
+    setIfDefined(settings.beneficiary, "lastName", lastName);
+    setIfDefined(settings.beneficiary.contact, "email", email);
+    setIfDefined(settings.beneficiary.contact, "phone", phone);
+
+    if (dob !== undefined) {
+      const formattedDob = new Date(dob);
+      if (isNaN(formattedDob.getTime())) {
+        throw new CustomError("Invalid date format", 400);
+      }
+      settings.beneficiary.dob = formattedDob;
     }
-    if (lastName) {
-      settings.beneficiary.lastName = lastName;
+
+    setIfDefined(settings.beneficiary.address, "street", street);
+    setIfDefined(settings.beneficiary.address, "city", city);
+    setIfDefined(settings.beneficiary.address, "zipCode", zipCode);
+
+    if (nationalityId && nation) {
+      settings.beneficiary.nationality = {
+        id: nation._id,
+        name: nation.name,
+      };
     }
-    if (nationality) {
-      settings.beneficiary.nationality = nationality;
+    if (countryId && country) {
+      settings.beneficiary.address.country = {
+        id: country._id,
+        name: country.name,
+        phoneCode: country.phoneCode,
+      };
     }
-    if (dob) {
-      settings.beneficiary.dob = dob;
+    if (stateId && state) {
+      settings.beneficiary.address.state = {
+        id: state._id,
+        name: state.name,
+      };
     }
-    if (email) {
-      settings.beneficiary.contact.email = email;
-    }
-    if (phone) {
-      settings.beneficiary.contact.phone = phone;
-    }
-    if (street) {
-      settings.beneficiary.address.street = street;
-    }
-    if (city) {
-      settings.beneficiary.address.city = city;
-    }
-    if (state) {
-      settings.beneficiary.address.state = state;
-    }
-    if (country) {
-      settings.beneficiary.address.country = country;
-    }
-    if (zipCode) {
-      settings.beneficiary.address.zipCode = zipCode;
-    }
+
     await settings.save();
     return settings;
   } catch (error) {
