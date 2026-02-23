@@ -60,7 +60,8 @@ async function registerAdmin(adminData) {
       role: safeAdmin.role,
     };
   } catch (error) {
-    throw new CustomError(error.message, error.statusCode || 500);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -98,7 +99,8 @@ async function registerSuperUser(adminData) {
 
     return admin.username;
   } catch (error) {
-    throw new CustomError(error.message, error.statusCode);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -146,7 +148,8 @@ async function loginAdmin(adminData) {
 
     return { accessToken, refreshToken };
   } catch (error) {
-    throw new CustomError(error.message, error.statusCode);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 
@@ -174,6 +177,7 @@ async function updateAdminRole(adminId, action) {
 
     return admin.role;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);
   }
 }
@@ -183,6 +187,7 @@ async function fetchAdmins() {
     const admins = await Admin.find().select("-password -refreshToken");
     return admins;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);
   }
 }
@@ -197,6 +202,7 @@ async function fetchAdminInfo(adminId) {
 
     return admin;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);
   }
 }
@@ -208,6 +214,7 @@ async function deleteAdmin(adminId) {
     if (!adminToDelete) throw new CustomError("Admin not found!", 404);
     return true;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);
   }
 }
@@ -222,22 +229,21 @@ async function logoutAdmin(adminId) {
     await admin.save();
     return admin;
   } catch (error) {
+    if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);
   }
 }
 
 async function manualSystemUpdate() {
   try {
-    console.log("Manual update of all cron jobs triggered");
-
-    // Run in sequence to avoid overload
     await updateAssetsData();
     await updateTradePerformance();
     await updateWalletPerformance();
 
     return true;
   } catch (error) {
-    throw new CustomError(error.message, error.statusCode);
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(error.message, 500);
   }
 }
 
