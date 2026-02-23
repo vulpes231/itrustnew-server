@@ -41,10 +41,7 @@ const savingsAccountSchema = new Schema(
       type: [String],
       required: true,
     },
-    interestRate: {
-      type: String,
-      // required: true,
-    },
+
     yearlyAPY: {
       type: Number,
       default: 0,

@@ -12,7 +12,6 @@ async function newSavingsAccount(accountData) {
     information,
     tag,
     canTrade,
-    interestRate,
     designTag,
     maxSavingsYearly,
     maxSavingsTotal,
@@ -34,7 +33,6 @@ async function newSavingsAccount(accountData) {
     !tag ||
     !slug ||
     !designTag ||
-    !interestRate ||
     !eligibleCountries ||
     !Array.isArray(eligibleCountries)
   ) {
@@ -56,14 +54,15 @@ async function newSavingsAccount(accountData) {
   }
 
   try {
-    const acctExists = await SavingsAccount.findOne({ name });
+    const acctExists = await SavingsAccount.findOne({
+      name: name.toLowerCase(),
+    });
     if (acctExists) throw new CustomError("Account already exist!", 409);
 
     const newAccount = {
-      name,
+      name: name.toLowerCase(),
       title,
-      details: notes,
-      interestRate,
+      details: details,
       slug,
       information,
       canTrade,
