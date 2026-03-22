@@ -160,14 +160,8 @@ async function completeVerification(userId, verifyData) {
 async function suspendUser(userId) {
   try {
     const user = await getUserById(userId);
-
-    console.log(user.accountStatus.banned, "before");
-
     user.accountStatus.banned = !user.accountStatus.banned;
     await user.save();
-
-    console.log(user.accountStatus.banned, "after");
-
     return user;
   } catch (error) {
     throw new CustomError(error.message, 500);
@@ -176,13 +170,11 @@ async function suspendUser(userId) {
 
 async function deleteUser(userId) {
   try {
-    // Verify user exists
     const user = await getUserById(userId);
     if (!user) {
       throw new CustomError("User not found", 404);
     }
 
-    // Delete related records
     await Promise.all([
       Transaction.deleteMany({ userId }),
       Trade.deleteMany({ userId }),
@@ -192,7 +184,6 @@ async function deleteUser(userId) {
       Usersetting.deleteMany({ userId }),
     ]);
 
-    // Delete the user itself
     await User.findByIdAndDelete(userId);
 
     return { success: true, message: "User and related data deleted" };

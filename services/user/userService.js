@@ -101,10 +101,10 @@ async function updateUserProfile(userId, userData) {
       if (value !== undefined) obj[key] = value;
     };
 
-    setIfDefined(user.name, "firstName", firstName);
-    setIfDefined(user.name, "lastName", lastName);
-    setIfDefined(user.credentials, "email", email);
-    setIfDefined(user.credentials, "username", username);
+    setIfDefined(user.personalInfo, "firstName", firstName);
+    setIfDefined(user.personalInfo, "lastName", lastName);
+    setIfDefined(user.contactInfo, "email", email);
+    setIfDefined(user.personalInfo, "username", username);
     setIfDefined(user.contactInfo, "phone", phone);
 
     if (dob !== undefined) {
@@ -112,18 +112,18 @@ async function updateUserProfile(userId, userData) {
       if (isNaN(formattedDob.getTime())) {
         throw new CustomError("Invalid date format", 400);
       }
-      user.personalDetails.dob = formattedDob;
+      user.personalInfo.dob = formattedDob;
     }
 
     if (nation && nationalityId) {
-      user.locationDetails.nationality = {
+      user.personalInfo.nationality = {
         id: nation._id,
         name: nation.name,
       };
     }
 
     if (country && countryId) {
-      user.locationDetails.country = {
+      user.contactInfo.country = {
         countryId: country._id,
         name: country.name,
         phoneCode: country.phoneCode,
@@ -131,20 +131,20 @@ async function updateUserProfile(userId, userData) {
     }
 
     if (stateId && state) {
-      user.locationDetails.state = {
+      user.contactInfo.state = {
         stateId: state._id,
         name: state.name,
       };
     }
 
-    setIfDefined(user.contactInfo.address, "street", street);
-    setIfDefined(user.contactInfo.address, "city", city);
-    setIfDefined(user.contactInfo.address, "zipCode", zipCode);
+    setIfDefined(user.contactInfo, "street", street);
+    setIfDefined(user.contactInfo, "city", city);
+    setIfDefined(user.contactInfo, "zipCode", zipCode);
 
-    setIfDefined(user.professionalInfo, "experience", experience);
-    setIfDefined(user.professionalInfo, "employment", employment);
+    setIfDefined(user.investmentInfo, "experience", experience);
+    setIfDefined(user.employmentInfo, "status", employment);
 
-    const employmentInfo = user.professionalInfo.employmentInfo;
+    const employmentInfo = user.employmentInfo;
 
     setIfDefined(employmentInfo, "employerName", employerName);
     setIfDefined(employmentInfo, "annualIncome", annualIncome);
@@ -154,7 +154,7 @@ async function updateUserProfile(userId, userData) {
     setIfDefined(employmentInfo, "estimatedNet", estimatedNet);
     setIfDefined(employmentInfo, "liquidNet", liquidNet);
 
-    const investmentInfo = user.professionalInfo.investmentInfo;
+    const investmentInfo = user.investmentInfo;
 
     setIfDefined(investmentInfo, "riskTolerance", riskTolerance);
     setIfDefined(investmentInfo, "retiring", retiring);
@@ -282,7 +282,7 @@ async function updateTwoFactorAuth(userId) {
   try {
     const user = await User.findById(userId);
     if (!user) {
-      throw new CustomError("Inavlid credentials!", 404);
+      throw new CustomError("Invalid credentials!", 404);
     }
     user.accountStatus.twoFaActivated = user.accountStatus.twoFaActivated
       ? false

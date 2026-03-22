@@ -38,8 +38,8 @@ async function registerService(userData) {
     });
 
     const [existingUser, existingEmail] = await Promise.all([
-      User.findOne({ "credentials.username": username }).session(session),
-      User.findOne({ "credentials.email": email }).session(session),
+      User.findOne({ "personalInfo.username": username }).session(session),
+      User.findOne({ "contactInfo.email": email }).session(session),
     ]);
 
     if (existingUser) {
@@ -55,10 +55,12 @@ async function registerService(userData) {
       name: {
         firstName: firstname,
         lastName: lastname,
+        username: username,
       },
       credentials: {
-        username: username,
         password: hashPassword,
+      },
+      contactInfo: {
         email: email,
       },
     };
@@ -67,10 +69,9 @@ async function registerService(userData) {
     const userId = newUser[0]._id;
 
     const walletData = [
-      { name: "cash", userId },
-      { name: "automated investing", userId },
-      { name: "brokerage", userId },
-      // { name: "margin", userId },
+      { name: "cash account", userId, slug: "cash" },
+      { name: "automated investing", userId, slug: "auto" },
+      { name: "individual brokerage", userId, slug: "brokerage" },
     ];
 
     await Wallet.insertMany(walletData, { session });
@@ -89,7 +90,7 @@ async function registerService(userData) {
 
     const accessToken = jwt.sign(
       {
-        username: user.credentials.username,
+        username: user.personalInfo.username,
         userId: user._id,
       },
       process.env.ACCESS_TOKEN_SECRET,
@@ -98,7 +99,7 @@ async function registerService(userData) {
 
     const refreshToken = jwt.sign(
       {
-        username: user.credentials.username,
+        username: user.personalInfo.username,
         userId: user._id,
       },
       process.env.REFRESH_TOKEN_SECRET,
@@ -159,7 +160,6 @@ async function completeRegister(userData, userId) {
     stateId,
     nationalityId,
     dob,
-    ssn,
     experience,
     employment,
     currencyId,
@@ -208,13 +208,7 @@ async function completeRegister(userData, userId) {
       $set: {
         contactInfo: {
           phone: phone,
-          address: {
-            street: street || null,
-            city: city || null,
-            zipCode: zipCode || null,
-          },
-        },
-        locationDetails: {
+          street: street,
           country: {
             countryId: countryInfo._id,
             name: countryInfo.name,
@@ -224,25 +218,33 @@ async function completeRegister(userData, userId) {
             stateId: stateInfo._id,
             name: stateInfo.name,
           },
+          city: {
+            type: city,
+          },
+          zipCode: {
+            type: zipCode,
+          },
+        },
+
+        personalDetails: {
+          dob: formattedDob,
           nationality: {
             id: nationInfo._id,
             name: nationInfo.name,
           },
-          currency: {
-            id: currencyInfo._id,
-            name: currencyInfo.name,
-            symbol: currencyInfo.symbol,
-            sign: currencyInfo.sign,
-            rate: currencyInfo.rate,
-          },
         },
-        personalDetails: {
-          dob: formattedDob,
-          ssn: ssn || null,
+        employmentInfo: {
+          status: employment,
         },
-        professionalInfo: {
-          experience: experience || null,
-          employment: employment || null,
+        investmentInfo: {
+          experience: experience,
+        },
+        currency: {
+          id: currencyInfo._id,
+          name: currencyInfo.name,
+          symbol: currencyInfo.symbol,
+          sign: currencyInfo.sign,
+          rate: currencyInfo.rate,
         },
         "accountStatus.isProfileComplete": true,
       },
@@ -260,8 +262,8 @@ async function completeRegister(userData, userId) {
 
     const userDataResponse = {
       credentials: {
-        username: updatedUser.credentials.username,
-        email: updatedUser.credentials.email,
+        username: updatedUser.personalInfo.username,
+        email: updatedUser.contactInfo.email,
       },
       identityVerification: {
         kycStatus: updatedUser.identityVerification.kycStatus,
@@ -308,7 +310,7 @@ async function loginService(loginData) {
     throw new CustomError("Email and password required!", 400);
   }
   try {
-    const user = await User.findOne({ "credentials.email": email });
+    const user = await User.findOne({ "contactInfo.email": email });
     if (!user) {
       throw new CustomError("User does not exist!", 404);
     }
@@ -322,14 +324,14 @@ async function loginService(loginData) {
     }
 
     if (user.accountStatus.twoFaActivated) {
-      const email = user.credentials.email;
+      const email = user.contactInfo.email;
       const otp = await sendLoginCode(email);
       user.accountStatus.otp = otp;
       await user.save();
 
       const userInfo = {
         credentials: {
-          username: user.credentials.username,
+          username: user.personalInfo.username,
           email: email,
         },
         identityVerification: {
@@ -350,7 +352,7 @@ async function loginService(loginData) {
     } else {
       const accessToken = jwt.sign(
         {
-          username: user.credentials.username,
+          username: user.personalInfo.username,
           userId: user._id,
         },
         process.env.ACCESS_TOKEN_SECRET,
@@ -358,7 +360,7 @@ async function loginService(loginData) {
       );
       const refreshToken = jwt.sign(
         {
-          username: user.credentials.username,
+          username: user.personalInfo.username,
           userId: user._id,
         },
         process.env.REFRESH_TOKEN_SECRET,
@@ -370,8 +372,8 @@ async function loginService(loginData) {
 
       const userInfo = {
         credentials: {
-          username: user.credentials.username,
-          email: user.credentials.email,
+          username: user.personalInfo.username,
+          email: user.contactInfo.email,
         },
         identityVerification: {
           kycStatus: user.identityVerification.kycStatus,

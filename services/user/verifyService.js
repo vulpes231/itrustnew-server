@@ -54,7 +54,7 @@ async function authUser(authData) {
 
     const accessToken = jwt.sign(
       {
-        username: user.credentials.username,
+        username: user.personalInfo.username,
         userId: user._id,
       },
       process.env.ACCESS_TOKEN_SECRET,
@@ -62,7 +62,7 @@ async function authUser(authData) {
     );
     const refreshToken = jwt.sign(
       {
-        username: user.credentials.username,
+        username: user.personalInfo.username,
         userId: user._id,
       },
       process.env.REFRESH_TOKEN_SECRET,

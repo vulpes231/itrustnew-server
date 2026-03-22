@@ -1,21 +1,11 @@
 const Trade = require("../../models/Trade");
-const Usersetting = require("../../models/Usersetting");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 
-const tradeService = require("../user/tradeService");
-
 async function fetchUserWallets(userId) {
   try {
-    const user = await Usersetting.findOne({ userId });
-    const allWallets = await Wallet.find({ userId: userId }).lean();
+    const wallets = await Wallet.find({ userId: userId }).lean();
 
-    const filteredWallets = allWallets.filter(
-      (wallet) => wallet.name !== "margin"
-    );
-    const wallets = user.trading.isOptionsEnabled
-      ? allWallets
-      : filteredWallets;
     return wallets;
   } catch (error) {
     if (error instanceof CustomError) throw error;

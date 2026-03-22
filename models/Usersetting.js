@@ -25,23 +25,6 @@ const userSettingSchema = new Schema(
       },
     },
 
-    trading: {
-      mode: {
-        type: String,
-        enum: ["regular", "drip", "options", "multi"],
-        default: "regular",
-      },
-      isDripEnabled: { type: Boolean, default: false },
-      isOptionsEnabled: { type: Boolean, default: false },
-      isMarginEnabled: { type: Boolean, default: false },
-    },
-    notification: {
-      priceAlert: { type: Boolean, default: false },
-      emailAlert: { type: Boolean, default: false },
-      deviceLoginAlert: { type: Boolean, default: false },
-      purchaseAlert: { type: Boolean, default: false },
-    },
-
     beneficiary: {
       firstName: { type: String },
       lastName: { type: String },

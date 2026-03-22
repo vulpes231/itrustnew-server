@@ -27,10 +27,7 @@ async function addSavingsAccount(userId, accountId) {
     const acct = await SavingsAccount.findById(accountId);
     if (!acct) throw new CustomError("Account not found!", 404);
 
-    const userCountryId = user.locationDetails.country.countryId;
-
-    console.log("user", userCountryId);
-    console.log("acct", acct.eligibleCountries);
+    const userCountryId = user.contactInfo.country.countryId;
 
     const canOpenAccount = acct.eligibleCountries.find(
       (countryId) => countryId.toString() === userCountryId.toString()
@@ -184,7 +181,7 @@ async function fundSavings(userId, fundData) {
           account: account.name,
           memo: memo || `Cash contribution to ${account.name}`,
           amount: parsedAmount,
-          status: "completed",
+          status: "processed",
           email: user.credentials.email,
           fullname: user.fullName,
         },
@@ -281,7 +278,7 @@ async function withdrawSavings(userId, withdrawData) {
           account: account.name,
           memo: memo || `Cash withdrawal from ${account.name}`,
           amount: parsedAmount,
-          status: "completed",
+          status: "processed",
           fullname: user.fullName,
         },
       ],
@@ -330,8 +327,6 @@ async function fetchSavingsAnalytics(userId) {
       savingBalance: saveBal,
       retirementBalance: retireBal,
     };
-
-    console.log(analytics);
 
     return analytics;
   } catch (error) {

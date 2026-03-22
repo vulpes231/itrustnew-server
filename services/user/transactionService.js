@@ -4,8 +4,8 @@ const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 
 async function addFunds(userId, trnxData) {
-  const { method, amount, account, memo, network } = trnxData;
-  if (!amount || !method || !account || !network)
+  const { method, amount, memo, network } = trnxData;
+  if (!amount || !method || !network)
     throw new CustomError("Bad request!", 400);
   try {
     const user = await User.findById(userId);
@@ -18,7 +18,7 @@ async function addFunds(userId, trnxData) {
       throw new CustomError("Contact support for more info!", 404);
     }
 
-    const receiver = wallets.find((wallet) => wallet.name === account);
+    const receiver = wallets.find((wallet) => wallet.slug === "cash");
     if (!receiver) {
       throw new CustomError("Invalid receiving account!", 400);
     }
@@ -34,7 +34,7 @@ async function addFunds(userId, trnxData) {
       memo: memo || customMemo,
       type: "deposit",
       userId: userId,
-      email: user.credentials.email,
+      email: user.contactInfo.email,
       fullname: user.fullName,
     });
     return trnx;
@@ -81,7 +81,7 @@ async function withdrawFunds(userId, trnxData) {
       memo: memo || customMemo,
       type: "withdraw",
       userId: userId,
-      email: user.credentials.email,
+      email: user.contactInfo.email,
       fullname: user.fullName,
     });
     return trnx;
@@ -130,8 +130,8 @@ async function moveFunds(userId, trnxData) {
       memo: memo || customMemo,
       type: "transfer",
       userId: userId,
-      email: user.credentials.email,
-      status: "completed",
+      email: user.contactInfo.email,
+      status: "processed",
       fullname: user.fullName,
     });
     return trnx;

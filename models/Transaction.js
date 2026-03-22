@@ -10,7 +10,7 @@ const transactionSchema = new Schema(
     type: {
       type: String,
       required: true,
-      enum: ["deposit", "withdraw", "transfer", "savings"],
+      enum: ["deposit", "withdraw", "transfer", "savings", "interest"],
     },
     userId: {
       type: Schema.Types.ObjectId,
@@ -31,7 +31,7 @@ const transactionSchema = new Schema(
     status: {
       type: String,
       default: "pending",
-      enum: ["pending", "cancelled", "completed", "failed"],
+      enum: ["pending", "cancelled", "processed", "failed"],
     },
     email: {
       type: String,

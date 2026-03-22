@@ -3,7 +3,7 @@ const Schema = mongoose.Schema;
 
 const userSchema = new Schema(
   {
-    name: {
+    personalInfo: {
       firstName: {
         type: String,
         required: true,
@@ -12,21 +12,27 @@ const userSchema = new Schema(
         type: String,
         required: true,
       },
-    },
-    credentials: {
       username: {
         type: String,
         required: true,
         unique: true,
       },
+      nationality: {
+        id: { type: Schema.Types.ObjectId, ref: "Nationality" },
+        name: { type: String },
+      },
+      dob: {
+        type: Date,
+      },
+      isPersonalComplete: {
+        type: Boolean,
+        default: false,
+      },
+    },
+    credentials: {
       password: {
         type: String,
         required: true,
-      },
-      email: {
-        type: String,
-        required: true,
-        unique: true,
       },
       refreshToken: {
         type: String,
@@ -39,24 +45,14 @@ const userSchema = new Schema(
       phone: {
         type: String,
       },
-      address: {
-        street: {
-          type: String,
-        },
-        city: {
-          type: String,
-        },
-        zipCode: {
-          type: String,
-        },
-        isVerified: {
-          type: String,
-          default: "not verified",
-          enum: ["not verified", "pending", "verified"],
-        },
+      email: {
+        type: String,
+        required: true,
+        unique: true,
       },
-    },
-    locationDetails: {
+      street: {
+        type: String,
+      },
       country: {
         countryId: { type: Schema.Types.ObjectId, ref: "Country" },
         name: { type: String },
@@ -66,49 +62,61 @@ const userSchema = new Schema(
         stateId: { type: Schema.Types.ObjectId, ref: "State" },
         name: { type: String },
       },
-      nationality: {
-        id: { type: Schema.Types.ObjectId, ref: "Nationality" },
-        name: { type: String },
-      },
-      currency: {
-        id: { type: Schema.Types.ObjectId, ref: "Currency" },
-        name: { type: String },
-        symbol: { type: String },
-        sign: { type: String },
-        rate: { type: String },
-      },
-    },
-    personalDetails: {
-      avatar: {
+      city: {
         type: String,
       },
-      dob: {
-        type: Date,
-      },
-      ssn: {
+      zipCode: {
         type: String,
       },
+      isAddressVerified: {
+        type: Boolean,
+        default: false,
+      },
+      status: {
+        type: String,
+        enum: ["not verified", "pending", "verified"],
+      },
     },
-    professionalInfo: {
+    currency: {
+      id: { type: Schema.Types.ObjectId, ref: "Currency" },
+      name: { type: String },
+      symbol: { type: String },
+      sign: { type: String },
+      rate: { type: String },
+    },
+    employmentInfo: {
       experience: {
         type: String,
       },
-      employment: {
+      status: {
         type: String,
       },
-      employmentInfo: {
-        employerName: { type: String },
-        position: { type: String },
-        taxBracket: { type: String },
-        liquidNet: { type: String },
-        estimatedNet: { type: String },
-        annualIncome: { type: String },
-        expYears: { type: String },
+      employer: { type: String },
+      position: { type: String },
+      taxBracket: { type: String },
+      liquidNet: { type: String },
+      estimatedNet: { type: String },
+      annualIncome: { type: String },
+      expYears: { type: String },
+    },
+    investmentInfo: {
+      riskTolerance: { type: String },
+      experience: {
+        type: String,
       },
-      investmentInfo: {
-        riskTolerance: { type: String },
-        objectives: { type: [String] },
-        retiring: { type: String },
+      objectives: { type: [String] },
+      retiring: { type: String },
+      drip: {
+        type: Boolean,
+        default: false,
+      },
+      margin: {
+        type: Boolean,
+        default: false,
+      },
+      options: {
+        type: Boolean,
+        default: false,
       },
     },
     identityVerification: {
@@ -167,6 +175,24 @@ const userSchema = new Schema(
       },
       otpBlockedUntil: {
         type: Date,
+      },
+    },
+    mailing: {
+      emailNotification: {
+        type: Boolean,
+        default: false,
+      },
+      priceAlert: {
+        type: Boolean,
+        default: false,
+      },
+      orderNotification: {
+        type: Boolean,
+        default: false,
+      },
+      loginAlert: {
+        type: Boolean,
+        default: false,
       },
     },
     savingsAccounts: [

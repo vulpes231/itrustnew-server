@@ -110,25 +110,23 @@ async function configureUserInfo(formData) {
 
     const setObject = {};
 
-    if (updates.firstName) setObject["name.firstName"] = updates.firstName;
+    if (updates.firstName)
+      setObject["personalInfo.firstName"] = updates.firstName;
 
-    if (updates.lastName) setObject["name.lastName"] = updates.lastName;
+    if (updates.lastName) setObject["personalInfo.lastName"] = updates.lastName;
 
-    if (updates.email) setObject["credentials.email"] = updates.email;
+    if (updates.email) setObject["contactInfo.email"] = updates.email;
 
-    if (updates.employment)
-      setObject["professionalInfo.employment"] = updates.employment;
+    if (updates.employment) setObject["employment.status"] = updates.employment;
 
     if (updates.experience)
-      setObject["professionalInfo.experience"] = updates.experience;
+      setObject["investmentInfo.experience"] = updates.experience;
 
-    if (updates.address)
-      setObject["contactInfo.address.street"] = updates.address;
+    if (updates.address) setObject["contactInfo.street"] = updates.address;
 
-    if (updates.city) setObject["contactInfo.address.city"] = updates.city;
+    if (updates.city) setObject["contactInfo.city"] = updates.city;
 
-    if (updates.zipCode)
-      setObject["contactInfo.address.zipCode"] = updates.zipCode;
+    if (updates.zipCode) setObject["contactInfo.zipCode"] = updates.zipCode;
 
     if (updates.dob) {
       const formattedDob = new Date(updates.dob);
@@ -137,14 +135,14 @@ async function configureUserInfo(formData) {
         throw new CustomError("Invalid date format", 400);
       }
 
-      setObject["personalDetails.dob"] = formattedDob;
+      setObject["personalInfo.dob"] = formattedDob;
     }
 
     if (updates.currencyId) {
       const currency = await getCurrencyById(updates.currencyId);
       if (!currency) throw new CustomError("Currency not found!", 404);
 
-      setObject["locationDetails.currency"] = {
+      setObject["currency"] = {
         id: currency._id,
         name: currency.name,
         symbol: currency.symbol,
@@ -157,7 +155,7 @@ async function configureUserInfo(formData) {
       const country = await getCountryById(updates.countryId);
       if (!country) throw new CustomError("Country not found!", 404);
 
-      setObject["locationDetails.country"] = {
+      setObject["contactInfo.country"] = {
         countryId: country._id,
         name: country.name,
         phoneCode: country.phoneCode,
@@ -168,7 +166,7 @@ async function configureUserInfo(formData) {
       const state = await getStateById(updates.stateId);
       if (!state) throw new CustomError("State not found!", 404);
 
-      setObject["locationDetails.state"] = {
+      setObject["contactInfo.state"] = {
         stateId: state._id,
         name: state.name,
       };
@@ -178,7 +176,7 @@ async function configureUserInfo(formData) {
       const nation = await getNationById(updates.nationalityId);
       if (!nation) throw new CustomError("Nationality not found!", 404);
 
-      setObject["locationDetails.nationality"] = {
+      setObject["personalInfo.nationality"] = {
         id: nation._id,
         name: nation.name,
       };

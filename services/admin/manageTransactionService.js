@@ -54,7 +54,7 @@ async function editTransaction(transactionId, action) {
     if (!transaction) {
       throw new CustomError("Transaction not found!", 404);
     }
-    if (transaction.status === "completed") {
+    if (transaction.status === "processed") {
       throw new CustomError("Action already completed!", 404);
     }
 
@@ -73,7 +73,7 @@ async function editTransaction(transactionId, action) {
       await transactionWallet.save({ session });
 
       // Update transaction status
-      transaction.status = "completed";
+      transaction.status = "processed";
       await transaction.save({ session });
 
       try {
@@ -155,7 +155,7 @@ async function createTransaction(transactionData) {
       memo: memo || customMemo,
       type: type,
       userId: userId,
-      email: user.credentials.email,
+      email: user.contactInfo.email,
       fullname: user.fullName,
     });
     return trnx;
