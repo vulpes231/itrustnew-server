@@ -52,7 +52,7 @@ async function registerService(userData) {
     const hashPassword = await bcrypt.hash(password, 10);
 
     const userInfo = {
-      name: {
+      personalInfo: {
         firstName: firstname,
         lastName: lastname,
         username: username,
@@ -206,39 +206,27 @@ async function completeRegister(userData, userId) {
 
     const updateData = {
       $set: {
-        contactInfo: {
-          phone: phone,
-          street: street,
-          country: {
-            countryId: countryInfo._id,
-            name: countryInfo.name,
-            phoneCode: countryInfo.phoneCode,
-          },
-          state: {
-            stateId: stateInfo._id,
-            name: stateInfo.name,
-          },
-          city: {
-            type: city,
-          },
-          zipCode: {
-            type: zipCode,
-          },
+        "contactInfo.phone": phone,
+        "contactInfo.street": street,
+        "contactInfo.city": city,
+        "contactInfo.zipCode": zipCode,
+        "contactInfo.country": {
+          countryId: countryInfo._id,
+          name: countryInfo.name,
+          phoneCode: countryInfo.phoneCode,
+        },
+        "contactInfo.state": {
+          stateId: stateInfo._id,
+          name: stateInfo.name,
         },
 
-        personalDetails: {
-          dob: formattedDob,
-          nationality: {
-            id: nationInfo._id,
-            name: nationInfo.name,
-          },
+        "personalInfo.dob": formattedDob,
+        "personalInfo.nationality": {
+          id: nationInfo._id,
+          name: nationInfo.name,
         },
-        employmentInfo: {
-          status: employment,
-        },
-        investmentInfo: {
-          experience: experience,
-        },
+        "employmentInfo.status": employment,
+        "investmentInfo.experience": experience,
         currency: {
           id: currencyInfo._id,
           name: currencyInfo.name,
@@ -283,6 +271,7 @@ async function completeRegister(userData, userId) {
       userInfo: userDataResponse,
     };
   } catch (error) {
+    console.log(error);
     if (session.inTransaction()) {
       try {
         await session.abortTransaction();

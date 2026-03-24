@@ -75,6 +75,7 @@ const userSchema = new Schema(
       status: {
         type: String,
         enum: ["not verified", "pending", "verified"],
+        default: "not verified",
       },
     },
     currency: {
@@ -242,7 +243,7 @@ const userSchema = new Schema(
 );
 
 userSchema.virtual("fullName").get(function () {
-  return `${this.name.firstName} ${this.name.lastName}`;
+  return `${this.personalInfo.firstName} ${this.personalInfo.lastName}`;
 });
 
 const User = mongoose.model("User", userSchema);

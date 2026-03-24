@@ -33,8 +33,11 @@ async function getUserFinancialSummary(userId) {
         totalProfitPercent: 0,
         totalInvested: 0,
         totalProfit: 0,
+        cashBalance: 0,
       };
     }
+
+    const cash = wallets.find((wallet) => wallet.slug === "cash");
 
     const totalBalance = wallets.reduce(
       (sum, wallet) => sum + (wallet.totalBalance || 0),
@@ -54,7 +57,7 @@ async function getUserFinancialSummary(userId) {
       totalBalance > 0 ? (dailyProfit / totalBalance) * 100 : 0;
 
     const totalInvested = userTrades.reduce(
-      (sum, trade) => sum + (trade.execution?.amount || 0),
+      (sum, trade) => sum + (trade.performance?.currentValue || 0),
       0
     );
 
@@ -66,6 +69,8 @@ async function getUserFinancialSummary(userId) {
     const totalProfitPercent =
       totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
+    const cashBalance = cash.availableBalance;
+
     return {
       totalBalance,
       availableBalance,
@@ -74,6 +79,7 @@ async function getUserFinancialSummary(userId) {
       totalProfit,
       totalProfitPercent: Number(totalProfitPercent.toFixed(2)),
       totalInvested,
+      cashBalance,
     };
   } catch (error) {
     if (error instanceof CustomError) {

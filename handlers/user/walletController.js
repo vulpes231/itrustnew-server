@@ -21,6 +21,7 @@ const getWalletAnalytics = async (req, res, next) => {
   const userId = req.user.userId;
   try {
     const walletAnalytics = await getUserFinancialSummary(userId);
+    // console.log(walletAnalytics);
     res.status(200).json({
       message: "User analytics fetched succesfully",
       data: walletAnalytics,
