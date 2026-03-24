@@ -77,15 +77,6 @@ async function registerService(userData) {
     await Wallet.insertMany(walletData, { session });
     await Usersetting.create([{ userId }], { session });
 
-    try {
-      await portFolioTracker.initializeUser(userId);
-    } catch (trackerError) {
-      console.warn(
-        `Portfolio tracker initialization failed for user ${userId}:`,
-        trackerError.message
-      );
-    }
-
     const user = await getUserById(userId, session);
 
     const accessToken = jwt.sign(
@@ -108,6 +99,15 @@ async function registerService(userData) {
 
     await session.commitTransaction();
     transactionCommitted = true;
+
+    try {
+      await portFolioTracker.initializeUser(userId);
+    } catch (trackerError) {
+      console.warn(
+        `Portfolio tracker initialization failed for user ${userId}:`,
+        trackerError.message
+      );
+    }
 
     return {
       accessToken,
