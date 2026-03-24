@@ -77,7 +77,7 @@ async function registerService(userData) {
     await Wallet.insertMany(walletData, { session });
     await Usersetting.create([{ userId }], { session });
 
-    const user = await getUserById(userId, session);
+    const user = newUser[0];
 
     const accessToken = jwt.sign(
       {
@@ -122,14 +122,16 @@ async function registerService(userData) {
       }
     }
 
-    if (error.code === 11000 || error.code === 11001) {
-      const field = error.keyPattern?.username
-        ? "Username"
-        : error.keyPattern?.email
-        ? "Email"
-        : "Field";
-      throw new CustomError(`${field} already exists!`, 409);
-    }
+    console.log(error);
+
+    // if (error.code === 11000 || error.code === 11001) {
+    //   const field = error.keyPattern?.username
+    //     ? "Username"
+    //     : error.keyPattern?.email
+    //     ? "Email"
+    //     : "Field";
+    //   throw new CustomError(`${field} already exists!`, 409);
+    // }
 
     if (error instanceof CustomError) {
       throw error;
