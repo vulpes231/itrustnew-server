@@ -148,20 +148,10 @@ async function verifyMail() {
 }
 
 async function submitVerification(userData) {
-  const {
-    userId,
-    frontId,
-    backId,
-    lastname,
-    firstname,
-    idType,
-    idNumber,
-    frontIdName,
-    backIdName,
-  } = userData;
+  const { userId, frontId, backId, idType, frontIdName, backIdName } = userData;
 
-  if (!idType || !idNumber || !firstname || !lastname || !userId)
-    throw new CustomError("Bad request!", 400);
+  if (!idType || !userId || !frontId || !frontIdName)
+    throw new CustomError("Bad request, Imcomplete data!", 400);
   try {
     const user = await User.findById(userId);
     if (!user) throw new CustomError("User not found!", 404);
@@ -170,9 +160,8 @@ async function submitVerification(userData) {
       userId,
       frontId,
       backId,
-      fullname: `${firstname} ${lastname}`,
+      fullname: user.fullName,
       idType,
-      idNumber,
       frontIdName,
       backIdName,
     });

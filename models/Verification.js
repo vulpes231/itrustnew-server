@@ -14,17 +14,12 @@ const verificationSchema = new Schema({
     required: true,
     default: "pending",
   },
-  idNumber: {
-    type: String,
-    required: true,
-  },
   frontId: {
     type: String,
     required: true,
   },
   backId: {
     type: String,
-    required: true,
   },
   frontIdName: {
     type: String,
@@ -32,7 +27,6 @@ const verificationSchema = new Schema({
   },
   backIdName: {
     type: String,
-    required: true,
   },
   userId: {
     type: Schema.Types.ObjectId,

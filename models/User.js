@@ -124,9 +124,6 @@ const userSchema = new Schema(
       idType: {
         type: String,
       },
-      idNumber: {
-        type: String,
-      },
       idFront: {
         type: String,
       },

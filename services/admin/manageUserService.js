@@ -109,7 +109,6 @@ async function completeVerification(userId, verifyData) {
       user.identityVerification = {
         kycStatus: "approved",
         idType: submittedData.idType,
-        idNumber: submittedData.idNumber,
         idFront: submittedData.frontId,
         idBack: submittedData.backId,
         verifiedAt: new Date(),

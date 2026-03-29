@@ -7,34 +7,60 @@ const path = require("path");
 const fs = require("fs").promises;
 
 const { generateFileName } = require("../../utils/utils");
+const User = require("../../models/User");
 
 const STORAGE_PATH = path.join(__dirname, "../../storage");
 const PUBLIC_STORAGE_PATH = "/storage";
 
 const submitDetails = async (req, res, next) => {
   const userId = req.user.userId;
-  console.log(userId);
 
   try {
     const reqData = req.body;
 
-    if (!req.files || req.files.length < 2) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({
-        message: "Both front and back ID images are required.",
+        message: "Main ID image is required.",
         success: false,
       });
     }
 
     const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+
     const frontId = req.files[0];
     const backId = req.files[1];
 
-    if (
-      !allowedMimeTypes.includes(frontId.mimetype) ||
-      !allowedMimeTypes.includes(backId.mimetype)
-    ) {
+    if (!allowedMimeTypes.includes(frontId.mimetype)) {
       return res.status(400).json({
-        message: "Only image files are allowed.",
+        message: "Front ID must be an image.",
+        success: false,
+      });
+    }
+
+    if (backId && !allowedMimeTypes.includes(backId.mimetype)) {
+      return res.status(400).json({
+        message: "Back ID must be an image.",
+        success: false,
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+        success: false,
+      });
+    }
+
+    if (user.identityVerification.kycStatus === "pending") {
+      return res.status(400).json({
+        message: "Verification in progress!",
+        success: false,
+      });
+    }
+    if (user.identityVerification.kycStatus === "approved") {
+      return res.status(400).json({
+        message: "Verification completed!",
         success: false,
       });
     }
@@ -56,19 +82,26 @@ const submitDetails = async (req, res, next) => {
       .webp({ quality: 80 })
       .toFile(frontFilePath);
 
-    const backFileName = generateFileName(backId.originalname, "back", userId);
-    const backFilePath = path.join(STORAGE_PATH, backFileName);
-
-    await sharp(backId.buffer)
-      .resize(800, 600, {
-        fit: "inside",
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 80 })
-      .toFile(backFilePath);
-
     let frontIdPath = `${PUBLIC_STORAGE_PATH}/${frontFileName}`;
-    let backIdPath = `${PUBLIC_STORAGE_PATH}/${backFileName}`;
+
+    let backIdPath = null;
+    let backFileName = null;
+
+    if (backId) {
+      backFileName = generateFileName(backId.originalname, "back", userId);
+
+      const backFilePath = path.join(STORAGE_PATH, backFileName);
+
+      await sharp(backId.buffer)
+        .resize(800, 600, {
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .webp({ quality: 80 })
+        .toFile(backFilePath);
+
+      backIdPath = `${PUBLIC_STORAGE_PATH}/${backFileName}`;
+    }
 
     const userData = {
       ...reqData,
@@ -81,10 +114,12 @@ const submitDetails = async (req, res, next) => {
 
     const isSubmitted = await verifyService.submitVerification(userData);
 
-    if (!isSubmitted)
-      return res
-        .status(500)
-        .json({ message: "Failed to submit.", success: false });
+    if (!isSubmitted) {
+      return res.status(500).json({
+        message: "Failed to submit.",
+        success: false,
+      });
+    }
 
     res.status(200).json({
       message: "Verification request pending.",
