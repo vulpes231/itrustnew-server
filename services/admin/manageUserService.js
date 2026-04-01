@@ -69,14 +69,10 @@ async function fetchUser(userId) {
 }
 
 async function completeVerification(userId, verifyData) {
-  const { verifyId, action } = verifyData;
+  const { verifyId } = verifyData;
 
-  if (!verifyId || !action) {
+  if (!verifyId) {
     throw new CustomError("Bad request!", 400);
-  }
-
-  if (!["approve", "reject"].includes(action)) {
-    throw new CustomError("Invalid action! Must be 'approve' or 'reject'", 400);
   }
 
   const session = await mongoose.startSession();
@@ -101,34 +97,15 @@ async function completeVerification(userId, verifyData) {
       throw new CustomError("Verification request already processed!", 400);
     }
 
-    if (submittedData.userId && submittedData.userId.toString() !== userId) {
-      throw new CustomError("Verification does not belong to this user!", 403);
-    }
+    user.identityVerification = {
+      kycStatus: "approved",
+      idType: submittedData.idType,
+      idFront: submittedData.frontId,
+      idBack: submittedData?.backId || null,
+      verifiedAt: new Date(),
+    };
 
-    if (action === "approve") {
-      user.identityVerification = {
-        kycStatus: "approved",
-        idType: submittedData.idType,
-        idFront: submittedData.frontId,
-        idBack: submittedData.backId,
-        verifiedAt: new Date(),
-      };
-
-      submittedData.status = "approved";
-    } else if (action === "reject") {
-      user.identityVerification = {
-        kycStatus: "failed",
-        failedAt: new Date(),
-
-        ...(user.identityVerification.idType && {
-          idType: user.identityVerification.idType,
-          idNumber: user.identityVerification.idNumber,
-        }),
-      };
-
-      submittedData.status = "rejected";
-    }
-
+    submittedData.status = "approved";
     await Promise.all([
       user.save({ session }),
       submittedData.save({ session }),

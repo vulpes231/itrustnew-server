@@ -166,6 +166,7 @@ async function submitVerification(userData) {
       backIdName,
     });
 
+    user.identityVerification.idType = idType;
     user.identityVerification.kycStatus = "pending";
     await user.save();
     return true;
@@ -188,7 +189,7 @@ async function getUserVerifyInfo(userId) {
 }
 
 async function submitAddressProof(userData) {
-  const { userId, docPath , idType} = userData;
+  const { userId, docPath, idType } = userData;
   if (!docPath) throw new CustomError("Bad request!", 400);
   try {
     const user = await User.findById(userId);
