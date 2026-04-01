@@ -177,7 +177,7 @@ const verifyAddress = async (req, res, next) => {
       });
     }
 
-    await fs.promises.mkdir(PROOF_STORAGE_PATH, { recursive: true });
+    await fs.mkdir(PROOF_STORAGE_PATH, { recursive: true });
 
     const proofFilename = generateFileName(proof.originalname, "proof", userId);
     const proofFilePath = path.join(PROOF_STORAGE_PATH, proofFilename);
@@ -206,7 +206,8 @@ const verifyAddress = async (req, res, next) => {
       success: true,
     });
   } catch (error) {
-    await fs.promises.unlink(proofFilePath);
+    console.log(error);
+    await fs.unlink(proofFilePath);
     next(error);
   }
 };

@@ -7,6 +7,9 @@ const {
   getUserTrnxAnalytics,
 } = require("../../services/user/transactionService");
 const { allowedMimeTypes } = require("../../utils/utils");
+const sharp = require("sharp");
+const path = require("path");
+const fs = require("fs");
 
 const deposit = async (req, res, next) => {
   const userId = req.user.userId;
@@ -14,7 +17,7 @@ const deposit = async (req, res, next) => {
   try {
     const trnxData = req.body;
 
-    let proofUrl = null;
+    let proof = null;
 
     if (trnxData.method === "bank") {
       if (!req.file) {
@@ -52,10 +55,10 @@ const deposit = async (req, res, next) => {
         .webp({ quality: 80 })
         .toFile(filePath);
 
-      proofUrl = `/storage/deposits/${filename}`;
+      proof = `/storage/deposits/${filename}`;
     }
 
-    await addFunds(userId, { ...trnxData, proofUrl });
+    await addFunds(userId, { ...trnxData, proof });
 
     res.status(200).json({
       message: "Deposit initiated.",

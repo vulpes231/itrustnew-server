@@ -80,6 +80,9 @@ const userSchema = new Schema(
       docPath: {
         type: String,
       },
+      idType: {
+        type: String,
+      },
     },
     currency: {
       id: { type: Schema.Types.ObjectId, ref: "Currency" },

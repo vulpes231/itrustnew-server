@@ -188,7 +188,7 @@ async function getUserVerifyInfo(userId) {
 }
 
 async function submitAddressProof(userData) {
-  const { userId, docPath } = userData;
+  const { userId, docPath , idType} = userData;
   if (!docPath) throw new CustomError("Bad request!", 400);
   try {
     const user = await User.findById(userId);
@@ -196,6 +196,7 @@ async function submitAddressProof(userData) {
 
     user.contactInfo.status = "pending";
     user.contactInfo.docPath = docPath;
+    user.contactInfo.idType = idType;
     await user.save();
     return { status: user.contactInfo.status };
   } catch (error) {
