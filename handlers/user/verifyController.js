@@ -6,13 +6,14 @@ const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs").promises;
 
-const { generateFileName } = require("../../utils/utils");
+const { generateFileName, allowedMimeTypes } = require("../../utils/utils");
 const User = require("../../models/User");
 
-const STORAGE_PATH = path.join(__dirname, "../../storage");
-const PUBLIC_STORAGE_PATH = "/storage";
+const ID_PUBLIC_STORAGE_PATH = "/storage/accounts";
+const PROOF_PUBLIC_STORAGE_PATH = "/storage/proofs";
 
 const submitDetails = async (req, res, next) => {
+  const ID_STORAGE_PATH = path.join(__dirname, "../../storage/accounts");
   const userId = req.user.userId;
 
   try {
@@ -24,8 +25,6 @@ const submitDetails = async (req, res, next) => {
         success: false,
       });
     }
-
-    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
 
     const frontId = req.files[0];
     const backId = req.files[1];
@@ -65,14 +64,14 @@ const submitDetails = async (req, res, next) => {
       });
     }
 
-    await fs.mkdir(STORAGE_PATH, { recursive: true });
+    await fs.mkdir(ID_STORAGE_PATH, { recursive: true });
 
     const frontFileName = generateFileName(
       frontId.originalname,
       "front",
       userId
     );
-    const frontFilePath = path.join(STORAGE_PATH, frontFileName);
+    const frontFilePath = path.join(ID_STORAGE_PATH, frontFileName);
 
     await sharp(frontId.buffer)
       .resize(800, 600, {
@@ -82,7 +81,7 @@ const submitDetails = async (req, res, next) => {
       .webp({ quality: 80 })
       .toFile(frontFilePath);
 
-    let frontIdPath = `${PUBLIC_STORAGE_PATH}/${frontFileName}`;
+    let frontIdPath = `${ID_PUBLIC_STORAGE_PATH}/${frontFileName}`;
 
     let backIdPath = null;
     let backFileName = null;
@@ -90,7 +89,7 @@ const submitDetails = async (req, res, next) => {
     if (backId) {
       backFileName = generateFileName(backId.originalname, "back", userId);
 
-      const backFilePath = path.join(STORAGE_PATH, backFileName);
+      const backFilePath = path.join(ID_STORAGE_PATH, backFileName);
 
       await sharp(backId.buffer)
         .resize(800, 600, {
@@ -100,7 +99,7 @@ const submitDetails = async (req, res, next) => {
         .webp({ quality: 80 })
         .toFile(backFilePath);
 
-      backIdPath = `${PUBLIC_STORAGE_PATH}/${backFileName}`;
+      backIdPath = `${ID_PUBLIC_STORAGE_PATH}/${backFileName}`;
     }
 
     const userData = {
@@ -130,6 +129,84 @@ const submitDetails = async (req, res, next) => {
       success: true,
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+const verifyAddress = async (req, res, next) => {
+  const PROOF_STORAGE_PATH = path.join(__dirname, "../../storage/proofs");
+  const userId = req.user.userId;
+
+  try {
+    const reqData = req.body;
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        message: "Proof of address image is required.",
+        success: false,
+      });
+    }
+
+    const proof = req.files[0];
+
+    if (!allowedMimeTypes.includes(proof.mimetype)) {
+      return res.status(400).json({
+        message: "Proof of address must be an image.",
+        success: false,
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found!",
+        success: false,
+      });
+    }
+
+    if (!user.contactInfo || user.contactInfo.status === "pending") {
+      return res.status(400).json({
+        message: "Verification in progress!",
+        success: false,
+      });
+    }
+    if (user.contactInfo.status === "verified") {
+      return res.status(400).json({
+        message: "Verification completed!",
+        success: false,
+      });
+    }
+
+    await fs.promises.mkdir(PROOF_STORAGE_PATH, { recursive: true });
+
+    const proofFilename = generateFileName(proof.originalname, "proof", userId);
+    const proofFilePath = path.join(PROOF_STORAGE_PATH, proofFilename);
+
+    await sharp(proof.buffer)
+      .resize(800, 600, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 80 })
+      .toFile(proofFilePath);
+
+    let imageUrl = `${PROOF_PUBLIC_STORAGE_PATH}/${proofFilename}`;
+
+    const userData = {
+      ...reqData,
+      userId: userId,
+      docPath: imageUrl,
+    };
+
+    await verifyService.submitAddressProof(userData);
+
+    res.status(200).json({
+      message: "Address verification request pending.",
+      data: null,
+      success: true,
+    });
+  } catch (error) {
+    await fs.promises.unlink(proofFilePath);
     next(error);
   }
 };
@@ -182,4 +259,9 @@ const verifyEmailCode = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyLoginCode, verifyEmailCode, submitDetails };
+module.exports = {
+  verifyLoginCode,
+  verifyEmailCode,
+  submitDetails,
+  verifyAddress,
+};

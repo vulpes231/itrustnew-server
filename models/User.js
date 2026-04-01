@@ -77,6 +77,9 @@ const userSchema = new Schema(
         enum: ["not verified", "pending", "verified"],
         default: "not verified",
       },
+      docPath: {
+        type: String,
+      },
     },
     currency: {
       id: { type: Schema.Types.ObjectId, ref: "Currency" },

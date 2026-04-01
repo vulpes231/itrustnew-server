@@ -4,7 +4,7 @@ const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 
 async function addFunds(userId, trnxData) {
-  const { method, amount, memo, network } = trnxData;
+  const { method, amount, memo, network, proofUrl } = trnxData;
   if (!amount || !method || !network)
     throw new CustomError("Bad request!", 400);
   try {
@@ -36,6 +36,7 @@ async function addFunds(userId, trnxData) {
       userId: userId,
       email: user.contactInfo.email,
       fullname: user.fullName,
+      proof: proofUrl || null,
     });
     return trnx;
   } catch (error) {

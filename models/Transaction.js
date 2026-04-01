@@ -41,6 +41,10 @@ const transactionSchema = new Schema(
       type: String,
       required: true,
     },
+    proof: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: true,

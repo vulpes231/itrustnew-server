@@ -187,9 +187,29 @@ async function getUserVerifyInfo(userId) {
   }
 }
 
+async function submitAddressProof(userData) {
+  const { userId, docPath } = userData;
+  if (!docPath) throw new CustomError("Bad request!", 400);
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw new CustomError("User not found!", 404);
+
+    user.contactInfo.status = "pending";
+    user.contactInfo.docPath = docPath;
+    await user.save();
+    return { status: user.contactInfo.status };
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, error.statusCode);
+  }
+}
+
 module.exports = {
   authUser,
   verifyMail,
   submitVerification,
   getUserVerifyInfo,
+  submitAddressProof,
 };
