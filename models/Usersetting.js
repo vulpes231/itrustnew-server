@@ -28,6 +28,7 @@ const userSettingSchema = new Schema(
     beneficiary: {
       firstName: { type: String },
       lastName: { type: String },
+      relationship: { type: String },
       nationality: {
         name: { type: String },
         id: { type: Schema.Types.ObjectId, ref: "Nationality" },

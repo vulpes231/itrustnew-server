@@ -146,7 +146,7 @@ async function updateUserProfile(userId, userData) {
 
     const employmentInfo = user.employmentInfo;
 
-    setIfDefined(employmentInfo, "employerName", employerName);
+    setIfDefined(employmentInfo, "employer", employerName);
     setIfDefined(employmentInfo, "annualIncome", annualIncome);
     setIfDefined(employmentInfo, "expYears", expYears);
     setIfDefined(employmentInfo, "position", position);
@@ -215,6 +215,7 @@ async function updateBeneficiary(userId, userData) {
     stateId,
     countryId,
     zipCode,
+    relationship,
   } = userData;
   try {
     const settings = await Usersetting.findOne({ userId: userId });
@@ -234,6 +235,7 @@ async function updateBeneficiary(userId, userData) {
 
     setIfDefined(settings.beneficiary, "firstName", firstName);
     setIfDefined(settings.beneficiary, "lastName", lastName);
+    setIfDefined(settings.beneficiary, "relationship", relationship);
     setIfDefined(settings.beneficiary.contact, "email", email);
     setIfDefined(settings.beneficiary.contact, "phone", phone);
 
