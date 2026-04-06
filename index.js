@@ -71,6 +71,7 @@ const savingsRoute = require("./routes/user/savings.js");
 const kycRoute = require("./routes/user/kyc.js");
 const settingsRoute = require("./routes/user/settings.js");
 const profileSettingsRoute = require("./routes/user/profileSettings.js");
+const chartRoute = require("./routes/user/chart.js");
 
 // admin routers
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
@@ -114,6 +115,7 @@ app.use("/kyc", kycRoute);
 app.use("/settings", settingsRoute);
 app.use("/invest", investPlanRoute);
 app.use("/profile", profileSettingsRoute);
+app.use("/chart", chartRoute);
 
 //admin protected routes
 app.use("/register", enrollAdminRoute);
