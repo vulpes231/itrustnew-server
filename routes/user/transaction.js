@@ -16,5 +16,6 @@ router.route("/analytics").get(getTransactionAnalytics);
 router.route("/deposit").post(upload.single("proof"), deposit);
 router.route("/withdraw").post(withdraw);
 router.route("/transfer").post(transfer);
+router.route("/cancel").post(stopTransaction);
 
 module.exports = router;

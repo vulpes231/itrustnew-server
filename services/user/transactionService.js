@@ -198,10 +198,10 @@ async function getUserTrnxAnalytics(userId) {
       const createdAt = new Date(trnx.createdAt);
 
       // Total completed deposits/withdrawals
-      if (type === "deposit" && status === "completed") {
+      if (type === "deposit" && status === "processed") {
         totalDeposit += amount;
       }
-      if (type === "withdraw" && status === "completed") {
+      if (type === "withdraw" && status === "processed") {
         totalWithdrawal += amount;
       }
 
@@ -215,7 +215,7 @@ async function getUserTrnxAnalytics(userId) {
 
       // Monthly completed transaction
       if (
-        status === "completed" &&
+        status === "processed" &&
         createdAt >= monthStart &&
         createdAt <= monthEnd
       ) {
