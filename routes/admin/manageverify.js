@@ -1,8 +1,16 @@
 const { Router } = require("express");
-const { getVerifyData } = require("../../handlers/admin/manageUserHandler");
+const {
+  getVerifyData,
+  failVerification,
+  cancelVerification,
+} = require("../../handlers/admin/manageUserHandler");
 
 const router = Router();
 
-router.route("/:userId").get(getVerifyData);
+router
+  .route("/:userId")
+  .get(getVerifyData)
+  .patch(failVerification)
+  .post(cancelVerification);
 
 module.exports = router;

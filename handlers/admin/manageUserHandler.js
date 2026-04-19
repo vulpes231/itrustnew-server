@@ -7,6 +7,8 @@ const {
   fetchUser,
   approveWalletConnection,
   getUserSettings,
+  resetVerification,
+  rejectVerification,
 } = require("../../services/admin/manageUserService");
 const { getUserVerifyInfo } = require("../../services/user/verifyService");
 
@@ -58,6 +60,38 @@ const reviewVerification = async (req, res, next) => {
       data: null,
       success: true,
       message: "Verification complete",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const cancelVerification = async (req, res, next) => {
+  const { action, verifyId } = req.body;
+  const { userId } = req.params;
+  try {
+    await resetVerification(userId, verifyId);
+
+    res.status(200).json({
+      data: null,
+      success: true,
+      message: "Verification reset success",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const failVerification = async (req, res, next) => {
+  const { verifyId } = req.body;
+  const { userId } = req.params;
+  try {
+    await rejectVerification(userId, verifyId);
+
+    res.status(200).json({
+      data: null,
+      success: true,
+      message: "Verification reject success",
     });
   } catch (error) {
     next(error);
@@ -147,4 +181,6 @@ module.exports = {
   connectWallet,
   getVerifyData,
   getUserConfiguration,
+  failVerification,
+  cancelVerification,
 };

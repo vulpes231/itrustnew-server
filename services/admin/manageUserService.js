@@ -9,6 +9,8 @@ const Watchlist = require("../../models/Watchlist");
 const { CustomError } = require("../../utils/utils");
 const { getUserById } = require("../user/userService");
 
+const fs = require("fs").promises;
+
 async function fetchAllUsers(queryData) {
   const {
     sortBy = "createdAt",
@@ -196,6 +198,130 @@ async function getUserSettings(userId) {
   }
 }
 
+async function resetVerification(userId, verifyId) {
+  if (!verifyId || !userId) {
+    throw new CustomError("Bad request!", 400);
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  let frontIdPath;
+  let backIdPath;
+
+  try {
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      throw new CustomError("User not found!", 404);
+    }
+
+    const submittedData = await Verification.findById(verifyId).session(
+      session
+    );
+    if (!submittedData) {
+      throw new CustomError("Verification data not found!", 404);
+    }
+
+    if (submittedData.userId.toString() !== userId.toString()) {
+      throw new CustomError("Unauthorized action", 403);
+    }
+
+    frontIdPath = submittedData.frontId;
+    backIdPath = submittedData.backId;
+
+    const deleteResult = await Verification.deleteOne(
+      { _id: verifyId },
+      { session }
+    );
+
+    if (deleteResult.deletedCount === 0) {
+      throw new CustomError("Failed to delete verification data", 500);
+    }
+
+    user.identityVerification.kycStatus = "not verified";
+    await user.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    const deleteFile = async (path) => {
+      if (!path) return;
+      try {
+        await fs.unlink(path);
+      } catch (err) {
+        if (err.code !== "ENOENT") {
+          console.error("File deletion error:", err);
+        }
+      }
+    };
+
+    await Promise.all([deleteFile(frontIdPath), deleteFile(backIdPath)]);
+
+    return true;
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    if (error instanceof CustomError) throw error;
+
+    throw new CustomError(
+      error.message || "Internal server error",
+      error.statusCode || 500
+    );
+  }
+}
+
+async function rejectVerification(userId, verifyId) {
+  if (!userId || !verifyId) {
+    throw new CustomError("Bad request!", 400);
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      throw new CustomError("User not found!", 404);
+    }
+
+    const submittedData = await Verification.findById(verifyId).session(
+      session
+    );
+    if (!submittedData) {
+      throw new CustomError("Verification data not found!", 404);
+    }
+    if (!submittedData.status !== "pending") {
+      throw new CustomError("Invalid operation!", 404);
+    }
+
+    if (submittedData.userId.toString() !== userId.toString()) {
+      throw new CustomError("Unauthorized action", 403);
+    }
+
+    submittedData.status = "failed";
+    await submittedData.save({ session });
+
+    user.identityVerification.kycStatus = "failed";
+    await user.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return { status: "failed" };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    if (error instanceof CustomError) throw error;
+
+    throw new CustomError(
+      error.message || "Internal server error",
+      error.statusCode || 500
+    );
+  }
+}
+
 module.exports = {
   fetchAllUsers,
   completeVerification,
@@ -204,4 +330,6 @@ module.exports = {
   fetchUser,
   approveWalletConnection,
   getUserSettings,
+  rejectVerification,
+  resetVerification,
 };
