@@ -16,6 +16,7 @@ const Usersetting = require("../../models/Usersetting");
 const { CustomError } = require("../../utils/utils");
 const { default: mongoose } = require("mongoose");
 const portFolioTracker = require("../user/chartService");
+const queueService = require("../queueService");
 
 async function registerService(userData) {
   const { firstname, lastname, username, email, password } = userData;
@@ -28,110 +29,103 @@ async function registerService(userData) {
   }
 
   const session = await mongoose.startSession();
-  let transactionCommitted = false;
 
   try {
-    await session.startTransaction({
-      readConcern: { level: "snapshot" },
-      writeConcern: { w: "majority" },
-      maxTimeMS: 10000,
-    });
+    const result = await session.withTransaction(
+      async () => {
+        const [existingUser, existingEmail] = await Promise.all([
+          User.findOne({ "personalInfo.username": username }).session(session),
+          User.findOne({ "contactInfo.email": email }).session(session),
+        ]);
 
-    const [existingUser, existingEmail] = await Promise.all([
-      User.findOne({ "personalInfo.username": username }).session(session),
-      User.findOne({ "contactInfo.email": email }).session(session),
-    ]);
+        if (existingUser) {
+          throw new CustomError("Username already exists!", 409);
+        }
+        if (existingEmail) {
+          throw new CustomError("Email already in use!", 409);
+        }
 
-    if (existingUser) {
-      throw new CustomError("Username already exists!", 409);
-    }
-    if (existingEmail) {
-      throw new CustomError("Email already in use!", 409);
-    }
+        const hashPassword = await bcrypt.hash(password, 10);
 
-    const hashPassword = await bcrypt.hash(password, 10);
+        const userInfo = {
+          personalInfo: {
+            firstName: firstname,
+            lastName: lastname,
+            username: username,
+          },
+          credentials: {
+            password: hashPassword,
+          },
+          contactInfo: {
+            email: email,
+          },
+        };
 
-    const userInfo = {
-      personalInfo: {
-        firstName: firstname,
-        lastName: lastname,
-        username: username,
+        const newUser = await User.create([userInfo], { session });
+        const userId = newUser[0]._id;
+
+        const walletData = [
+          { name: "cash account", userId, slug: "cash" },
+          { name: "automated investing", userId, slug: "auto" },
+          { name: "individual brokerage", userId, slug: "brokerage" },
+        ];
+
+        await Wallet.insertMany(walletData, { session });
+        await Usersetting.create([{ userId }], { session });
+
+        const user = newUser[0];
+
+        const accessToken = jwt.sign(
+          {
+            username: user.personalInfo.username,
+            userId: user._id,
+          },
+          process.env.ACCESS_TOKEN_SECRET,
+          { expiresIn: "1d" },
+        );
+
+        const refreshToken = jwt.sign(
+          {
+            username: user.personalInfo.username,
+            userId: user._id,
+          },
+          process.env.REFRESH_TOKEN_SECRET,
+          { expiresIn: "4d" },
+        );
+
+        return { accessToken, refreshToken, userId };
       },
-      credentials: {
-        password: hashPassword,
-      },
-      contactInfo: {
-        email: email,
-      },
-    };
-
-    const newUser = await User.create([userInfo], { session });
-    const userId = newUser[0]._id;
-
-    const walletData = [
-      { name: "cash account", userId, slug: "cash" },
-      { name: "automated investing", userId, slug: "auto" },
-      { name: "individual brokerage", userId, slug: "brokerage" },
-    ];
-
-    await Wallet.insertMany(walletData, { session });
-    await Usersetting.create([{ userId }], { session });
-
-    const user = newUser[0];
-
-    const accessToken = jwt.sign(
       {
-        username: user.personalInfo.username,
-        userId: user._id,
+        readPreference: "primary",
+        readConcern: { level: "snapshot" },
+        writeConcern: { w: "majority" },
       },
-      process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: "1d" }
     );
-
-    const refreshToken = jwt.sign(
-      {
-        username: user.personalInfo.username,
-        userId: user._id,
-      },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: "4d" }
-    );
-
-    await session.commitTransaction();
-    transactionCommitted = true;
 
     try {
-      await portFolioTracker.initializeUser(userId);
+      await portFolioTracker.initializeUser(result.userId);
     } catch (trackerError) {
       console.warn(
-        `Portfolio tracker initialization failed for user ${userId}:`,
-        trackerError.message
+        `Portfolio tracker initialization failed for user ${result.userId}:`,
+        trackerError.message,
       );
     }
 
+    queueService
+      .sendToQueue("email_queue", {
+        type: "VERIFICATION_EMAIL",
+        to: email,
+      })
+      .catch((error) => {
+        console.error("Failed to queue verification email:", error);
+      });
+
     return {
-      accessToken,
-      refreshToken,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
     };
   } catch (error) {
-    if (session.inTransaction() && !transactionCommitted) {
-      try {
-        await session.abortTransaction();
-      } catch (abortError) {
-        console.error("Error aborting transaction:", abortError.message);
-      }
-    }
-
     console.log(error);
-
-    // if (error.code === 11000 || error.code === 11001) {
-    //   const field = error.keyPattern?.username
-    //     ? "Username"
-    //     : error.keyPattern?.email
-    //     ? "Email"
-    //     : "Field";
-    //   throw new CustomError(`${field} already exists!`, 409);
-    // }
 
     if (error instanceof CustomError) {
       throw error;
@@ -139,16 +133,10 @@ async function registerService(userData) {
 
     throw new CustomError(
       error.message || "Registration failed",
-      error.statusCode || 500
+      error.statusCode || 500,
     );
   } finally {
-    if (!session.hasEnded) {
-      try {
-        await session.endSession();
-      } catch (sessionError) {
-        console.error("Error ending session:", sessionError.message);
-      }
-    }
+    await session.endSession();
   }
 }
 
@@ -288,7 +276,7 @@ async function completeRegister(userData, userId) {
 
     throw new CustomError(
       error.message || "Complete Account failed",
-      error.statusCode || 500
+      error.statusCode || 500,
     );
   } finally {
     await session.endSession();
@@ -308,10 +296,21 @@ async function loginService(loginData) {
 
     const verifyPassword = await bcrypt.compare(
       password,
-      user.credentials.password
+      user.credentials.password,
     );
     if (!verifyPassword) {
       throw new CustomError("Invalid email or password!", 400);
+    }
+
+    if (!user.accountStatus.emailVerified) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "VERIFICATION_EMAIL",
+          to: email,
+        })
+        .catch((error) => {
+          console.error("Failed to queue verification email:", error);
+        });
     }
 
     if (user.accountStatus.twoFaActivated) {
@@ -347,7 +346,7 @@ async function loginService(loginData) {
           userId: user._id,
         },
         process.env.ACCESS_TOKEN_SECRET,
-        { expiresIn: "1d" }
+        { expiresIn: "1d" },
       );
       const refreshToken = jwt.sign(
         {
@@ -355,7 +354,7 @@ async function loginService(loginData) {
           userId: user._id,
         },
         process.env.REFRESH_TOKEN_SECRET,
-        { expiresIn: "4d" }
+        { expiresIn: "4d" },
       );
 
       user.credentials.refreshToken = refreshToken;

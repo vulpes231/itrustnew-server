@@ -180,6 +180,7 @@ const userSchema = new Schema(
       otpBlockedUntil: {
         type: Date,
       },
+      otpSentAt: { type: Date },
     },
     mailing: {
       emailNotification: {
@@ -242,7 +243,7 @@ const userSchema = new Schema(
       default: "0000",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.virtual("fullName").get(function () {

@@ -2,6 +2,7 @@ require("dotenv").config();
 const crypto = require("crypto");
 const path = require("path");
 const multer = require("multer");
+const { default: mongoose } = require("mongoose");
 
 const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
 const upload = multer({
@@ -17,6 +18,21 @@ const upload = multer({
     }
   },
 });
+
+async function waitForDatabaseConnection(maxAttempts = 30) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const state = mongoose.connection.readyState;
+    if (state === 1) {
+      console.log("✅ Database connection verified");
+      return true;
+    }
+    console.log(
+      `Waiting for database connection... (${i + 1}/${maxAttempts}) Current state: ${state}`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error("Database connection timeout after 30 seconds");
+}
 
 const getClientIp = (req) => {
   // Destructure from headers first (for proxy servers)
@@ -89,4 +105,5 @@ module.exports = {
   getDurationInMs,
   upload,
   allowedMimeTypes,
+  waitForDatabaseConnection,
 };

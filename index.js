@@ -1,3 +1,5 @@
+require("node:dns/promises").setServers(["1.1.1.1", "8.8.8.8"]);
+
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -9,13 +11,19 @@ require("dotenv").config();
 const { shutdownCronJobs, devRouter, initCronJobs } = require("./jobs/jobs");
 const { verifyJWT } = require("./middlewares/verifyJWT.js");
 const errorHandler = require("./middlewares/errorHandler.js");
-const { ROLES } = require("./utils/utils.js");
+const { ROLES, waitForDatabaseConnection } = require("./utils/utils.js");
 const { requireRole } = require("./middlewares/requireRole.js");
 const workerService = require("./services/workerService.js");
 const queueService = require("./services/queueService.js");
 
 async function initializeServices() {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      console.log(
+        "Waiting for database connection before initializing services...",
+      );
+      await waitForDatabaseConnection();
+    }
     await queueService.connect();
     console.log("Queue service connected");
 
@@ -87,6 +95,7 @@ const manageVerifyRoute = require("./routes/admin/manageverify.js");
 const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 const manageConfigRoute = require("./routes/admin/manageconfig.js");
 const manageSysInfoRoute = require("./routes/admin/systemanalytics.js");
+const { closeTransporter } = require("./utils/mailer.js");
 
 // routes
 
@@ -94,8 +103,7 @@ app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
 app.use("/signup", userRegisterRoute);
 app.use("/signin", userLoginRoute);
-app.use("/code", otpVerificationRoute);
-app.use("/mail", mailRoute);
+
 app.use("/asset", assetRoute);
 app.use("/", rootRoute);
 
@@ -104,6 +112,8 @@ app.use("/login", loginAdminRoute);
 
 // user protected routes
 app.use(verifyJWT);
+app.use("/code", otpVerificationRoute);
+app.use("/mail", mailRoute);
 app.use("/user", userProfileRoute);
 app.use("/signout", userLogoutRoute);
 app.use("/wallet", walletRoute);
@@ -123,52 +133,52 @@ app.use("/manageadmin", manageAdminRoute);
 app.use(
   "/manageuser",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageUserRoute
+  manageUserRoute,
 );
 app.use(
   "/analytics",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageSysInfoRoute
+  manageSysInfoRoute,
 );
 app.use(
   "/managetrans",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageTransactionRoute
+  manageTransactionRoute,
 );
 app.use(
   "/managewallet",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageWalletRoute
+  manageWalletRoute,
 );
 app.use(
   "/managetrade",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageTradeRoute
+  manageTradeRoute,
 );
 app.use(
   "/managesavings",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageSavingsAccountRoute
+  manageSavingsAccountRoute,
 );
 app.use(
   "/manageplans",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  managePlansRoute
+  managePlansRoute,
 );
 app.use(
   "/managesettings",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageSettingsRoute
+  manageSettingsRoute,
 );
 app.use(
   "/manageverify",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageVerifyRoute
+  manageVerifyRoute,
 );
 app.use(
   "/manageconfig",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
-  manageConfigRoute
+  manageConfigRoute,
 );
 
 let server;
@@ -176,7 +186,7 @@ let server;
 mongoose.connection.once("connected", async () => {
   await initializeServices();
   server = app.listen(PORT, () =>
-    console.log(`Server started on http://localhost:${PORT}`)
+    console.log(`Server started on http://localhost:${PORT}`),
   );
 });
 
@@ -210,15 +220,17 @@ const shutdown = async (signal) => {
 
     await shutdownCronJobs();
 
+    await closeTransporter();
+
     await queueService.close();
 
     if (mongoose.connection.readyState === 1) {
       console.log("Closing MongoDB connection...");
       await mongoose.disconnect();
-      console.log("✅ MongoDB connection closed");
+      console.log("MongoDB connection closed");
     }
 
-    console.log("🛑 Shutdown complete");
+    console.log("Shutdown complete");
     clearTimeout(shutdownTimeout);
     process.exit(0);
   } catch (err) {

@@ -20,14 +20,14 @@ class EmailWorkerService {
 
     queueService.connection?.on("close", () => {
       console.warn(
-        "Email worker: RabbitMQ connection closed. Restarting consumer..."
+        "Email worker: RabbitMQ connection closed. Restarting consumer...",
       );
       this.restartConsumer();
     });
 
     queueService.channel?.on("close", () => {
       console.warn(
-        "Email worker: RabbitMQ channel closed. Restarting consumer..."
+        "Email worker: RabbitMQ channel closed. Restarting consumer...",
       );
       this.restartConsumer();
     });
@@ -36,7 +36,6 @@ class EmailWorkerService {
   async restartConsumer() {
     if (!this.isConsuming) return;
 
-    // Delay to allow reconnection
     setTimeout(() => {
       console.log("Email worker reconnecting to queue...");
       this.consumeEmails();
@@ -44,19 +43,31 @@ class EmailWorkerService {
   }
 
   async consumeEmails() {
-    await queueService.consume(this.queueName, async (emailData) => {
+    await queueService.consume(this.queueName, async (emailData, msg) => {
       try {
         console.log("Processing email:", emailData.type, "to:", emailData.to);
 
         switch (emailData.type) {
           case "VERIFICATION_EMAIL":
-            await emailService.sendMailVerificationCode(emailData.to);
+            console.log(`Calling sendMailVerificationCode for ${emailData.to}`);
+            const result = await emailService.sendMailVerificationCode(
+              emailData.to,
+            );
+            console.log(`sendMailVerificationCode returned:`, result);
+            break;
+          case "DEPOSIT_EMAIL":
+            await emailService.sendDepositAlert(
+              emailData.to,
+              emailData.templateData.amount,
+              emailData.templateData.paymentMethod,
+              emailData.templateData.currency,
+            );
             break;
 
           case "WELCOME_EMAIL":
             await emailService.sendWelcomeMessage(
               emailData.to,
-              emailData.templateData.name
+              emailData.templateData.name,
             );
             break;
 
@@ -65,13 +76,30 @@ class EmailWorkerService {
             break;
         }
 
-        console.log(`${emailData.type} sent successfully to:`, emailData.to);
+        queueService.channel.ack(msg);
       } catch (error) {
-        console.error(`Failed to process email ${emailData.type}:`, error);
-        throw error;
+        console.error("Worker error:", error.message);
+
+        const isSafeToRetry = isRetryableError(error);
+
+        if (isSafeToRetry) {
+          queueService.channel.nack(msg, false, true);
+        } else {
+          console.warn("Dropping message (non-retryable)");
+          queueService.channel.nack(msg, false, false);
+          throw error;
+        }
       }
     });
   }
+}
+
+function isRetryableError(error) {
+  const retryableErrors = ["ECONNREFUSED", "ETIMEDOUT", "ENOTFOUND"];
+
+  return retryableErrors.some(
+    (e) => error.message.includes(e) || error.code === e,
+  );
 }
 
 module.exports = new EmailWorkerService();

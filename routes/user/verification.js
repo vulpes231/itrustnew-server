@@ -8,6 +8,6 @@ const { verifyJWT } = require("../../middlewares/verifyJWT");
 const router = Router();
 
 router.route("/auth").post(verifyLoginCode);
-router.route("/mail").post(verifyJWT, verifyEmailCode);
+router.route("/mail").post(verifyEmailCode);
 
 module.exports = router;

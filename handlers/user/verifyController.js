@@ -69,7 +69,7 @@ const submitDetails = async (req, res, next) => {
     const frontFileName = generateFileName(
       frontId.originalname,
       "front",
-      userId
+      userId,
     );
     const frontFilePath = path.join(ID_STORAGE_PATH, frontFileName);
 
@@ -244,10 +244,10 @@ const verifyEmailCode = async (req, res, next) => {
       const user = await userService.getUserById(userId);
       await queueService.sendToQueue("email_queue", {
         type: "WELCOME_EMAIL",
-        to: user.credentials.email,
+        to: user.contactInfo.email,
         templateData: {
-          name: user.credentials.username,
-          email: user.credentials.email,
+          name: user.personalInfo.username,
+          email: user.contactInfo.email,
         },
       });
     }

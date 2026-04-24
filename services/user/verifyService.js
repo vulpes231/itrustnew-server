@@ -38,7 +38,7 @@ async function authUser(authData) {
       // Block after 3 failed attempts for 15 mins
       if (user.accountStatus.otpAttempts >= 3) {
         user.accountStatus.otpBlockedUntil = new Date(
-          Date.now() + 15 * 60 * 1000
+          Date.now() + 15 * 60 * 1000,
         );
       }
 
@@ -58,7 +58,7 @@ async function authUser(authData) {
         userId: user._id,
       },
       process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
     const refreshToken = jwt.sign(
       {
@@ -66,7 +66,7 @@ async function authUser(authData) {
         userId: user._id,
       },
       process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: "4d" }
+      { expiresIn: "4d" },
     );
 
     user.credentials.refreshToken = refreshToken;
@@ -125,7 +125,7 @@ async function verifyMail() {
 
       if (user.accountStatus.otpAttempts >= 3) {
         user.accountStatus.otpBlockedUntil = new Date(
-          Date.now() + 15 * 60 * 1000
+          Date.now() + 15 * 60 * 1000,
         );
       }
 

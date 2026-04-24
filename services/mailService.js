@@ -29,7 +29,7 @@ async function sendLoginCode(email) {
     user.accountStatus.otpBlockedUntil = null;
 
     await user.save();
-    await sendMail(email, subject, twoFaMessage);
+    await sendMail(email, subject, msg);
     return true;
   } catch (error) {
     throw new CustomError("OTP send error!", 500);
@@ -42,14 +42,22 @@ async function sendMailVerificationCode(email) {
   }
 
   const otp = generateOtp();
-  const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
   const subject = "Verify Your Email Address - iTrust Investments";
   const msg = buildEmailMsg(otp);
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
   try {
-    const user = await User.findOne({ email });
-    if (!user) return true;
+    const user = await User.findOne({ "contactInfo.email": email });
+    if (!user) throw new CustomError("User not found!", 400);
+
+    if (
+      user.accountStatus.otpSentAt &&
+      user.accountStatus.otpExpires > new Date()
+    ) {
+      console.log("OTP already sent recently — skipping email");
+      return { skipped: true };
+    }
 
     const hashedOtp = await bcrypt.hash(otp, 10);
     user.accountStatus.otp = hashedOtp;
@@ -57,20 +65,29 @@ async function sendMailVerificationCode(email) {
     user.accountStatus.otpAttempts = 0;
     user.accountStatus.otpBlockedUntil = null;
 
+    const sendResult = await sendMail(email, subject, msg);
+
+    user.accountStatus.otpSentAt = new Date();
     await user.save();
 
-    const emailResult = await sendMail(email, subject, msg);
-    console.log(
-      "📧 Email sending completed:",
-      emailResult ? "Success" : "Failed"
-    );
+    if (!sendResult?.messageId) {
+      throw new Error("Email sent but no messageId returned");
+    }
 
-    return true;
+    return {
+      status: "email sent",
+      messageId: sendResult.messageId,
+      otpSent: true,
+    };
   } catch (error) {
-    console.log("❌ Failed to send verification email:", error);
+    console.error("Failed to send verification email:", {
+      email,
+      error: error.message,
+      stack: error.stack,
+    });
     throw new CustomError(
-      "Failed to send email verification code! Please try again later.",
-      error.statusCode
+      `Failed to send email verification code: ${error.message}`,
+      500,
     );
   }
 }
@@ -143,8 +160,8 @@ async function sendDepositAlert(email, amount, paymentMethod, currency) {
             <p style="font-size: 18px; margin: 0;">
                 <span class="method-icon">${method.icon}</span>
                 <strong>${symbol}${amount} ${currency.toUpperCase()}</strong> via ${
-    method.name
-  }
+                  method.name
+                }
             </p>
         </div>
         
@@ -223,8 +240,8 @@ async function sendTradeAlert(email, action, asset, quantity) {
             }
             .asset-icon { font-size: 24px; margin-right: 10px; vertical-align: middle; }
             .action-${action} { color: ${
-    action === "bought" ? "#28a745" : "#dc3545"
-  }; font-weight: bold; }
+              action === "bought" ? "#28a745" : "#dc3545"
+            }; font-weight: bold; }
         </style>
     </head>
     <body>
@@ -241,8 +258,8 @@ async function sendTradeAlert(email, action, asset, quantity) {
                 <span class="asset-icon">${asset.img}</span>
                 You <span class="action-${action}">${actionVerb}</span> 
                 <strong>${quantity} ${asset.symbol}${asset.name}</strong> (${
-    asset.name
-  })
+                  asset.name
+                })
             </p>
         </div>
         
