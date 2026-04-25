@@ -4,6 +4,7 @@ const { CustomError } = require("../utils/utils");
 async function fetchAssets(queryData) {
   const { page, limit, sortBy, type } = queryData;
   try {
+    console.log("SORT BY RECEIVED:", sortBy);
     const filter = {};
 
     if (type) filter["type"] = type;
