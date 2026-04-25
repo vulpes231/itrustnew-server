@@ -86,6 +86,8 @@ async function authUser(authData) {
         emailVerified: user.accountStatus.emailVerified,
         twoFaActivated: user.accountStatus.twoFaActivated,
         twoFaVerified: user.accountStatus.twoFaVerified,
+        twoFaVerified: user.accountStatus.twoFaVerified,
+        isPersonalComplete: user.personalInfo.isPersonalComplete,
       },
     };
 
@@ -96,7 +98,7 @@ async function authUser(authData) {
   }
 }
 
-async function verifyMail() {
+async function verifyMail(verifyData) {
   const { code, userId } = verifyData;
   if (!userId || !code) {
     throw new CustomError("Bad request!", 400);
@@ -137,7 +139,8 @@ async function verifyMail() {
     user.accountStatus.otpExpires = null;
     user.accountStatus.otpAttempts = 0;
     user.accountStatus.otpBlockedUntil = null;
-    user.accountStatus.twoFaVerified = true;
+    user.accountStatus.emailVerified = true;
+    user.accountStatus.otpSentAt = null;
 
     await user.save();
     return true;

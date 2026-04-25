@@ -49,13 +49,13 @@ const validateEmailConfig = () => {
     throw new Error(`Missing email configuration: ${missing.join(", ")}`);
   }
 
-  console.log("Email config loaded:", {
-    host: process.env.EMAIL_HOST,
-    port: 465,
-    secure: true,
-    user: process.env.EMAIL_ADDRESS,
-    hasPassword: !!process.env.EMAIL_PASSWORD,
-  });
+  // console.log("Email config loaded:", {
+  //   host: process.env.EMAIL_HOST,
+  //   port: 465,
+  //   secure: true,
+  //   user: process.env.EMAIL_ADDRESS,
+  //   hasPassword: !!process.env.EMAIL_PASSWORD,
+  // });
 };
 
 const sendMail = async (email, subject, message, attachments = []) => {
@@ -76,9 +76,9 @@ const sendMail = async (email, subject, message, attachments = []) => {
     console.log(`Sending email to ${email}...`);
     const info = await transporter.sendMail(mailOptions);
 
-    console.log("Email sent successfully!");
-    console.log("Message ID:", info.messageId);
-    console.log("Response:", info.response);
+    // console.log("Email sent successfully!");
+    // console.log("Message ID:", info.messageId);
+    // console.log("Response:", info.response);
 
     // Log success
     if (process.env.LOG_SUCCESSFUL_EMAILS === "true") {
@@ -95,10 +95,10 @@ const sendMail = async (email, subject, message, attachments = []) => {
 
     return info;
   } catch (error) {
-    console.error("Email sending failed:", error.message);
-    console.error("Error code:", error.code);
-    console.error("Error command:", error.command);
-    console.error("Response code:", error.responseCode);
+    // console.error("Email sending failed:", error.message);
+    // console.error("Error code:", error.code);
+    // console.error("Error command:", error.command);
+    // console.error("Response code:", error.responseCode);
 
     if (error.code === "EAUTH") {
       console.error(

@@ -19,9 +19,9 @@ const queueService = require("./services/queueService.js");
 async function initializeServices() {
   try {
     if (mongoose.connection.readyState !== 1) {
-      console.log(
-        "Waiting for database connection before initializing services...",
-      );
+      // console.log(
+      //   "Waiting for database connection before initializing services...",
+      // );
       await waitForDatabaseConnection();
     }
     await queueService.connect();

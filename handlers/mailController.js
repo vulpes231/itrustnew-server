@@ -2,6 +2,8 @@ const {
   sendLoginCode,
   sendMailVerificationCode,
 } = require("../services/mailService");
+
+const queueService = require("../services/queueService");
 const { sendMail } = require("../utils/mailer");
 
 const sendLoginOtp = async (req, res, next) => {
