@@ -5,20 +5,38 @@ async function fetchAssets(queryData) {
   const { page, limit, sortBy, type } = queryData;
   try {
     const filter = {};
+
     if (type) filter["type"] = type;
 
-    const sort = {};
+    let sort = {};
 
-    if (sortBy === "priceData.changePercent") {
-      sort["priceData.changePercent"] = -1;
-    } else if (sortBy === "priceData.volume") {
-      sort["priceData.volume"] = -1;
-    } else if (sortBy === "marketCap") {
-      sort["marketCap"] = -1;
-    } else if (sortBy === "name") {
-      sort["name"] = 1;
-    } else {
-      sort["priceData.volume"] = -1;
+    switch (sortBy) {
+      case "top_gainers":
+        sort = { "priceData.changePercent": -1 };
+        break;
+
+      case "top_losers":
+        sort = { "priceData.changePercent": 1 };
+        break;
+
+      case "24h_change":
+        sort = { "priceData.change": -1 };
+        break;
+
+      case "market_cap":
+        sort = { "fundamentals.marketCap": -1 };
+        break;
+
+      case "volume":
+        sort = { "priceData.volume": -1 };
+        break;
+
+      case "name":
+        sort = { name: 1 };
+        break;
+
+      default:
+        sort = { "priceData.volume": -1 };
     }
 
     const assets = await Asset.find(filter)
@@ -26,7 +44,7 @@ async function fetchAssets(queryData) {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    const totalAssetCount = await Asset.countDocuments();
+    const totalAssetCount = await Asset.countDocuments(filter);
     const totalPages = Math.ceil(totalAssetCount / limit);
     return { assets, totalAssetCount, totalPages, currentPage: page };
   } catch (error) {
