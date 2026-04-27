@@ -19,8 +19,16 @@ async function sendLoginCode(email) {
   const msg = buildTwoFaMsg(otp);
 
   try {
-    const user = await User.findOne({ email });
-    if (!user) return true;
+    const user = await User.findOne({ "contactInfo.email": email });
+    if (!user) throw new CustomError("User not found!", 400);
+
+    if (
+      user.accountStatus.otpSentAt &&
+      user.accountStatus.otpExpires > new Date()
+    ) {
+      console.log("OTP already sent recently — skipping email");
+      return { skipped: true };
+    }
 
     const hashedOtp = await bcrypt.hash(otp, 10);
     user.accountStatus.otp = hashedOtp;
@@ -28,9 +36,19 @@ async function sendLoginCode(email) {
     user.accountStatus.otpAttempts = 0;
     user.accountStatus.otpBlockedUntil = null;
 
+    const sendResult = await sendMail(email, subject, msg);
+
+    user.accountStatus.otpSentAt = new Date();
     await user.save();
-    await sendMail(email, subject, msg);
-    return true;
+
+    if (!sendResult?.messageId) {
+      throw new Error("OTP sent but no messageId returned");
+    }
+    return {
+      status: "OTP sent",
+      messageId: sendResult.messageId,
+      otpSent: true,
+    };
   } catch (error) {
     throw new CustomError("OTP send error!", 500);
   }

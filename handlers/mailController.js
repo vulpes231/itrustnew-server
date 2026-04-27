@@ -1,18 +1,17 @@
-const {
-  sendLoginCode,
-  sendMailVerificationCode,
-} = require("../services/mailService");
-
 const queueService = require("../services/queueService");
 const { sendMail } = require("../utils/mailer");
 
 const sendLoginOtp = async (req, res, next) => {
   const { email } = req.body;
   try {
-    await sendLoginCode(email);
+    await queueService.sendToQueue("email_queue", {
+      type: "AUTH_CODE_EMAIL",
+      to: email,
+    });
+
     res
       .status(200)
-      .json({ message: "Login code resent.", data: null, success: true });
+      .json({ message: "Login code sent.", data: null, success: true });
   } catch (error) {
     next(error);
   }

@@ -11,7 +11,7 @@ async function authUser(authData) {
     throw new CustomError("Bad request!", 400);
   }
   try {
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ "contactInfo.email": email });
     if (!user) throw new CustomError("Invalid credentials", 404);
 
     if (
@@ -47,6 +47,7 @@ async function authUser(authData) {
     user.accountStatus.otpAttempts = 0;
     user.accountStatus.otpBlockedUntil = null;
     user.accountStatus.twoFaVerified = true;
+    user.accountStatus.otpSentAt = null;
 
     const accessToken = jwt.sign(
       {
@@ -70,8 +71,8 @@ async function authUser(authData) {
 
     const userInfo = {
       credentials: {
-        username: username,
-        email: email,
+        username: user.personalInfo.username,
+        email: user.contactInfo.email,
       },
       identityVerification: {
         kycStatus: user.identityVerification.kycStatus,
@@ -82,8 +83,6 @@ async function authUser(authData) {
         emailVerified: user.accountStatus.emailVerified,
         twoFaActivated: user.accountStatus.twoFaActivated,
         twoFaVerified: user.accountStatus.twoFaVerified,
-        twoFaVerified: user.accountStatus.twoFaVerified,
-        isPersonalComplete: user.personalInfo.isPersonalComplete,
       },
     };
 

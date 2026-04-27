@@ -10,9 +10,8 @@ const registerUser = async (req, res, next) => {
   try {
     const userData = req.body;
 
-    const { accessToken, refreshToken } = await authService.registerService(
-      userData
-    );
+    const { accessToken, refreshToken } =
+      await authService.registerService(userData);
 
     await queueService.sendToQueue("email_queue", {
       type: "VERIFICATION_EMAIL",
@@ -66,8 +65,8 @@ const loginUser = async (req, res, next) => {
       res.status(200).json({
         message: `Verify login.`,
         token: null,
-        userInfo,
-        otp: userInfo.accountStatus.otp,
+        data: userInfo,
+        success: true,
       });
     } else {
       res.cookie("jwt", refreshToken, {

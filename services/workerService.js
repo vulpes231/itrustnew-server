@@ -45,9 +45,12 @@ class EmailWorkerService {
   async consumeEmails() {
     await queueService.consume(this.queueName, async (emailData, msg) => {
       try {
-        console.log("Processing email:", emailData.type, "to:", emailData.to);
-
         switch (emailData.type) {
+          case "AUTH_CODE_EMAIL":
+            console.log(`Calling sendAuthCode for ${emailData.to}`);
+            const authResult = await emailService.sendLoginCode(emailData.to);
+            console.log(`sendAuthnCode returned:`, authResult);
+            break;
           case "VERIFICATION_EMAIL":
             console.log(`Calling sendMailVerificationCode for ${emailData.to}`);
             const result = await emailService.sendMailVerificationCode(

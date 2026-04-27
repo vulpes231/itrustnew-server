@@ -213,10 +213,10 @@ const verifyAddress = async (req, res, next) => {
 };
 
 const verifyLoginCode = async (req, res, next) => {
-  const authData = req.body;
+  const { email, code } = req.body;
   try {
     const { refreshToken, accessToken, userInfo } =
-      await verifyService.authUser(authData);
+      await verifyService.authUser({ email, code });
     res.cookie("jwt", refreshToken, {
       httpOnly: true,
       secure: true,

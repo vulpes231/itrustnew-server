@@ -315,13 +315,17 @@ async function loginService(loginData) {
 
     if (user.accountStatus.twoFaActivated) {
       const email = user.contactInfo.email;
-      const otp = await sendLoginCode(email);
-      user.accountStatus.otp = otp;
-      await user.save();
+      queueService
+        .sendToQueue("email_queue", {
+          type: "AUTH_CODE_EMAIL",
+          to: email,
+        })
+        .catch((error) => {
+          console.error("Failed to queue auth email:", error);
+        });
 
       const userInfo = {
         credentials: {
-          username: user.personalInfo.username,
           email: email,
         },
         identityVerification: {
@@ -333,8 +337,6 @@ async function loginService(loginData) {
           emailVerified: user.accountStatus.emailVerified,
           twoFaActivated: user.accountStatus.twoFaActivated,
           twoFaVerified: user.accountStatus.twoFaVerified,
-          otp: user.accountStatus.otp,
-          isProfileComplete: user.accountStatus.isProfileComplete,
         },
       };
 

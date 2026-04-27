@@ -103,7 +103,8 @@ app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
 app.use("/signup", userRegisterRoute);
 app.use("/signin", userLoginRoute);
-
+app.use("/code", otpVerificationRoute);
+app.use("/mail", mailRoute);
 app.use("/asset", assetRoute);
 app.use("/", rootRoute);
 
@@ -112,8 +113,6 @@ app.use("/login", loginAdminRoute);
 
 // user protected routes
 app.use(verifyJWT);
-app.use("/code", otpVerificationRoute);
-app.use("/mail", mailRoute);
 app.use("/user", userProfileRoute);
 app.use("/signout", userLogoutRoute);
 app.use("/wallet", walletRoute);
