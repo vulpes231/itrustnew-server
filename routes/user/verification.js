@@ -3,10 +3,13 @@ const {
   verifyLoginCode,
   verifyEmailCode,
 } = require("../../handlers/user/verifyController");
+const { verifyJWT } = require("../../middlewares/verifyJWT");
+
+verifyJWT;
 
 const router = Router();
 
 router.route("/auth").post(verifyLoginCode);
-router.route("/mail").post(verifyEmailCode);
+router.route("/mail").post(verifyJWT, verifyEmailCode);
 
 module.exports = router;
