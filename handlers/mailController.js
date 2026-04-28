@@ -24,6 +24,7 @@ const sendMailOtp = async (req, res, next) => {
     await queueService.sendToQueue("email_queue", {
       type: "VERIFICATION_EMAIL",
       to: email,
+      subject: "Verify Your Email Address - Itrust Investment",
     });
 
     res.status(200).json({

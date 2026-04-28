@@ -47,16 +47,13 @@ class EmailWorkerService {
       try {
         switch (emailData.type) {
           case "AUTH_CODE_EMAIL":
-            console.log(`Calling sendAuthCode for ${emailData.to}`);
             const authResult = await emailService.sendLoginCode(emailData.to);
-            console.log(`sendAuthnCode returned:`, authResult);
             break;
           case "VERIFICATION_EMAIL":
-            console.log(`Calling sendMailVerificationCode for ${emailData.to}`);
             const result = await emailService.sendMailVerificationCode(
+              emailData.subject,
               emailData.to,
             );
-            console.log(`sendMailVerificationCode returned:`, result);
             break;
           case "DEPOSIT_EMAIL":
             await emailService.sendDepositAlert(

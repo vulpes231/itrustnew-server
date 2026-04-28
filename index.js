@@ -15,6 +15,7 @@ const { ROLES, waitForDatabaseConnection } = require("./utils/utils.js");
 const { requireRole } = require("./middlewares/requireRole.js");
 const workerService = require("./services/workerService.js");
 const queueService = require("./services/queueService.js");
+const { closeTransporter } = require("./utils/mailer.js");
 
 async function initializeServices() {
   try {
@@ -65,6 +66,7 @@ const assetRoute = require("./routes/asset.js");
 const userRegisterRoute = require("./routes/user/register.js");
 const userLoginRoute = require("./routes/user/login.js");
 const userLogoutRoute = require("./routes/user/logout.js");
+const resetAccountPassRoute = require("./routes/resetaccountpass.js");
 
 //protected routes
 const otpVerificationRoute = require("./routes/user/verification.js");
@@ -95,7 +97,6 @@ const manageVerifyRoute = require("./routes/admin/manageverify.js");
 const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 const manageConfigRoute = require("./routes/admin/manageconfig.js");
 const manageSysInfoRoute = require("./routes/admin/systemanalytics.js");
-const { closeTransporter } = require("./utils/mailer.js");
 
 // routes
 
@@ -106,6 +107,7 @@ app.use("/signin", userLoginRoute);
 app.use("/code", otpVerificationRoute);
 app.use("/mail", mailRoute);
 app.use("/asset", assetRoute);
+app.use("/resetaccountpass", resetAccountPassRoute);
 app.use("/", rootRoute);
 
 // admin unproteted routes

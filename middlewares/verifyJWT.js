@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET;
+const RESET_PASS_TOKEN_SECRET = process.env.RESET_PASS_TOKEN_SECRET;
 
 const verifyJWT = (req, res, next) => {
   if (req.path.startsWith("/storage")) {
@@ -36,4 +37,32 @@ const verifyJWT = (req, res, next) => {
   });
 };
 
-module.exports = { verifyJWT };
+const verifyResetToken = (req, res, next) => {
+  if (req.path.startsWith("/storage")) {
+    return next();
+  }
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, RESET_PASS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      if (err.name === "TokenExpiredError") {
+        return res.status(403).json({ message: "Token expired" });
+      }
+      return res.status(403).json({ message: "Forbidden: Invalid token" });
+    }
+
+    req.user = {
+      userId: decoded.userId,
+    };
+
+    next();
+  });
+};
+
+module.exports = { verifyJWT, verifyResetToken };

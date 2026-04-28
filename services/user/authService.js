@@ -307,6 +307,7 @@ async function loginService(loginData) {
         .sendToQueue("email_queue", {
           type: "VERIFICATION_EMAIL",
           to: email,
+          subject: "Verify Your Email Address - Itrust Investment",
         })
         .catch((error) => {
           console.error("Failed to queue verification email:", error);

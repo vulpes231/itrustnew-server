@@ -54,14 +54,14 @@ async function sendLoginCode(email) {
   }
 }
 
-async function sendMailVerificationCode(email) {
+async function sendMailVerificationCode(subject, email) {
   if (!email) {
     throw new CustomError("Email required!", 400);
   }
 
   const otp = generateOtp();
 
-  const subject = "Verify Your Email Address - iTrust Investments";
+  // const subject = "Verify Your Email Address - Itrust Investment";
   const msg = buildEmailMsg(otp);
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
