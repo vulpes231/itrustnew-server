@@ -17,6 +17,26 @@ async function updateAssetsData() {
   const startTime = Date.now();
 
   try {
+    console.log("Updating CRYPTO assets...");
+    await updateCryptoAssets();
+
+    console.log("Updating STOCK assets...");
+    await updateStockAssets();
+
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    console.log(`Asset update completed in ${duration}s`);
+  } catch (error) {
+    console.error("Asset data update failed:", error.message);
+    throw error;
+  }
+}
+
+async function updateCryptoAssets() {
+  console.log("Starting crypto asset update...");
+  const startTime = Date.now();
+
+  try {
     const assets = await Asset.find({
       type: "crypto",
       isActive: true,
@@ -57,24 +77,24 @@ async function updateAssetsData() {
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       console.log(
-        `Processing batch ${i + 1}/${batches.length} (${
+        `Processing crypto batch ${i + 1}/${batches.length} (${
           batch.length
-        } assets)...`
+        } assets)...`,
       );
 
       try {
-        const batchResults = await processAssetBatch(batch, assetsByApiId);
+        const batchResults = await processCryptoBatch(batch, assetsByApiId);
         updatedCount += batchResults.updatedCount;
         errorCount += batchResults.errorCount;
 
         if (i < batches.length - 1) {
           console.log(
-            `Waiting ${REQUEST_DELAY / 1000} seconds before next batch...`
+            `Waiting ${REQUEST_DELAY / 1000} seconds before next batch...`,
           );
           await delay(REQUEST_DELAY);
         }
       } catch (batchError) {
-        console.error(`Batch ${i + 1} failed:`, batchError.message);
+        console.error(`Crypto batch ${i + 1} failed:`, batchError.message);
         errorCount += batch.length;
       }
     }
@@ -83,15 +103,159 @@ async function updateAssetsData() {
     const duration = ((endTime - startTime) / 1000).toFixed(2);
 
     console.log(
-      `Asset update completed in ${duration}s: ${updatedCount} updated, ${errorCount} errors`
+      `Crypto update completed in ${duration}s: ${updatedCount} updated, ${errorCount} errors`,
     );
   } catch (error) {
-    console.error("Asset data update failed:", error.message);
+    console.error("Crypto asset data update failed:", error.message);
     throw error;
   }
 }
 
-async function processAssetBatch(apiIds, assetsByApiId) {
+async function updateStockAssets() {
+  console.log("Starting stock asset update...");
+  const startTime = Date.now();
+
+  try {
+    const assets = await Asset.find({
+      type: "stock",
+      isActive: true,
+    }).limit(250);
+
+    if (assets.length === 0) {
+      console.log("No active stock assets found to update");
+      return;
+    }
+
+    console.log(`Updating ${assets.length} stock assets...`);
+
+    const stocksBySymbol = {};
+    assets.forEach((asset) => {
+      if (asset.symbol) {
+        stocksBySymbol[asset.symbol] = asset;
+      }
+    });
+
+    const symbols = Object.keys(stocksBySymbol);
+
+    if (symbols.length === 0) {
+      console.log("No stocks with valid symbols found");
+      return;
+    }
+
+    console.log(`Found ${symbols.length} stocks to update`);
+
+    const STOCK_BATCH_SIZE = 10;
+    const batches = [];
+    for (let i = 0; i < symbols.length; i += STOCK_BATCH_SIZE) {
+      batches.push(symbols.slice(i, i + STOCK_BATCH_SIZE));
+    }
+
+    let updatedCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      console.log(
+        `Processing stock batch ${i + 1}/${batches.length} (${
+          batch.length
+        } stocks)...`,
+      );
+
+      try {
+        const batchResults = await processStockBatch(batch, stocksBySymbol);
+        updatedCount += batchResults.updatedCount;
+        errorCount += batchResults.errorCount;
+
+        if (i < batches.length - 1) {
+          await delay(2000);
+        }
+      } catch (batchError) {
+        console.error(`Stock batch ${i + 1} failed:`, batchError.message);
+        errorCount += batch.length;
+      }
+    }
+
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+    console.log(
+      `Stock update completed in ${duration}s: ${updatedCount} updated, ${errorCount} errors`,
+    );
+  } catch (error) {
+    console.error("Stock asset data update failed:", error.message);
+    throw error;
+  }
+}
+
+async function processStockBatch(symbols, stocksBySymbol) {
+  let updatedCount = 0;
+  let errorCount = 0;
+
+  const FMP_API_KEY = process.env.FMP_API_KEY;
+  const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
+
+  try {
+    const symbolsParam = symbols.join(",");
+    const quoteUrl = `${FMP_BASE_URL}/quote/${symbolsParam}`;
+
+    const response = await axios.get(quoteUrl, {
+      params: {
+        apikey: FMP_API_KEY,
+      },
+      timeout: 15000,
+    });
+
+    if (response.data && Array.isArray(response.data)) {
+      for (const quote of response.data) {
+        const asset = stocksBySymbol[quote.symbol];
+
+        if (asset && quote) {
+          try {
+            const updateData = {
+              "priceData.current": quote.price || asset.priceData.current,
+              "priceData.open": quote.open,
+              "priceData.previousClose": quote.previousClose,
+              "priceData.dayLow": quote.dayLow,
+              "priceData.dayHigh": quote.dayHigh,
+              "priceData.change": quote.change,
+              "priceData.changePercent": quote.changesPercentage,
+              "priceData.volume": quote.volume,
+              "priceData.avgVolume": quote.avgVolume,
+              "historical.yearLow": quote.yearLow,
+              "historical.yearHigh": quote.yearHigh,
+              "fundamentals.marketCap":
+                quote.marketCap || asset.fundamentals.marketCap,
+              "fundamentals.pe": quote.pe || asset.fundamentals.pe,
+              lastUpdated: new Date(),
+            };
+
+            await Asset.findByIdAndUpdate(asset._id, updateData);
+            updatedCount++;
+            console.log(`✅ Updated stock: ${quote.symbol} - $${quote.price}`);
+          } catch (err) {
+            console.error(`Error updating stock ${quote.symbol}:`, err.message);
+            errorCount++;
+          }
+        }
+      }
+    }
+
+    for (const symbol of symbols) {
+      const asset = stocksBySymbol[symbol];
+      if (asset && !response.data.find((q) => q.symbol === symbol)) {
+        console.log(`⚠️ No data found for stock: ${symbol}`);
+        errorCount++;
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching stock data:", error.message);
+    errorCount += symbols.length;
+  }
+
+  return { updatedCount, errorCount };
+}
+
+async function processCryptoBatch(apiIds, assetsByApiId) {
   let updatedCount = 0;
   let errorCount = 0;
 
@@ -123,7 +287,7 @@ async function processAssetBatch(apiIds, assetsByApiId) {
 
         if (!cryptoData) {
           console.warn(
-            `No market data found for ${apiId} (${asset?.symbol || "unknown"})`
+            `No market data found for ${apiId} (${asset?.symbol || "unknown"})`,
           );
           errorCount++;
           continue;
@@ -160,7 +324,7 @@ async function processAssetBatch(apiIds, assetsByApiId) {
 
         const result = await Asset.updateOne(
           { _id: asset._id }, // Use _id for more reliable updates
-          { $set: updateFields }
+          { $set: updateFields },
         );
 
         if (result.modifiedCount > 0) {
@@ -168,7 +332,7 @@ async function processAssetBatch(apiIds, assetsByApiId) {
           console.log(
             `Updated ${asset.symbol} - $${
               cryptoData.current_price?.toFixed(2) || "N/A"
-            }`
+            }`,
           );
         } else {
           console.log(`No changes for ${asset.symbol}`);
@@ -182,7 +346,7 @@ async function processAssetBatch(apiIds, assetsByApiId) {
     // Log missing assets that were in the batch but not returned
     const returnedApiIds = marketData.map((item) => item.id);
     const missingApiIds = apiIds.filter(
-      (apiId) => !returnedApiIds.includes(apiId)
+      (apiId) => !returnedApiIds.includes(apiId),
     );
 
     for (const missingApiId of missingApiIds) {
@@ -190,7 +354,7 @@ async function processAssetBatch(apiIds, assetsByApiId) {
       console.warn(
         `No market data returned for ${missingApiId} (${
           asset?.symbol || "unknown"
-        })`
+        })`,
       );
       errorCount++;
     }
@@ -211,37 +375,76 @@ async function processAssetBatch(apiIds, assetsByApiId) {
   return { updatedCount, errorCount };
 }
 
+const isMarketOpen = () => {
+  const now = new Date();
+  const estTime = new Date(
+    now.toLocaleString("en-US", { timeZone: "America/New_York" }),
+  );
+  const hour = estTime.getHours();
+  const day = estTime.getDay();
+
+  // Weekday and between 9:30 AM - 4:00 PM EST
+  return day >= 1 && day <= 5 && hour >= 9.5 && hour < 16;
+};
+
 async function fetchAssetsWithRetry(assetSymbols, maxRetries = 3) {
+  if (!assetSymbols || assetSymbols.length === 0) {
+    console.log("No asset symbols provided");
+    return [];
+  }
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`Fetching assets (attempt ${attempt}/${maxRetries})...`);
-      const assets = await Asset.find();
+      console.log(
+        `Fetching assets for ${assetSymbols.length} symbols (attempt ${attempt}/${maxRetries})...`,
+      );
+
+      const assets = await Asset.find({
+        symbol: { $in: assetSymbols.map((s) => s.toUpperCase()) },
+        isActive: true,
+      }).lean();
 
       const fetchedSymbols = assets
         .map((a) => a.symbol?.toUpperCase())
         .filter(Boolean);
+
       const missingSymbols = assetSymbols.filter(
-        (symbol) => !fetchedSymbols.includes(symbol)
+        (symbol) => !fetchedSymbols.includes(symbol.toUpperCase()),
       );
 
       if (missingSymbols.length > 0) {
-        console.log(`Missing data for symbols: ${missingSymbols.join(", ")}`);
+        console.log(
+          `⚠️ Missing data for symbols: ${missingSymbols.join(", ")}`,
+        );
+
         if (attempt < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+          const delay = 1000 * Math.pow(2, attempt - 1); // Exponential backoff: 1s, 2s, 4s
+          console.log(`Retrying in ${delay / 1000}s...`);
+          await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
+        } else {
+          console.warn(
+            `Could not fetch ${missingSymbols.length} symbols after ${maxRetries} attempts`,
+          );
         }
       }
 
+      console.log(`Successfully fetched ${assets.length} assets`);
       return assets;
     } catch (error) {
       console.error(`Attempt ${attempt} failed:`, error.message);
       if (attempt < maxRetries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+        const delay = 1000 * Math.pow(2, attempt - 1);
+        console.log(`Retrying in ${delay / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       } else {
+        console.error(`Failed to fetch assets after ${maxRetries} attempts`);
         throw error;
       }
     }
   }
+
+  return [];
 }
 
 async function updateWalletPerformance() {
@@ -313,7 +516,7 @@ async function updateWalletPerformance() {
             dailyProfit: 0,
             dailyProfitPercent: 0,
           },
-        }
+        },
       );
     } else {
       // Prepare bulk operations
@@ -346,11 +549,11 @@ async function updateWalletPerformance() {
             dailyProfit: 0,
             dailyProfitPercent: 0,
           },
-        }
+        },
       );
 
       console.log(
-        `Updated ${bulkResult.modifiedCount} wallets, reset ${resetResult.modifiedCount} wallets`
+        `Updated ${bulkResult.modifiedCount} wallets, reset ${resetResult.modifiedCount} wallets`,
       );
     }
 
@@ -443,12 +646,20 @@ const updateTradePerformance = async () => {
         "wallet.id": 1,
         createdAt: 1,
         userId: 1,
-      }
+      },
     ).lean();
 
     if (openTrades.length === 0) {
       console.log("No open trades found.");
       return;
+    }
+
+    const stockTrades = openTrades.filter(
+      (trade) => trade.assetType === "stock",
+    );
+
+    if (stockTrades.length > 0 && !isMarketOpen()) {
+      console.log("Stock market is closed, using last known prices");
     }
 
     console.log(`Found ${openTrades.length} open trades to update.`);
@@ -535,14 +746,14 @@ const updateTradePerformance = async () => {
             $set: {
               "performance.totalReturn": parseFloat(totalReturn.toFixed(4)),
               "performance.totalReturnPercent": parseFloat(
-                totalReturnPercent.toFixed(4)
+                totalReturnPercent.toFixed(4),
               ),
               "performance.todayReturn": parseFloat(todayReturn.toFixed(4)),
               "performance.todayReturnPercent": parseFloat(
-                todayReturnPercent.toFixed(4)
+                todayReturnPercent.toFixed(4),
               ),
               "performance.currentValue": parseFloat(
-                totalCurrentValue.toFixed(4)
+                totalCurrentValue.toFixed(4),
               ),
               updatedAt: now,
             },
@@ -560,12 +771,12 @@ const updateTradePerformance = async () => {
           console.log(
             `Updated ${batch.length} trades in batch ${
               Math.floor(i / BATCH_SIZE) + 1
-            }`
+            }`,
           );
         } catch (batchError) {
           console.error(
             `Error in batch ${Math.floor(i / BATCH_SIZE) + 1}:`,
-            batchError.message
+            batchError.message,
           );
         }
       }
@@ -604,7 +815,7 @@ async function closeTradesInBatch(tradesToClose, closeTime) {
                   trade.performance?.currentValue || currentValue,
               },
             },
-            { session }
+            { session },
           );
 
           if (trade.wallet?.id) {
@@ -616,7 +827,7 @@ async function closeTradesInBatch(tradesToClose, closeTime) {
                   totalBalance: totalReturn,
                 },
               },
-              { session }
+              { session },
             );
           }
 
@@ -626,8 +837,8 @@ async function closeTradesInBatch(tradesToClose, closeTime) {
             `Trade closed (${closeReason}): ${trade.asset.symbol} ${
               trade.orderType
             } - ${totalReturn >= 0 ? "Profit" : "Loss"} of $${Math.abs(
-              totalReturn
-            ).toFixed(2)}`
+              totalReturn,
+            ).toFixed(2)}`,
           );
 
           return { tradeId: trade._id, success: true };
@@ -635,7 +846,7 @@ async function closeTradesInBatch(tradesToClose, closeTime) {
           console.error(`Error closing trade ${trade._id}:`, error.message);
           return { tradeId: trade._id, success: false, error: error.message };
         }
-      }
+      },
     );
 
     const results = await Promise.all(closePromises);
@@ -650,7 +861,7 @@ async function closeTradesInBatch(tradesToClose, closeTime) {
     if (failedTrades.length > 0) {
       console.log(
         "Failed trades:",
-        failedTrades.map((ft) => ft.tradeId)
+        failedTrades.map((ft) => ft.tradeId),
       );
 
       await queueFailedTradeClosures(failedTrades);
@@ -675,7 +886,7 @@ async function recordTradeInPortfolio(userId, pnl, description) {
     } catch (error) {
       console.error(
         `Attempt ${attempt} failed to record portfolio for user ${userId}:`,
-        error.message
+        error.message,
       );
 
       if (attempt === MAX_RETRIES) {
@@ -692,7 +903,7 @@ async function recordTradeInPortfolio(userId, pnl, description) {
 
       // Exponential backoff
       await new Promise((resolve) =>
-        setTimeout(resolve, 1000 * Math.pow(2, attempt))
+        setTimeout(resolve, 1000 * Math.pow(2, attempt)),
       );
     }
   }
@@ -706,4 +917,5 @@ module.exports = {
   updateTradePerformance,
   updateWalletPerformance,
   updateAssetsData,
+  fetchAssetsWithRetry,
 };

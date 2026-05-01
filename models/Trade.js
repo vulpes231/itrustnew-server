@@ -21,7 +21,7 @@ const tradeSchema = new Schema(
     },
     assetType: {
       type: String,
-      enum: ["stocks", "crypto", "etf"],
+      enum: ["stock", "crypto", "etf"],
       required: true,
     },
     orderType: {
@@ -73,7 +73,7 @@ const tradeSchema = new Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 tradeSchema.index({ userId: 1, status: 1, createdAt: -1, assetId: 1 });

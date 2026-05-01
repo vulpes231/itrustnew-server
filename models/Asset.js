@@ -77,7 +77,7 @@ const assetSchema = new Schema(
 assetSchema.index({ symbol: 1, exchange: 1 });
 assetSchema.index({ type: 1 });
 assetSchema.index({ "priceData.changePercent": -1 });
-assetSchema.index({ apiId: 1 }); // For quick lookups by CoinGecko ID
+assetSchema.index({ apiId: 1 });
 
 const Asset = mongoose.model("Asset", assetSchema);
 module.exports = Asset;

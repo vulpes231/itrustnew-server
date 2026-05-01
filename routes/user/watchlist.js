@@ -1,16 +1,18 @@
 const { Router } = require("express");
 const {
-	getWatchlist,
-	addToWatchlist,
-	removeFromWatchlist,
+  getUserWatchlist,
+  addAssetToWatchlist,
+  removeAssetFromWatchlist,
 } = require("../../handlers/user/watchlistController");
 
 const router = Router();
 
 router
-	.route("/")
-	.get(getWatchlist)
-	.post(addToWatchlist)
-	.put(removeFromWatchlist);
+  .route("/")
+  .get(getUserWatchlist)
+  .post(addAssetToWatchlist)
+  .put(removeAssetFromWatchlist);
+
+router.route("/check/:assetId");
 
 module.exports = router;

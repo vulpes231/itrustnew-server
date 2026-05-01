@@ -173,7 +173,7 @@ async function buyAsset(userId, assetData) {
 
     throw new CustomError(
       error.message || "Failed to process trade",
-      error.statusCode || 500
+      error.statusCode || 500,
     );
   } finally {
     session.endSession();
@@ -252,14 +252,14 @@ async function getTradedata(userId) {
     const startOfToday = new Date(
       today.getFullYear(),
       today.getMonth(),
-      today.getDate()
+      today.getDate(),
     ).getTime();
 
     const todayBuys = trades.filter(
-      (trade) => trade.createdAt >= startOfToday && trade.orderType === "buy"
+      (trade) => trade.createdAt >= startOfToday && trade.orderType === "buy",
     );
     const todaySells = trades.filter(
-      (trade) => trade.createdAt >= startOfToday && trade.orderType === "sell"
+      (trade) => trade.createdAt >= startOfToday && trade.orderType === "sell",
     );
 
     const totalBuys = buyTrades.reduce((sum, trade) => {

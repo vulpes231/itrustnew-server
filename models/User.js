@@ -237,6 +237,11 @@ const userSchema = new Schema(
         },
       },
     ],
+    watchList: [
+      {
+        assetId: { type: Schema.Types.ObjectId, ref: "Asset" },
+      },
+    ],
     role: {
       type: String,
       enum: ["0000"],
