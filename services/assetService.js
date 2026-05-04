@@ -83,7 +83,9 @@ async function searchAssets(queryData) {
         { symbol: { $regex: query, $options: "i" } },
       ],
     })
-      .select("name symbol type priceData.current _id")
+      .select(
+        "name symbol type priceData.current _id priceData.change priceData.changePercent imageUrl fundamentals.marketCap",
+      )
       .lean();
     return assets;
   } catch (error) {

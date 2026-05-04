@@ -53,7 +53,7 @@ async function withdrawFunds(userId, trnxData) {
     const user = await User.findById(userId);
     if (!user) throw new CustomError("Invalid credentials!", 404);
 
-    if (user.identityVerification.kycStatus !== "completed")
+    if (user.identityVerification.kycStatus !== "approved")
       throw new CustomError("Account not verified!", 400);
 
     const wallets = await Wallet.find({ userId });
@@ -63,7 +63,7 @@ async function withdrawFunds(userId, trnxData) {
       });
     }
 
-    const withdrawFrom = wallets.find((wallet) => wallet.name === account);
+    const withdrawFrom = wallets.find((wallet) => wallet.slug === "cash");
     if (!withdrawFrom)
       throw new CustomError("Invalid withdrawal account!", 400);
 
@@ -157,6 +157,11 @@ async function getUserLedger(userId) {
 async function cancelTransaction(transactionId) {
   try {
     const transaction = await Transaction.findOne({ _id: transactionId });
+
+    if (transaction.status !== "pending") {
+      throw new CustomError("Cannot cancel transaction!", 400);
+    }
+
     transaction.status = "cancelled";
     await transaction.save();
     return transaction;
@@ -188,7 +193,7 @@ async function getUserTrnxAnalytics(userId) {
       23,
       59,
       59,
-      999
+      999,
     );
 
     transactions.forEach((trnx) => {

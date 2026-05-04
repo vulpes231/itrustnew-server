@@ -11,11 +11,11 @@ const { upload } = require("../../utils/utils");
 
 const router = Router();
 
-router.route("/").get(getTransactionHistory).put(stopTransaction);
+router.route("/").get(getTransactionHistory);
 router.route("/analytics").get(getTransactionAnalytics);
 router.route("/deposit").post(upload.single("proof"), deposit);
 router.route("/withdraw").post(withdraw);
 router.route("/transfer").post(transfer);
-router.route("/cancel").post(stopTransaction);
+router.route("/cancel").patch(stopTransaction);
 
 module.exports = router;

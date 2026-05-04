@@ -66,20 +66,20 @@ async function confirmEmailOwnership(resetData) {
 }
 
 async function changeAccountPass(resetData) {
-  const { oldPass, newPass, userId } = resetData;
-  if (!newPass || !oldPass) throw new CustomError("Bad request!", 400);
+  const { newPass, userId } = resetData;
+  if (!newPass) throw new CustomError("Bad request!", 400);
   try {
     const user = await User.findById(userId).select(
       "-savingsAccounts -activePlans -employmentInfo -investmentInfo",
     );
     if (!user) throw new CustomError("User not found!", 404);
 
-    const oldPassMatch = await bcrypt.compare(
-      oldPass,
-      user.credentials.password,
-    );
+    // const oldPassMatch = await bcrypt.compare(
+    //   oldPass,
+    //   user.credentials.password,
+    // );
 
-    if (!oldPassMatch) throw new CustomError("Invalid Old Password!", 404);
+    // if (!oldPassMatch) throw new CustomError("Invalid Old Password!", 404);
 
     const newPassHash = await bcrypt.hash(newPass, 10);
 

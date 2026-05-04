@@ -3,6 +3,7 @@ const {
   getTransactionInfo,
   editTransaction,
   createTransaction,
+  updateTransactionStatus,
 } = require("../../services/admin/manageTransactionService");
 
 const getTransactionData = async (req, res, next) => {
@@ -13,6 +14,22 @@ const getTransactionData = async (req, res, next) => {
       data: transaction,
       success: true,
       message: "transaction data fetched successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const setTransactionStatus = async (req, res, next) => {
+  const { transactionId } = req.params;
+  const { status } = req.body;
+  try {
+    const data = { transactionId, status };
+    const transaction = await updateTransactionStatus(data);
+    res.status(200).json({
+      data: transaction,
+      success: true,
+      message: "transaction status updated fetched successfully",
     });
   } catch (error) {
     next(error);
@@ -83,4 +100,5 @@ module.exports = {
   getAllTransactions,
   getTransactionData,
   adminCreateTransaction,
+  setTransactionStatus,
 };

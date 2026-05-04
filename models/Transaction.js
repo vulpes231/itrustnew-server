@@ -31,7 +31,7 @@ const transactionSchema = new Schema(
     status: {
       type: String,
       default: "pending",
-      enum: ["pending", "cancelled", "processed", "failed"],
+      enum: ["pending", "cancelled", "processed", "failed", "in process"],
     },
     email: {
       type: String,
@@ -50,7 +50,7 @@ const transactionSchema = new Schema(
     timestamps: true,
     toJSON: true,
     virtuals: true,
-  }
+  },
 );
 
 transactionSchema.index({ userId: 1, createdAt: -1 });

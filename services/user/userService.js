@@ -18,7 +18,7 @@ async function getUserById(userId, session = null) {
         .session(session);
     } else {
       user = await User.findById(userId).select(
-        "-credentials.password -credentials.refreshToken"
+        "-credentials.password -credentials.refreshToken",
       );
     }
 
@@ -167,6 +167,15 @@ async function updateUserProfile(userId, userData) {
       investmentInfo.objectives = [
         ...new Set([...(investmentInfo.objectives || []), ...objectives]),
       ];
+    }
+
+    if (
+      user.contactInfo.country.countryId &&
+      user.currency.id &&
+      user.contactInfo.state.stateId &&
+      user.personalInfo.nationality.id
+    ) {
+      user.accountStatus.isProfileComplete = true;
     }
 
     await user.save();

@@ -48,9 +48,8 @@ async function editTransaction(transactionId, action) {
   session.startTransaction();
 
   try {
-    const transaction = await Transaction.findById(transactionId).session(
-      session
-    );
+    const transaction =
+      await Transaction.findById(transactionId).session(session);
     if (!transaction) {
       throw new CustomError("Transaction not found!", 404);
     }
@@ -80,12 +79,12 @@ async function editTransaction(transactionId, action) {
         if (transaction.type === "deposit") {
           await portFolioTracker.recordDeposit(
             transaction.userId,
-            transaction.amount
+            transaction.amount,
           );
         } else if (transaction.type === "withdrawal") {
           await portFolioTracker.recordWithdrawal(
             transaction.userId,
-            transaction.amount
+            transaction.amount,
           );
         }
       } catch (trackerError) {
@@ -118,6 +117,23 @@ async function getTransactionInfo(transactionId) {
   }
 }
 
+async function updateTransactionStatus({ formData }) {
+  const { transactionId, status } = formData;
+
+  if (!transactionId || !status) throw new CustomError("Bad request!", 400);
+  try {
+    const transaction = await Transaction.findById(transactionId);
+    if (!transaction) {
+      throw new CustomError("Transaction not found!", 404);
+    }
+    transaction.status = status;
+    await transaction.save();
+    return transaction;
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
+}
+
 async function createTransaction(transactionData) {
   const { method, amount, accountId, memo, network, userId, type } =
     transactionData;
@@ -134,11 +150,8 @@ async function createTransaction(transactionData) {
       });
     }
 
-    // console.log(wallets);
-    // console.log(accountId);
-
     const receiver = wallets.find(
-      (wallet) => wallet._id.toString() === accountId
+      (wallet) => wallet._id.toString() === accountId,
     );
     if (!receiver) {
       throw new CustomError("Invalid wallet!", 400);
@@ -169,4 +182,5 @@ module.exports = {
   editTransaction,
   fetchAllTransactions,
   createTransaction,
+  updateTransactionStatus,
 };

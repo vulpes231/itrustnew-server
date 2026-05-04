@@ -42,7 +42,7 @@ const confirmPassResetOtp = async (req, res, next) => {
 };
 
 const updateAccountPass = async (req, res, next) => {
-  const { newPass, oldPass } = req.body;
+  const { newPass } = req.body;
 
   try {
     const { userId } = req.user;
@@ -50,7 +50,6 @@ const updateAccountPass = async (req, res, next) => {
     if (!userId) return res.status(401).json({ message: "Unauthorized" });
     const { message } = await resetAccountPassService.changeAccountPass({
       newPass,
-      oldPass,
       userId,
     });
 
