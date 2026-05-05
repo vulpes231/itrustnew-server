@@ -38,8 +38,16 @@ const walletSchema = new Schema(
       type: Number,
       default: 0,
     },
+    totalInvested: {
+      type: Number,
+      default: 0,
+    },
+    totalProfitLoss: {
+      type: Number,
+      default: 0,
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const Wallet = mongoose.model("Wallet", walletSchema);

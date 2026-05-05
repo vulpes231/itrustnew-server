@@ -74,8 +74,14 @@ const userSchema = new Schema(
       },
       status: {
         type: String,
-        enum: ["not verified", "pending", "verified"],
+        enum: ["not verified", "pending", "verified", "rejected"],
         default: "not verified",
+      },
+      verifiedAt: {
+        type: Date,
+      },
+      rejectedAt: {
+        type: Date,
       },
       docPath: {
         type: String,

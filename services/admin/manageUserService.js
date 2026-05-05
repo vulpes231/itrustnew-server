@@ -50,7 +50,7 @@ async function fetchUser(userId) {
   }
   try {
     const user = await User.findById(userId).select(
-      "-credentials.password -credentials.refreshToken"
+      "-credentials.password -credentials.refreshToken",
     );
 
     if (!user) {
@@ -128,7 +128,7 @@ async function completeVerification(userId, verifyData) {
     console.error("Verification completion error:", error);
     throw new CustomError(
       error.message || "Failed to complete verification",
-      500
+      500,
     );
   } finally {
     await session.endSession();
@@ -215,9 +215,8 @@ async function resetVerification(userId, verifyId) {
       throw new CustomError("User not found!", 404);
     }
 
-    const submittedData = await Verification.findById(verifyId).session(
-      session
-    );
+    const submittedData =
+      await Verification.findById(verifyId).session(session);
     if (!submittedData) {
       throw new CustomError("Verification data not found!", 404);
     }
@@ -231,7 +230,7 @@ async function resetVerification(userId, verifyId) {
 
     const deleteResult = await Verification.deleteOne(
       { _id: verifyId },
-      { session }
+      { session },
     );
 
     if (deleteResult.deletedCount === 0) {
@@ -266,7 +265,7 @@ async function resetVerification(userId, verifyId) {
 
     throw new CustomError(
       error.message || "Internal server error",
-      error.statusCode || 500
+      error.statusCode || 500,
     );
   }
 }
@@ -285,9 +284,8 @@ async function rejectVerification(userId, verifyId) {
       throw new CustomError("User not found!", 404);
     }
 
-    const submittedData = await Verification.findById(verifyId).session(
-      session
-    );
+    const submittedData =
+      await Verification.findById(verifyId).session(session);
     if (!submittedData) {
       throw new CustomError("Verification data not found!", 404);
     }
@@ -317,8 +315,81 @@ async function rejectVerification(userId, verifyId) {
 
     throw new CustomError(
       error.message || "Internal server error",
-      error.statusCode || 500
+      error.statusCode || 500,
     );
+  }
+}
+
+async function verifyUserAddress(formData) {
+  const VALID_ACTIONS = ["accept", "reject"];
+
+  const { userId, action } = formData;
+
+  if (!userId || !action) {
+    throw new CustomError("Bad request! UserId and action are required.", 400);
+  }
+
+  if (!VALID_ACTIONS.includes(action)) {
+    throw new CustomError(
+      `Invalid action! Must be one of: ${VALID_ACTIONS.join(", ")}`,
+      400,
+    );
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const user = await User.findById(userId).session(session);
+
+    if (!user) {
+      throw new CustomError("User not found!", 404);
+    }
+
+    if (user.contactInfo.status !== "pending") {
+      throw new CustomError(
+        `Cannot ${action} address verification. Current status: ${user.contactInfo.status}`,
+        400,
+      );
+    }
+
+    const updates = {
+      accept: {
+        "contactInfo.isAddressVerified": true,
+        "contactInfo.status": "verified",
+        "contactInfo.verifiedAt": new Date(),
+      },
+      reject: {
+        "contactInfo.isAddressVerified": false,
+        "contactInfo.status": "rejected",
+        "contactInfo.rejectedAt": new Date(),
+      },
+    };
+
+    await User.updateOne(
+      { _id: userId },
+      { $set: updates[action] },
+      { session },
+    );
+
+    await session.commitTransaction();
+
+    return {
+      success: true,
+      userId,
+      action,
+      newStatus: updates[action]["contactInfo.status"],
+    };
+  } catch (error) {
+    await session.abortTransaction();
+
+    if (error instanceof CustomError) throw error;
+    throw new CustomError(
+      error.message || "Failed to verify user address",
+      500,
+    );
+  } finally {
+    session.endSession();
   }
 }
 
@@ -332,4 +403,5 @@ module.exports = {
   getUserSettings,
   rejectVerification,
   resetVerification,
+  verifyUserAddress,
 };

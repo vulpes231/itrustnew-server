@@ -109,6 +109,7 @@ async function buyAsset(userId, assetData) {
     }
 
     userWallet.availableBalance -= marginAmount;
+    // userWallet.totalInvested += marginAmount;
     await userWallet.save();
 
     const tradeData = {
@@ -183,23 +184,71 @@ async function buyAsset(userId, assetData) {
 async function sellAsset(userId, tradeId) {
   if (!userId) throw new CustomError("Bad credentials!", 400);
   if (!tradeId) throw new CustomError("Bad request!", 400);
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const trade = await Trade.findById(tradeId);
+    const trade = await Trade.findById(tradeId).session(session);
     if (!trade) throw new CustomError("Trade not found!", 404);
 
-    const userWallet = await Wallet.findById(trade.wallet.id);
-    if (!trade) throw new CustomError("Wallet not found!", 404);
+    if (trade.status === "closed") {
+      throw new CustomError("Trade already closed!", 400);
+    }
 
-    userWallet.availableBalance += trade.performance.totalReturn;
-    await userWallet.save();
+    if (trade.userId.toString() !== userId) {
+      throw new CustomError("Unauthorized!", 403);
+    }
+
+    const userWallet = await Wallet.findById(trade.wallet.id).session(session);
+    if (!userWallet) throw new CustomError("Wallet not found!", 404);
+
+    const principalAmount = trade.execution.amount;
+    const profitOrLoss = trade.performance.totalReturn;
+
+    userWallet.availableBalance += principalAmount;
+
+    if (profitOrLoss > 0) {
+      userWallet.totalBalance += profitOrLoss;
+      userWallet.availableBalance += profitOrLoss;
+    } else if (profitOrLoss < 0) {
+      const loss = Math.abs(profitOrLoss);
+      userWallet.totalBalance -= loss;
+      userWallet.availableBalance -= loss;
+
+      if (userWallet.availableBalance < 0) {
+        userWallet.availableBalance = 0;
+      }
+    }
+
+    if (userWallet.totalBalance < 0) userWallet.totalBalance = 0;
+    if (userWallet.availableBalance < 0) userWallet.availableBalance = 0;
+
+    // userWallet.totalProfitLoss += profitOrLoss;
+
+    await userWallet.save({ session });
 
     trade.status = "closed";
-    await trade.save();
+    trade.closedAt = new Date();
+    await trade.save({ session });
 
-    return trade;
+    await session.commitTransaction();
+    session.endSession();
+
+    return {
+      success: true,
+      trade,
+      wallet: {
+        totalBalance: userWallet.totalBalance,
+        availableBalance: userWallet.availableBalance,
+      },
+    };
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
     if (error instanceof CustomError) throw error;
-    throw new CustomError(error.message, error.statusCode);
+    throw new CustomError(error.message, 500);
   }
 }
 

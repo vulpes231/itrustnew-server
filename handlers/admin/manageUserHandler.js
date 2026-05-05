@@ -9,6 +9,7 @@ const {
   getUserSettings,
   resetVerification,
   rejectVerification,
+  verifyUserAddress,
 } = require("../../services/admin/manageUserService");
 const { getUserVerifyInfo } = require("../../services/user/verifyService");
 
@@ -172,6 +173,24 @@ const removeUser = async (req, res, next) => {
   }
 };
 
+const verifyContactAddress = async (req, res, next) => {
+  const { userId } = req.params;
+  const { action } = req.body;
+
+  console.log(action, userId);
+
+  try {
+    await verifyUserAddress({ userId, action });
+    res.status(200).json({
+      data: null,
+      success: true,
+      message: "User address verified.",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   reviewVerification,
@@ -183,4 +202,5 @@ module.exports = {
   getUserConfiguration,
   failVerification,
   cancelVerification,
+  verifyContactAddress,
 };

@@ -41,16 +41,16 @@ async function getUserFinancialSummary(userId) {
 
     const totalBalance = wallets.reduce(
       (sum, wallet) => sum + (wallet.totalBalance || 0),
-      0
+      0,
     );
     const availableBalance = wallets.reduce(
       (sum, wallet) => sum + (wallet.availableBalance || 0),
-      0
+      0,
     );
 
     const dailyProfit = wallets.reduce(
       (sum, wallet) => sum + (wallet.dailyProfit || 0),
-      0
+      0,
     );
 
     const dailyProfitPercent =
@@ -58,12 +58,12 @@ async function getUserFinancialSummary(userId) {
 
     const totalInvested = userTrades.reduce(
       (sum, trade) => sum + (trade.performance?.currentValue || 0),
-      0
+      0,
     );
 
     const totalProfit = userTrades.reduce(
       (sum, trade) => sum + (trade.performance?.totalReturn || 0),
-      0
+      0,
     );
 
     const totalProfitPercent =
@@ -89,4 +89,67 @@ async function getUserFinancialSummary(userId) {
   }
 }
 
-module.exports = { fetchUserWallets, getUserFinancialSummary };
+async function getWalletInvestData(userId) {
+  try {
+    const [accounts, trades] = await Promise.all([
+      Wallet.find({ userId }),
+      Trade.find({ userId }),
+    ]);
+
+    const brokerageAcct = accounts.find((acct) => acct.slug === "brokerage");
+    const investAcct = accounts.find((acct) => acct.slug === "auto");
+
+    if (!brokerageAcct || !investAcct) {
+      throw new CustomError("Required accounts not found", 404);
+    }
+
+    const brokerageId = brokerageAcct._id.toString();
+    const investId = investAcct._id.toString();
+
+    const totals = trades.reduce(
+      (acc, trade) => {
+        const walletId = trade.wallet.id.toString();
+        const amount = trade.execution.amount;
+        const profitLoss = trade.performance?.totalReturn || 0;
+
+        if (walletId === brokerageId) {
+          acc.brokerage.invested += amount;
+          acc.brokerage.profitLoss += profitLoss;
+        } else if (walletId === investId) {
+          acc.auto.invested += amount;
+          acc.auto.profitLoss += profitLoss;
+        }
+
+        return acc;
+      },
+      {
+        brokerage: { invested: 0, profitLoss: 0 },
+        auto: { invested: 0, profitLoss: 0 },
+      },
+    );
+
+    return {
+      brokerage: {
+        totalProfitLoss: totals.brokerage.profitLoss,
+        totalInvested: totals.brokerage.invested,
+      },
+      auto: {
+        totalProfitLoss: totals.auto.profitLoss,
+        totalInvested: totals.auto.invested,
+      },
+    };
+  } catch (error) {
+    if (error instanceof CustomError) throw error;
+
+    throw new CustomError(
+      error.message || "Failed to fetch wallet investment data",
+      error.statusCode || 500,
+    );
+  }
+}
+
+module.exports = {
+  fetchUserWallets,
+  getUserFinancialSummary,
+  getWalletInvestData,
+};

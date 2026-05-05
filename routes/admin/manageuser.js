@@ -8,6 +8,7 @@ const {
   connectWallet,
   getUserConfiguration,
   getVerifyData,
+  verifyContactAddress,
 } = require("../../handlers/admin/manageUserHandler");
 
 const router = Router();
@@ -23,6 +24,7 @@ router
   .put(suspendAccount)
   .delete(removeUser);
 
+router.route("/address/:userId").post(verifyContactAddress);
 router.route("/verify/:userId").get(getVerifyData);
 
 module.exports = router;
