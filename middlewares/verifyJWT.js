@@ -65,4 +65,32 @@ const verifyResetToken = (req, res, next) => {
   });
 };
 
-module.exports = { verifyJWT, verifyResetToken };
+const verify2faToken = (req, res, next) => {
+  if (req.path.startsWith("/storage")) {
+    return next();
+  }
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  jwt.verify(token, ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      if (err.name === "TokenExpiredError") {
+        return res.status(403).json({ message: "Token expired" });
+      }
+      return res.status(403).json({ message: "Forbidden: Invalid token" });
+    }
+
+    req.user = {
+      userId: decoded.userId,
+    };
+
+    next();
+  });
+};
+
+module.exports = { verifyJWT, verifyResetToken, verify2faToken };

@@ -65,7 +65,7 @@ const loginUser = async (req, res, next) => {
     if (userInfo.accountStatus.twoFaActivated) {
       res.status(200).json({
         message: `Verify login.`,
-        token: null,
+        token: accessToken,
         data: userInfo,
         success: true,
       });

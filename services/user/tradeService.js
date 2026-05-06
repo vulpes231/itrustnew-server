@@ -181,9 +181,18 @@ async function buyAsset(userId, assetData) {
   }
 }
 
-async function sellAsset(userId, tradeId) {
+async function sellAsset(formData) {
+  const { userId, tradeId, percentToClose } = formData;
   if (!userId) throw new CustomError("Bad credentials!", 400);
-  if (!tradeId) throw new CustomError("Bad request!", 400);
+  if (!tradeId || !percentToClose) throw new CustomError("Bad request!", 400);
+
+  const validPercentages = [25, 50, 75, 100];
+  if (!validPercentages.includes(percentToClose)) {
+    throw new CustomError(
+      "Invalid percentToClose! Must be 25, 50, 75, or 100",
+      400,
+    );
+  }
 
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -203,16 +212,24 @@ async function sellAsset(userId, tradeId) {
     const userWallet = await Wallet.findById(trade.wallet.id).session(session);
     if (!userWallet) throw new CustomError("Wallet not found!", 404);
 
-    const principalAmount = trade.execution.amount;
-    const profitOrLoss = trade.performance.totalReturn;
+    // Calculate partial amounts based on percentToClose
+    const closeRatio = percentToClose / 100;
+    const principalToClose = trade.execution.amount * closeRatio;
+    const profitOrLossToClose = trade.performance.totalReturn * closeRatio;
 
-    userWallet.availableBalance += principalAmount;
+    // Calculate remaining trade amounts
+    const remainingPrincipal = trade.execution.amount * (1 - closeRatio);
+    const remainingProfitOrLoss =
+      trade.performance.totalReturn * (1 - closeRatio);
 
-    if (profitOrLoss > 0) {
-      userWallet.totalBalance += profitOrLoss;
-      userWallet.availableBalance += profitOrLoss;
-    } else if (profitOrLoss < 0) {
-      const loss = Math.abs(profitOrLoss);
+    // Update wallet with the closed portion
+    userWallet.availableBalance += principalToClose;
+
+    if (profitOrLossToClose > 0) {
+      userWallet.totalBalance += profitOrLossToClose;
+      userWallet.availableBalance += profitOrLossToClose;
+    } else if (profitOrLossToClose < 0) {
+      const loss = Math.abs(profitOrLossToClose);
       userWallet.totalBalance -= loss;
       userWallet.availableBalance -= loss;
 
@@ -224,12 +241,33 @@ async function sellAsset(userId, tradeId) {
     if (userWallet.totalBalance < 0) userWallet.totalBalance = 0;
     if (userWallet.availableBalance < 0) userWallet.availableBalance = 0;
 
-    // userWallet.totalProfitLoss += profitOrLoss;
-
     await userWallet.save({ session });
 
-    trade.status = "closed";
-    trade.closedAt = new Date();
+    // Update or close trade based on percentToClose
+    if (percentToClose === 100) {
+      // Fully close the trade
+      trade.status = "closed";
+      trade.closedAt = new Date();
+    } else {
+      // Partially close - update trade with remaining amounts
+      trade.execution.amount = remainingPrincipal;
+      trade.performance.totalReturn = remainingProfitOrLoss;
+      trade.status = "open";
+
+      if (!trade.partialCloses) {
+        trade.partialCloses = [];
+      }
+
+      trade.partialCloses.push({
+        percentClosed: percentToClose,
+        principalClosed: principalToClose,
+        profitLossClosed: profitOrLossToClose,
+        closedAt: new Date(),
+        remainingPrincipal: remainingPrincipal,
+        remainingProfitLoss: remainingProfitOrLoss,
+      });
+    }
+
     await trade.save({ session });
 
     await session.commitTransaction();
@@ -244,6 +282,7 @@ async function sellAsset(userId, tradeId) {
       },
     };
   } catch (error) {
+    console.log(error);
     await session.abortTransaction();
     session.endSession();
 
@@ -341,9 +380,28 @@ async function getTradedata(userId) {
   }
 }
 
+async function searchUserTrades(queryData) {
+  const { query } = queryData;
+  if (!query || query.length < 2) {
+    throw new CustomError("Invalid search term!", 400);
+  }
+  try {
+    const trades = await Trade.find({
+      $or: [
+        { "asset.name": { $regex: query, $options: "i" } },
+        { "asset.symbol": { $regex: query, $options: "i" } },
+      ],
+    }).lean();
+    return trades;
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
+}
+
 module.exports = {
   buyAsset,
   sellAsset,
   fetchUserTrades,
   getTradedata,
+  searchUserTrades,
 };

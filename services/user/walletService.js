@@ -71,6 +71,8 @@ async function getUserFinancialSummary(userId) {
 
     const cashBalance = cash.availableBalance;
 
+    const openTrades = userTrades.filter((trade) => trade.status === "open");
+
     return {
       totalBalance,
       availableBalance,
@@ -80,6 +82,7 @@ async function getUserFinancialSummary(userId) {
       totalProfitPercent: Number(totalProfitPercent.toFixed(2)),
       totalInvested,
       cashBalance,
+      assetsOwned: openTrades.length,
     };
   } catch (error) {
     if (error instanceof CustomError) {
@@ -136,6 +139,10 @@ async function getWalletInvestData(userId) {
       auto: {
         totalProfitLoss: totals.auto.profitLoss,
         totalInvested: totals.auto.invested,
+      },
+      default: {
+        totalProfitLoss: totals.auto.profitLoss + totals.brokerage.profitLoss,
+        totalInvested: totals.auto.invested + totals.brokerage.invested,
       },
     };
   } catch (error) {

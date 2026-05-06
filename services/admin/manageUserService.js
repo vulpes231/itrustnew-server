@@ -8,6 +8,7 @@ const Wallet = require("../../models/Wallet");
 const Watchlist = require("../../models/Watchlist");
 const { CustomError } = require("../../utils/utils");
 const { getUserById } = require("../user/userService");
+const Transaction = require("../../models/Transaction");
 
 const fs = require("fs").promises;
 

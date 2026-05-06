@@ -54,6 +54,7 @@ const tradeSchema = new Schema(
       todayReturn: { type: Number, default: 0 },
       todayReturnPercent: { type: Number, default: 0 },
       currentValue: { type: Number, default: 0 },
+      currentPrice: { type: Number, default: 0 },
     },
     status: {
       type: String,
@@ -67,6 +68,19 @@ const tradeSchema = new Schema(
     fullname: {
       type: String,
       required: true,
+    },
+    partialCloses: {
+      type: [
+        {
+          percentClosed: Number,
+          principalClosed: Number,
+          profitLossClosed: Number,
+          closedAt: Date,
+          remainingPrincipal: Number,
+          remainingProfitLoss: Number,
+        },
+      ],
+      default: [],
     },
   },
   {

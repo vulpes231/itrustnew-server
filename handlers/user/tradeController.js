@@ -3,6 +3,7 @@ const {
   sellAsset,
   fetchUserTrades,
   getTradedata,
+  searchUserTrades,
 } = require("../../services/user/tradeService");
 
 const openPosition = async (req, res, next) => {
@@ -22,13 +23,32 @@ const openPosition = async (req, res, next) => {
 
 const closePosition = async (req, res, next) => {
   const userId = req.user.userId;
-  const { tradeId } = req.body;
+  const { tradeId, percentToClose } = req.body;
   try {
-    const trade = await sellAsset(userId, tradeId);
+    const { trade, success, wallet } = await sellAsset({
+      userId,
+      tradeId,
+      percentToClose,
+    });
     res.status(200).json({
       message: `${trade.asset.name} position closed succesfully`,
       success: true,
       data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const searchTrades = async (req, res, next) => {
+  const query = req.query.query;
+  const queryData = { query };
+  try {
+    const trades = await searchUserTrades(queryData);
+    res.status(200).json({
+      message: `Trades fecthed successfully`,
+      success: true,
+      data: trades,
     });
   } catch (error) {
     next(error);
@@ -81,4 +101,5 @@ module.exports = {
   closePosition,
   getUserTrades,
   getTradeInsight,
+  searchTrades,
 };
