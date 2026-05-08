@@ -73,8 +73,9 @@ const setBeneficiary = async (req, res, next) => {
 
 const setTwoFactor = async (req, res, next) => {
   const userId = req.user.userId;
+  const { action } = req.body;
   try {
-    await updateTwoFactorAuth(userId);
+    await updateTwoFactorAuth({ userId, action });
     res.status(200).json({
       message: "2FA updated successfully.",
       success: true,

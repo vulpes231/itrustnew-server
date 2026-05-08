@@ -288,16 +288,27 @@ async function updateBeneficiary(userId, userData) {
   }
 }
 
-async function updateTwoFactorAuth(userId) {
+async function updateTwoFactorAuth(formData) {
+  const { action, userId } = formData;
   if (!userId) throw new CustomError("Bad request!", 400);
   try {
     const user = await User.findById(userId);
     if (!user) {
       throw new CustomError("Invalid credentials!", 404);
     }
-    user.accountStatus.twoFaActivated = user.accountStatus.twoFaActivated
-      ? false
-      : true;
+    const allowedActions = ["enable", "disable"];
+
+    if (!allowedActions.includes(action))
+      throw new CustomError("Invalid action", 400);
+
+    if (action === "enable") {
+      user.accountStatus.twoFaActivated = true;
+      user.accountStatus.twoFaVerified = true;
+    } else {
+      user.accountStatus.twoFaActivated = false;
+      user.accountStatus.twoFaVerified = false;
+    }
+
     await user.save();
     return user;
   } catch (error) {
