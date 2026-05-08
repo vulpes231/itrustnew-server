@@ -386,6 +386,11 @@ async function loginService(loginData) {
     }
 
     if (user.accountStatus.twoFaActivated) {
+      if (user.accountStatus.twoFaVerified) {
+        user.accountStatus.twoFaVerified = false;
+        await user.save();
+      }
+
       queueService
         .sendToQueue("email_queue", {
           type: "AUTH_CODE_EMAIL",

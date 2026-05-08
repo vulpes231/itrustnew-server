@@ -186,8 +186,10 @@ async function sellAsset(formData) {
   if (!userId) throw new CustomError("Bad credentials!", 400);
   if (!tradeId || !percentToClose) throw new CustomError("Bad request!", 400);
 
+  const parserPercent = parseFloat(percentToClose);
+
   const validPercentages = [25, 50, 75, 100];
-  if (!validPercentages.includes(percentToClose)) {
+  if (!validPercentages.includes(parserPercent)) {
     throw new CustomError(
       "Invalid percentToClose! Must be 25, 50, 75, or 100",
       400,
