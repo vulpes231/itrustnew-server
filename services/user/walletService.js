@@ -73,8 +73,15 @@ async function getUserFinancialSummary(userId) {
 
     const openTrades = userTrades.filter((trade) => trade.status === "open");
 
+    const totalOpenProfit = openTrades.reduce(
+      (sum, trade) => sum + (trade.performance?.totalReturn || 0),
+      0,
+    );
+
+    const totalAccountBalance = totalBalance + totalProfit;
+
     return {
-      totalBalance,
+      totalBalance: totalAccountBalance,
       availableBalance,
       dailyProfit,
       dailyProfitPercent: Number(dailyProfitPercent.toFixed(2)),
@@ -109,6 +116,13 @@ async function getWalletInvestData(userId) {
     const brokerageId = brokerageAcct._id.toString();
     const investId = investAcct._id.toString();
 
+    const openTrades = trades.filter((trade) => trade.status === "open");
+
+    // const totalOpenProfit = openTrades.reduce(
+    //   (sum, trade) => sum + (trade.performance?.totalReturn || 0),
+    //   0,
+    // );
+
     const totals = trades.reduce(
       (acc, trade) => {
         const walletId = trade.wallet.id.toString();
@@ -131,18 +145,22 @@ async function getWalletInvestData(userId) {
       },
     );
 
+    const totalBrokerage =
+      totals.brokerage.profitLoss + totals.brokerage.invested;
+    const totalAuto = totals.auto.profitLoss + totals.auto.invested;
+
     return {
       brokerage: {
         totalProfitLoss: totals.brokerage.profitLoss,
-        totalInvested: totals.brokerage.invested,
+        totalInvested: totalBrokerage,
       },
       auto: {
         totalProfitLoss: totals.auto.profitLoss,
-        totalInvested: totals.auto.invested,
+        totalInvested: totalAuto,
       },
       default: {
         totalProfitLoss: totals.auto.profitLoss + totals.brokerage.profitLoss,
-        totalInvested: totals.auto.invested + totals.brokerage.invested,
+        totalInvested: totalBrokerage + totalAuto,
       },
     };
   } catch (error) {

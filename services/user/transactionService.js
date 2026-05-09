@@ -70,7 +70,7 @@ async function withdrawFunds(userId, trnxData) {
     if (withdrawFrom.availableBalance < parseFloat(amount))
       throw new CustomError("Insufficient funds!", 400);
 
-    const customMemo = `${method} withdrawal from ${account}`;
+    const customMemo = `${method} withdrawal from ${withdrawFrom.slug}`;
 
     const trnx = await Transaction.create({
       method: {
