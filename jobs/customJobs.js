@@ -755,6 +755,7 @@ const updateTradePerformance = async () => {
               "performance.currentValue": parseFloat(
                 totalCurrentValue.toFixed(4),
               ),
+              "performance.currentPrice": parseFloat(currentPrice),
               updatedAt: now,
             },
           },

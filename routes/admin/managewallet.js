@@ -1,7 +1,7 @@
 const { Router } = require("express");
 
 const {
-	adminGetUserWallets,
+  adminGetUserWallets,
 } = require("../../handlers/admin/manageWalletHandler");
 
 const router = Router();

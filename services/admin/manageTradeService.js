@@ -12,6 +12,7 @@ async function createTrade(tradeData) {
     assetId,
     planId,
     orderType,
+    executionType,
     walletId,
     amount,
     leverage,
@@ -26,20 +27,23 @@ async function createTrade(tradeData) {
     throw new CustomError("Fill in the required field!", 400);
   }
 
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const parsedAmt = parseFloat(amount);
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).session(session);
     if (!user) {
       throw new CustomError("Invalid request!", 404);
     }
 
-    const wallet = await Wallet.findById(walletId);
+    const wallet = await Wallet.findById(walletId).session(session);
     if (!wallet) {
       throw new CustomError("Invalid wallet!", 404);
     }
 
-    const asset = await Asset.findById(assetId);
+    const asset = await Asset.findById(assetId).session(session);
     if (!asset) {
       throw new CustomError("Asset not found!", 404);
     }
@@ -69,6 +73,7 @@ async function createTrade(tradeData) {
         amount: parsedAmt,
         leverage: leverage || 1,
         interval: interval || null,
+        type: executionType,
       },
       targets: {
         takeProfit: tp || null,
@@ -90,18 +95,38 @@ async function createTrade(tradeData) {
     }
 
     wallet.availableBalance -= parsedAmt;
-    await wallet.save();
+    await wallet.save({ session });
 
-    const createdTrade = await Trade.create(newTrade);
-    return createdTrade;
+    const createdTrade = await Trade.create([newTrade], { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return {
+      trade: createdTrade[0],
+      success: true,
+      email: user.contactInfo.email,
+    };
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     throw new CustomError(error.message, 500);
   }
 }
 
-async function closeTrade(tradeId) {
+async function closeTrade(formData) {
+  const { tradeId, percentToClose } = formData;
   if (!tradeId) {
     throw new CustomError("Invalid trade!", 400);
+  }
+
+  const parserPercent = parseFloat(percentToClose);
+  const validPercentages = [25, 50, 75, 100];
+  if (!validPercentages.includes(parserPercent)) {
+    throw new CustomError(
+      "Invalid percentToClose! Must be 25, 50, 75, or 100",
+      400,
+    );
   }
 
   const session = await mongoose.startSession();
@@ -129,60 +154,128 @@ async function closeTrade(tradeId) {
 
     const currentPrice = asset.priceData.current;
     const entryPrice = trade.execution.price;
-    const quantity = trade.execution.quantity;
-    const leverage = trade.execution.leverage || 1;
+    const originalQuantity = trade.execution.quantity;
+    const originalAmount = trade.execution.amount;
+    const originalLeverage = trade.execution.leverage || 1;
     const extraBonus = trade.extra || 0;
 
     let currentValue, totalReturn, totalReturnPercent;
 
     if (trade.orderType === "buy") {
-      currentValue = quantity * currentPrice * leverage;
-      totalReturn = currentValue - trade.execution.amount;
-      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+      currentValue = originalQuantity * currentPrice * originalLeverage;
+      totalReturn = currentValue - originalAmount;
+      totalReturnPercent = (totalReturn / originalAmount) * 100;
     } else if (trade.orderType === "sell") {
       currentValue =
-        trade.execution.amount - quantity * currentPrice * leverage;
-      totalReturn = currentValue - trade.execution.amount;
-      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+        originalAmount - originalQuantity * currentPrice * originalLeverage;
+      totalReturn = currentValue - originalAmount;
+      totalReturnPercent = (totalReturn / originalAmount) * 100;
     } else {
-      currentValue = quantity * currentPrice;
-      totalReturn = currentValue - trade.execution.amount;
-      totalReturnPercent = (totalReturn / trade.execution.amount) * 100;
+      currentValue = originalQuantity * currentPrice;
+      totalReturn = currentValue - originalAmount;
+      totalReturnPercent = (totalReturn / originalAmount) * 100;
     }
 
     const totalCurrentValue = currentValue + extraBonus;
     const totalProfitLoss = totalReturn + extraBonus;
-    const totalProfitLossPercentage =
-      (totalProfitLoss / trade.execution.amount) * 100;
+    const totalProfitLossPercentage = (totalProfitLoss / originalAmount) * 100;
 
-    trade.performance.currentValue = totalCurrentValue;
-    trade.performance.totalReturn = totalProfitLoss;
-    trade.performance.totalReturnPercent = totalProfitLossPercentage;
+    const closeRatio = parserPercent / 100;
+    const principalToClose = originalAmount * closeRatio;
+    const profitLossToClose = totalProfitLoss * closeRatio;
+    const currentValueToClose = totalCurrentValue * closeRatio;
 
-    wallet.availableBalance += totalCurrentValue;
-    wallet.totalBalance += totalProfitLoss;
+    const remainingPrincipal = originalAmount * (1 - closeRatio);
+    const remainingProfitLoss = totalProfitLoss * (1 - closeRatio);
+    const remainingCurrentValue = totalCurrentValue * (1 - closeRatio);
+    const remainingQuantity = originalQuantity * (1 - closeRatio);
+    const remainingBonus = extraBonus * (1 - closeRatio);
+
+    wallet.availableBalance += principalToClose;
+
+    if (profitLossToClose > 0) {
+      wallet.totalBalance += profitLossToClose;
+      wallet.availableBalance += profitLossToClose;
+    } else if (profitLossToClose < 0) {
+      const loss = Math.abs(profitLossToClose);
+      wallet.totalBalance -= loss;
+      wallet.availableBalance -= loss;
+
+      if (wallet.availableBalance < 0) {
+        wallet.availableBalance = 0;
+      }
+    }
+
+    if (wallet.totalBalance < 0) wallet.totalBalance = 0;
+    if (wallet.availableBalance < 0) wallet.availableBalance = 0;
 
     await wallet.save({ session });
 
-    trade.targets.exitPoint = currentPrice;
-    trade.status = "closed";
-    trade.closedAt = new Date();
-    trade.closeReason = "manual_close";
+    if (parserPercent === 100) {
+      trade.performance.currentValue = totalCurrentValue;
+      trade.performance.totalReturn = totalProfitLoss;
+      trade.performance.totalReturnPercent = totalProfitLossPercentage;
+      trade.targets.exitPoint = currentPrice;
+      trade.status = "closed";
+      trade.closedAt = new Date();
+      trade.closeReason = "manual_close";
+    } else {
+      trade.execution.amount = remainingPrincipal;
+      trade.execution.quantity = remainingQuantity;
+
+      trade.performance.currentValue = remainingCurrentValue;
+      trade.performance.totalReturn = remainingProfitLoss;
+      trade.performance.totalReturnPercent =
+        (remainingProfitLoss / remainingPrincipal) * 100;
+
+      trade.extra = remainingBonus;
+
+      trade.status = "open";
+
+      if (!trade.partialCloses) {
+        trade.partialCloses = [];
+      }
+
+      trade.partialCloses.push({
+        percentClosed: parserPercent,
+        principalClosed: principalToClose,
+        profitLossClosed: profitLossToClose,
+        currentValueClosed: currentValueToClose,
+        closedAt: new Date(),
+        exitPrice: currentPrice,
+        remainingPrincipal: remainingPrincipal,
+        remainingProfitLoss: remainingProfitLoss,
+        remainingQuantity: remainingQuantity,
+      });
+    }
 
     await trade.save({ session });
 
     await portFolioTracker.recordTrade(
       trade.userId,
-      totalProfitLoss,
-      `Trade closed (manual): ${trade.asset.symbol} ${trade.orderType} - ${
-        totalProfitLoss >= 0 ? "Profit" : "Loss"
-      } of $${Math.abs(totalProfitLoss).toFixed(2)}`
+      profitLossToClose,
+      `Trade ${parserPercent === 100 ? "closed" : `partially closed (${parserPercent}%)`}: ${trade.asset.symbol} ${trade.orderType} - ${
+        profitLossToClose >= 0 ? "Profit" : "Loss"
+      } of $${Math.abs(profitLossToClose).toFixed(2)}`,
     );
 
     await session.commitTransaction();
     session.endSession();
 
-    return trade;
+    return {
+      success: true,
+      trade,
+      closedPortion: {
+        percentClosed: parserPercent,
+        principalClosed: principalToClose,
+        profitLossClosed: profitLossToClose,
+        currentValueClosed: currentValueToClose,
+      },
+      wallet: {
+        totalBalance: wallet.totalBalance,
+        availableBalance: wallet.availableBalance,
+      },
+    };
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -235,6 +328,9 @@ async function updateTradePerformance(tradeId, externalSession = null) {
     trade.performance.currentValue = totalCurrentValue;
     trade.performance.totalReturn = totalProfitLoss;
     trade.performance.totalReturnPercent = totalProfitLossPercentage;
+    trade.performance.currentPrice = currentPrice;
+
+    // trade.execution.
 
     let tradeClosed = false;
     let closeReason = "";
@@ -276,8 +372,8 @@ async function updateTradePerformance(tradeId, externalSession = null) {
         `Trade closed (${closeReason}): ${trade.asset.symbol} ${
           trade.orderType
         } - ${totalProfitLoss >= 0 ? "Profit" : "Loss"} of $${Math.abs(
-          totalProfitLoss
-        ).toFixed(2)}`
+          totalProfitLoss,
+        ).toFixed(2)}`,
       );
     }
 
@@ -316,7 +412,7 @@ async function editTradeData(tradeData) {
       await portFolioTracker.recordDeposit(
         trade.userId,
         parsedExtra,
-        `Extra bonus added to trade: ${trade.asset.symbol}`
+        `Extra bonus added to trade: ${trade.asset.symbol}`,
       );
 
       trade.extra += parsedExtra;
@@ -376,6 +472,22 @@ async function getTradeById(tradeId) {
   }
 }
 
+async function getTradeByUserId(formData) {
+  const { userId } = formData;
+  if (!userId) {
+    throw new CustomError("Bad request!", 400);
+  }
+  try {
+    const userTrades = await Trade.find({
+      userId,
+    }).lean();
+
+    return userTrades;
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
+}
+
 async function deleteTrade(tradeId) {
   if (!tradeId) {
     throw new CustomError("Invalid trade!", 400);
@@ -394,4 +506,5 @@ module.exports = {
   updateTradePerformance,
   fetchAllTrades,
   getTradeById,
+  getTradeByUserId,
 };

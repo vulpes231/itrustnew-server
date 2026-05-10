@@ -64,6 +64,15 @@ class EmailWorkerService {
             );
             break;
 
+          case "TRADE_EMAIL":
+            await emailService.sendTradeAlert(
+              emailData.to,
+              emailData.templateData.trade,
+              emailData.templateData.closedPortion,
+              emailData.templateData.isPartialClose,
+            );
+            break;
+
           case "WELCOME_EMAIL":
             await emailService.sendWelcomeMessage(
               emailData.to,
