@@ -24,12 +24,13 @@ async function newSavingsAccount(accountData) {
     apy,
   } = accountData;
 
+  console.log(accountData);
+
   if (
     !name ||
     !title ||
     !details ||
     !information ||
-    !canTrade ||
     !tag ||
     !slug ||
     !designTag ||
@@ -107,6 +108,13 @@ async function editSavingsAccount(accountData) {
     maxWithdrawal,
     eligibleCountries,
     status,
+    slug,
+    jointMaxSelection,
+    maxSavingsYearly,
+    maxSavingsTotal,
+    designTag,
+    apy,
+    information,
   } = accountData;
 
   if (!accountId || !mongoose.Types.ObjectId.isValid(accountId)) {
@@ -118,19 +126,6 @@ async function editSavingsAccount(accountData) {
     throw new CustomError("Savings account not found", 404);
   }
 
-  if (
-    (name !== undefined && !name) ||
-    (title !== undefined && !title) ||
-    (details !== undefined && !details) ||
-    (interestRate !== undefined &&
-      (!interestRate ||
-        isNaN(interestRate) ||
-        interestRate < 0 ||
-        interestRate > 100))
-  ) {
-    throw new CustomError("Invalid or missing required fields", 400);
-  }
-
   if (eligibleCountries) {
     if (
       (!eligibleCountries.add || !Array.isArray(eligibleCountries.add)) &&
@@ -138,17 +133,17 @@ async function editSavingsAccount(accountData) {
     ) {
       throw new CustomError(
         "Invalid eligibleCountries format; must include add or remove arrays",
-        400
+        400,
       );
     }
     if (
       (eligibleCountries.add &&
         !eligibleCountries.add.every((id) =>
-          mongoose.Types.ObjectId.isValid(id)
+          mongoose.Types.ObjectId.isValid(id),
         )) ||
       (eligibleCountries.remove &&
         !eligibleCountries.remove.every((id) =>
-          mongoose.Types.ObjectId.isValid(id)
+          mongoose.Types.ObjectId.isValid(id),
         ))
     ) {
       throw new CustomError("Invalid country ID format", 400);
@@ -177,6 +172,11 @@ async function editSavingsAccount(accountData) {
         ...(details && { details }),
         ...(interestRate !== undefined && { interestRate }),
         ...(status && { status }),
+        ...(designTag && { designTag }),
+        ...(apy && { yearlyAPY }),
+        ...(slug && { slug }),
+        ...(information && { information }),
+        ...(jointMaxSelection && { jointMaxSelection }),
         ...(minDeposit !== undefined && {
           "contributionLimits.min": minDeposit,
         }),
@@ -188,6 +188,12 @@ async function editSavingsAccount(accountData) {
         }),
         ...(maxWithdrawal !== undefined && {
           "withdrawalLimits.max": maxWithdrawal,
+        }),
+        ...(maxSavingsTotal !== undefined && {
+          "maxSavings.total": maxSavingsTotal,
+        }),
+        ...(maxSavingsYearly !== undefined && {
+          "maxSavings.yearly": maxSavingsYearly,
         }),
       },
       ...(eligibleCountries?.add && {
@@ -201,7 +207,7 @@ async function editSavingsAccount(accountData) {
     const updatedAccount = await SavingsAccount.findByIdAndUpdate(
       accountId,
       updateData,
-      { new: true, runValidators: true }
+      { new: true, runValidators: true },
     );
 
     if (!updatedAccount) {

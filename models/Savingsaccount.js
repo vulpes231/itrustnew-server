@@ -58,39 +58,29 @@ const savingsAccountSchema = new Schema(
     contributionLimits: {
       min: {
         type: Number,
-        required: true,
+
         min: 0,
+        default: 500,
       },
       max: {
         type: Number,
-        required: true,
+
         min: 0,
-        validate: {
-          validator: function (value) {
-            return value >= this.contributionLimits.min;
-          },
-          message:
-            "Max contribution limit must be greater than or equal to min contribution limit",
-        },
+        default: 1000,
       },
     },
     withdrawalLimits: {
       min: {
         type: Number,
-        required: true,
+
         min: 0,
+        default: 500,
       },
       max: {
         type: Number,
-        required: true,
+
         min: 0,
-        validate: {
-          validator: function (value) {
-            return value >= this.withdrawalLimits.min;
-          },
-          message:
-            "Max withdrawal limit must be greater than or equal to min withdrawal limit",
-        },
+        default: 1000,
       },
     },
     eligibleCountries: [
@@ -115,7 +105,7 @@ const savingsAccountSchema = new Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 const SavingsAccount = mongoose.model("SavingsAccount", savingsAccountSchema);
