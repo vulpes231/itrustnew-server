@@ -1,6 +1,8 @@
 const Autoplan = require("../../models/Autoplan");
 const Trade = require("../../models/Trade");
 const { CustomError } = require("../../utils/utils");
+const fs = require("fs").promises;
+const path = require("path");
 
 async function addNewPlan(planData) {
   const {
@@ -62,50 +64,105 @@ async function editPlan(planData) {
   const {
     planId,
     name,
+    title,
     type,
+    min,
     winRate,
     aum,
-    expectedreturn,
+    expectedReturn,
     dailyReturn,
     milestone,
     duration,
   } = planData;
 
   if (!planId) {
-    throw new CustomError("Bad request!", 400);
+    throw new CustomError("Bad request! Plan ID is required.", 400);
   }
-  try {
-    const updateData = {
-      $set: {
-        ...(name && { name }),
-        ...(type && { type }),
-        ...(winRate && { winRate }),
-        ...(aum && { aum }),
-        ...(expectedreturn && { expectedreturn }),
-        ...(dailyReturn && { dailyReturn }),
-        ...(milestone && { milestone }),
-        ...(duration && { duration }),
-      },
-    };
 
-    const plan = await Autoplan.findByIdAndUpdate(planId, updateData, {
-      new: true,
-      runValidators: true,
-    });
-    if (!plan) {
-      throw new CustomError("Invalid plan!", 404);
+  try {
+    const updateFields = {};
+
+    if (name !== undefined && name !== "") {
+      updateFields.name = name;
     }
+
+    if (title !== undefined && title !== "") {
+      updateFields.title = title;
+    }
+
+    if (type !== undefined && type !== "") {
+      updateFields.planType = type;
+    }
+
+    if (min !== undefined && min !== "") {
+      updateFields.minInvestment = parseFloat(min);
+    }
+
+    if (winRate !== undefined && winRate !== "") {
+      updateFields["performance.winRate"] = parseFloat(winRate);
+    }
+
+    if (expectedReturn !== undefined && expectedReturn !== "") {
+      updateFields["performance.expectedReturnPercent"] =
+        parseFloat(expectedReturn);
+    }
+
+    if (dailyReturn !== undefined && dailyReturn !== "") {
+      updateFields["performance.dailyReturnPercent"] = parseFloat(dailyReturn);
+    }
+
+    if (aum !== undefined && aum !== "") {
+      updateFields["performance.aum"] = aum.toString();
+    }
+
+    if (milestone !== undefined && milestone !== "") {
+      updateFields["expiresIn.milestone"] = parseFloat(milestone);
+    }
+
+    if (duration !== undefined && duration !== "") {
+      updateFields["expiresIn.duration"] = duration;
+    }
+
+    if (Object.keys(updateFields).length === 0) {
+      throw new CustomError("No valid fields to update!", 400);
+    }
+
+    const plan = await Autoplan.findByIdAndUpdate(
+      planId,
+      {
+        $set: updateFields,
+      },
+      {
+        new: true,
+        runValidators: true,
+        context: "query",
+      },
+    );
+
+    if (!plan) {
+      throw new CustomError("Plan not found!", 404);
+    }
+
+    // console.log("Plan updated successfully:", plan._id);
+
     return plan;
   } catch (error) {
-    throw new CustomError(error.message, 500);
+    console.error("Error in editPlan:", error);
+
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(`Failed to update plan: ${error.message}`, 500);
   }
 }
 
 async function removePlan(planId) {
   try {
     const plan = await Autoplan.findById(planId);
-    if (plan) {
-      throw new CustomError("Invalid plan!", 404);
+
+    if (!plan) {
+      throw new CustomError("Plan not found!", 404);
     }
 
     const positionCount = await Trade.countDocuments({ planId: plan._id });
@@ -113,9 +170,29 @@ async function removePlan(planId) {
       throw new CustomError("You have open trades with this plan!", 403);
     }
 
+    if (plan.img) {
+      try {
+        const imagePath = path.join(STORAGE_PATH, path.basename(plan.img));
+
+        await fs.access(imagePath);
+        await fs.unlink(imagePath);
+        console.log(`Deleted plan image: ${imagePath}`);
+      } catch (fileError) {
+        if (fileError.code === "ENOENT") {
+          console.warn(`Image file not found: ${plan.img}`);
+        } else {
+          console.error(`Error deleting image file: ${fileError.message}`);
+        }
+      }
+    }
+
     await Autoplan.findByIdAndDelete(plan._id);
+
     return true;
   } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
     throw new CustomError(error.message, 500);
   }
 }

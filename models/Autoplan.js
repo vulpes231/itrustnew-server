@@ -45,7 +45,6 @@ const autoPlanSchema = new Schema(
     expiresIn: {
       milestone: {
         type: Number,
-        required: true,
       },
       duration: {
         type: String,
@@ -60,7 +59,7 @@ const autoPlanSchema = new Schema(
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
-  }
+  },
 );
 
 autoPlanSchema.index({ name: 1, planType: 1 });
@@ -68,7 +67,7 @@ autoPlanSchema.index({ "investmentRange.min": 1, "investmentRange.max": 1 });
 autoPlanSchema.index({ "performance.winRate": -1 });
 
 autoPlanSchema.virtual("formattedDuration").get(function () {
-  return `${this.expiresIn.milestone} ${this.expiresIn.duration}`;
+  return `${this.expiresIn.milestone} ${this.expiresIn.duration}${this.expiresIn.milestone > 1 && "s"}`;
 });
 
 const Autoplan = mongoose.model("Autoplan", autoPlanSchema);

@@ -11,9 +11,11 @@ const path = require("path");
 const { generateFileName } = require("../../utils/utils");
 const fs = require("fs").promises;
 
-const STORAGE_PATH = path.join(__dirname, "../../storage");
+const STORAGE_PATH = path.join(__dirname, "../../storage/plans");
 
 const createPlan = async (req, res, next) => {
+  let savedImagePath = null;
+
   try {
     const planData = req.body;
 
@@ -39,17 +41,18 @@ const createPlan = async (req, res, next) => {
     const planImageName = generateFileName(
       planImg.originalname,
       "planImg",
-      planData.name
+      planData.name,
     );
 
     const planImgPath = path.join(STORAGE_PATH, planImageName);
+    savedImagePath = planImgPath;
 
     await sharp(planImg.buffer)
       .resize(800, 600, { fit: "inside", withoutEnlargement: true })
       .webp({ quality: 80 })
       .toFile(planImgPath);
 
-    planData.img = `/storage/${planImageName}`;
+    planData.img = `/storage/plans/${planImageName}`;
 
     const planName = await addNewPlan(planData);
 
@@ -58,6 +61,18 @@ const createPlan = async (req, res, next) => {
       success: true,
     });
   } catch (error) {
+    // Clean up: remove saved image if it exists and an error occurred
+    if (savedImagePath) {
+      try {
+        await fs.unlink(savedImagePath);
+        console.log(`Removed image at ${savedImagePath} due to error`);
+      } catch (unlinkError) {
+        console.error(
+          `Failed to remove image at ${savedImagePath}:`,
+          unlinkError,
+        );
+      }
+    }
     next(error);
   }
 };

@@ -26,6 +26,6 @@ const upload = multer({
 const router = Router();
 
 router.route("/").get(getMyPlans).post(upload.single("planImg"), createPlan);
-router.route("/:planId").get(singlePlan).put(updatePlan).delete(deletePlan);
+router.route("/:planId").get(singlePlan).patch(updatePlan).delete(deletePlan);
 
 module.exports = router;
