@@ -3,7 +3,8 @@ const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 const { fetchTransactionInfo } = require("../user/transactionService");
-const portFolioTracker = require("../user/chartService");
+
+const portfolioService = require("../user/portfolioService");
 
 async function fetchAllTransactions(queryData) {
   const {
@@ -67,24 +68,40 @@ async function editTransaction(transactionId, action) {
     }
 
     if (action === "approve") {
-      transactionWallet.availableBalance += transaction.amount;
-      transactionWallet.totalBalance += transaction.amount;
+      transactionWallet.balance.available += transaction.amount;
+      transactionWallet.balance.total += transaction.amount;
       await transactionWallet.save({ session });
 
-      // Update transaction status
       transaction.status = "processed";
       await transaction.save({ session });
 
       try {
         if (transaction.type === "deposit") {
-          await portFolioTracker.recordDeposit(
+          await portfolioService.updatePortfolioValue(
             transaction.userId,
             transaction.amount,
+            "deposit",
+            {
+              transactionId: transaction._id,
+              paymentMethod: transaction.method.mode,
+            },
           );
         } else if (transaction.type === "withdrawal") {
-          await portFolioTracker.recordWithdrawal(
+          await portfolioService.updatePortfolioValue(
             transaction.userId,
             transaction.amount,
+            "deposit",
+            {
+              transactionId: transaction._id,
+              paymentMethod: transaction.method.mode,
+            },
+          );
+          await PortfolioTracker.updatePortfolioValue(
+            transaction.userId,
+            -transaction.amount,
+            {
+              transactionId: transaction._id,
+            },
           );
         }
       } catch (trackerError) {
@@ -156,6 +173,7 @@ async function createTransaction(transactionData) {
     if (!receiver) {
       throw new CustomError("Invalid wallet!", 400);
     }
+
     const customMemo = `${method} ${type} to ${receiver.name}`;
 
     const trnx = await Transaction.create({
@@ -170,7 +188,13 @@ async function createTransaction(transactionData) {
       userId: userId,
       email: user.contactInfo.email,
       fullname: user.fullName,
+      status: "processed",
     });
+
+    receiver.balance.total = parseFloat(amount);
+    receiver.balance.available = parseFloat(amount);
+    await receiver.save();
+
     return trnx;
   } catch (error) {
     throw new CustomError(error.message, 500);

@@ -40,11 +40,11 @@ async function getUserFinancialSummary(userId) {
     const cash = wallets.find((wallet) => wallet.slug === "cash");
 
     const totalBalance = wallets.reduce(
-      (sum, wallet) => sum + (wallet.totalBalance || 0),
+      (sum, wallet) => sum + (wallet.balance.total || 0),
       0,
     );
     const availableBalance = wallets.reduce(
-      (sum, wallet) => sum + (wallet.availableBalance || 0),
+      (sum, wallet) => sum + (wallet.balance.available || 0),
       0,
     );
 
@@ -122,12 +122,12 @@ async function getWalletInvestData(userId) {
     //   (sum, trade) => sum + (trade.performance?.totalReturn || 0),
     //   0,
     // );
-
     const totals = trades.reduce(
       (acc, trade) => {
         const walletId = trade.wallet.id.toString();
         const amount = trade.execution.amount;
-        const profitLoss = trade.performance?.totalReturn || 0;
+        const interest = trade.extra || 0;
+        const profitLoss = (trade.performance?.totalReturn || 0) + interest;
 
         if (walletId === brokerageId) {
           acc.brokerage.invested += amount;

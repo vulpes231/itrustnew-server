@@ -209,7 +209,7 @@ const userSchema = new Schema(
     savingsAccounts: [
       {
         name: { type: String },
-        symbol: { type: String },
+        slug: { type: String },
         title: { type: String },
         tag: { type: String },
         rate: { type: Number },
@@ -218,7 +218,12 @@ const userSchema = new Schema(
         analytics: {
           totalReturn: { type: Number, default: 0 },
           dailyChange: { type: Number, default: 0 },
-          balance: { type: Number, default: 0 },
+          dailyChangePercent: { type: Number, default: 0 },
+          totalReturnPercent: { type: Number, default: 0 },
+          balance: {
+            total: { type: Number, default: 0 },
+            available: { type: Number, default: 0 },
+          },
           contributions: { type: Number, default: 0 },
           withdrawals: { type: Number, default: 0 },
         },
@@ -234,6 +239,7 @@ const userSchema = new Schema(
         image: { type: String },
         duration: { type: String },
         start: { type: Date },
+        amount: { type: NUmber, default: 0 },
         end: { type: Date },
         planId: { type: Schema.Types.ObjectId, ref: "Autoplan" },
         analytics: {

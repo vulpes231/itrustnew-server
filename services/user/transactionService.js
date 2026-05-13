@@ -67,7 +67,7 @@ async function withdrawFunds(userId, trnxData) {
     if (!withdrawFrom)
       throw new CustomError("Invalid withdrawal account!", 400);
 
-    if (withdrawFrom.availableBalance < parseFloat(amount))
+    if (withdrawFrom.balance.available < parseFloat(amount))
       throw new CustomError("Insufficient funds!", 400);
 
     const customMemo = `${method} withdrawal from ${withdrawFrom.slug}`;
@@ -103,7 +103,7 @@ async function moveFunds(userId, trnxData) {
     const transferFrom = await Wallet.findById(fromWallet);
     if (!transferFrom) throw new CustomError("Invalid from account!", 400);
 
-    if (transferFrom.availableBalance < parseFloat(amount))
+    if (transferFrom.balance.available < parseFloat(amount))
       throw new CustomError("Insufficient funds!", 400);
 
     const transferTo = await Wallet.findById(toWallet);
@@ -111,12 +111,12 @@ async function moveFunds(userId, trnxData) {
 
     const parsedAmount = parseFloat(amount);
 
-    transferFrom.totalBalance -= parsedAmount;
-    transferFrom.availableBalance -= parsedAmount;
+    transferFrom.balance.total -= parsedAmount;
+    transferFrom.balance.available -= parsedAmount;
     await transferFrom.save();
 
-    transferTo.totalBalance += parsedAmount;
-    transferTo.availableBalance += parsedAmount;
+    transferTo.balance.total += parsedAmount;
+    transferTo.balance.available += parsedAmount;
     await transferTo.save();
 
     const customMemo = `Transfer from ${transferFrom.name} to ${transferTo.name}`;

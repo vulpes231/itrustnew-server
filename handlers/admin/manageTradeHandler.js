@@ -1,19 +1,12 @@
 const User = require("../../models/User");
-const {
-  createTrade,
-  closeTrade,
-  editTradeData,
-  getTradeById,
-  fetchAllTrades,
-  getTradeByUserId,
-} = require("../../services/admin/manageTradeService");
+const tradeService = require("../../services/admin/manageTradeService");
 const queueService = require("../../services/queueService");
 
 const addNewTrade = async (req, res, next) => {
   const tradeData = req.body;
 
   try {
-    const result = await createTrade(tradeData);
+    const result = await tradeService.createBuyTrade(tradeData);
 
     if (result.success && tradeData.notifyUser) {
       await queueService.sendToQueue("email_queue", {
@@ -39,7 +32,7 @@ const exitTrade = async (req, res, next) => {
   const { amount, notifyUser } = req.body;
 
   try {
-    const result = await closeTrade({
+    const result = await tradeService.closeTrade({
       tradeId,
       percentToClose: amount || 100,
     });
@@ -78,9 +71,10 @@ const exitTrade = async (req, res, next) => {
 
 const updateTrade = async (req, res, next) => {
   const tradeData = req.body;
+  const { tradeId } = req.params;
 
   try {
-    const trade = await editTradeData(tradeData);
+    const trade = await tradeService.editTrade({ ...tradeData, tradeId });
     res.status(200).json({
       message: "Trade updated successfully.",
       data: trade,
@@ -94,7 +88,7 @@ const updateTrade = async (req, res, next) => {
 const getTradeInfo = async (req, res, next) => {
   const { tradeId } = req.params;
   try {
-    const trade = await getTradeById(tradeId);
+    const trade = await tradeService.getTradeById(tradeId);
     res.status(200).json({
       message: "Trade info fetched successfully.",
       data: trade,
@@ -113,7 +107,7 @@ const getAllTrades = async (req, res, next) => {
   const queryData = { page, limit, sortBy, filterBy };
   try {
     const { trades, totalItems, totalPages, currentPage } =
-      await fetchAllTrades(queryData);
+      await tradeService.getAllTrades(queryData);
     res.status(200).json({
       message: "Trades fetched successfully.",
       data: trades,
@@ -132,10 +126,10 @@ const getAllTrades = async (req, res, next) => {
 const getAccountTrades = async (req, res, next) => {
   const { userId } = req.params;
   try {
-    const userTrades = await getTradeByUserId({ userId });
+    const { trades } = await tradeService.getUserTrades({ userId });
     res.status(200).json({
       message: "Trades fetched successfully.",
-      data: userTrades,
+      data: trades,
       success: true,
     });
   } catch (error) {

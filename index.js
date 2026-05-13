@@ -81,7 +81,7 @@ const savingsRoute = require("./routes/user/savings.js");
 const kycRoute = require("./routes/user/kyc.js");
 const settingsRoute = require("./routes/user/settings.js");
 const profileSettingsRoute = require("./routes/user/profileSettings.js");
-const chartRoute = require("./routes/user/chart.js");
+const chartRoute = require("./routes/user/portfolio.js");
 
 // admin routers
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");

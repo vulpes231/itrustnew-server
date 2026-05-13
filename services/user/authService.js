@@ -4,20 +4,16 @@ const {
   getNationById,
   getStateById,
 } = require("../locationService");
-
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
-const { getUserById } = require("./userService");
 const { getCurrencyById } = require("../currencyService");
 const Wallet = require("../../models/Wallet");
-const { sendLoginCode } = require("../mailService");
-const Usersetting = require("../../models/Usersetting");
 const { CustomError } = require("../../utils/utils");
 const { default: mongoose } = require("mongoose");
-const portFolioTracker = require("../user/chartService");
 const queueService = require("../queueService");
 const { format } = require("date-fns");
+const portfolioService = require("./portfolioService");
 
 async function registerService(userData) {
   const { firstname, lastname, username, email, password } = userData;
@@ -104,7 +100,7 @@ async function registerService(userData) {
     );
 
     try {
-      await portFolioTracker.initializeUser(result.userId);
+      await portfolioService.createAccountSnapshot(result.userId);
     } catch (trackerError) {
       console.warn(
         `Portfolio tracker initialization failed for user ${result.userId}:`,

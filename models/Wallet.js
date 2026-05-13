@@ -10,13 +10,9 @@ const walletSchema = new Schema(
     slug: {
       type: String,
     },
-    totalBalance: {
-      type: Number,
-      default: 0,
-    },
-    availableBalance: {
-      type: Number,
-      default: 0,
+    balance: {
+      total: { type: Number, default: 0 },
+      available: { type: Number, default: 0 },
     },
     userId: {
       type: Schema.Types.ObjectId,
