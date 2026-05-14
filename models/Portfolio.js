@@ -126,80 +126,42 @@ portfolioSchema.statics.getTimeframeData = async function (userId, timeframe) {
 };
 
 portfolioSchema.statics.getFullHistory = async function (userId, timeframe) {
-  const user = await mongoose.model("User").findById(userId);
-  const startDate = user.createdAt;
   const now = new Date();
+  let startDate;
 
-  let groupFormat = {};
-
+  // Calculate start date based on timeframe
   switch (timeframe) {
     case "1h":
-      groupFormat = {
-        $dateToString: { format: "%Y-%m-%d %H:00:00", date: "$timestamp" },
-      };
+      startDate = new Date(now.getTime() - 60 * 60 * 1000);
       break;
     case "1d":
-      groupFormat = {
-        $dateToString: { format: "%Y-%m-%d", date: "$timestamp" },
-      };
+      startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       break;
     case "1w":
-      groupFormat = {
-        $dateToString: {
-          format: "%Y-%m-%d",
-          date: {
-            $dateFromParts: {
-              year: { $year: "$timestamp" },
-              week: { $isoWeek: "$timestamp" },
-              weekday: 1,
-            },
-          },
-        },
-      };
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       break;
     case "1m":
-      groupFormat = {
-        $dateToString: { format: "%Y-%m-01", date: "$timestamp" },
-      };
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       break;
     case "1y":
-      groupFormat = {
-        $dateToString: { format: "%Y-01-01", date: "$timestamp" },
-      };
+      startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
       break;
     default:
-      groupFormat = {
-        $dateToString: { format: "%Y-%m-%d", date: "$timestamp" },
-      };
+      startDate = null;
   }
 
-  return this.aggregate([
-    {
-      $match: {
-        userId: userId,
-        timestamp: { $gte: startDate, $lte: now },
-      },
-    },
-    {
-      $group: {
-        _id: groupFormat,
-        value: { $last: "$portfolioValue" },
-        timestamp: { $last: "$timestamp" },
-      },
-    },
-    {
-      $sort: { timestamp: 1 },
-    },
-    {
-      $project: {
-        x: "$_id",
-        y: "$value",
-        rawTimestamp: "$timestamp",
-        _id: 0,
-      },
-    },
-  ]);
-};
+  const query = { userId };
+  if (startDate) {
+    query.timestamp = { $gte: startDate };
+  }
 
+  const snapshots = await this.find(query).sort({ timestamp: 1 });
+
+  return snapshots.map((s) => ({
+    x: s.timestamp,
+    y: s.portfolioValue,
+    reason: s.reason,
+  }));
+};
 const Portfolio = mongoose.model("PortFolio", portfolioSchema);
 module.exports = Portfolio;

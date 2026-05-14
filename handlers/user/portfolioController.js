@@ -28,8 +28,6 @@ const getUserChartData = async (req, res, next) => {
       chartData = await portfolioService.getChartData(userId, timeframe);
     }
 
-    console.log(timeframe, chartData);
-
     res.json({
       timeframe,
       data: chartData,

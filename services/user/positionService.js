@@ -3,10 +3,6 @@ const { CustomError } = require("../../utils/utils");
 const mongoose = require("mongoose");
 
 class PositionService {
-  /**
-   * Update position when a trade is created or closed
-   * Now properly tracks quantity and average entry price
-   */
   async updatePosition(trade, session = null) {
     const {
       userId,
@@ -34,7 +30,6 @@ class PositionService {
       const tradePrice = execution.price;
 
       if (position) {
-        // Calculate new weighted average entry price
         const existingValue = position.amountInvested;
         const existingQuantity = position.quantity;
         const newTotalAmount = existingValue + tradeAmount;
@@ -43,7 +38,6 @@ class PositionService {
         const newCurrentValue =
           position.performance.currentValue + execution.positionAmount;
 
-        // Update position
         position.amountInvested = newTotalAmount;
         position.quantity = newTotalQuantity;
         position.averageEntryPrice = newAveragePrice;
@@ -243,7 +237,6 @@ class PositionService {
     };
 
     for (const position of positions) {
-      // Use the stored performance values (already calculated correctly)
       const currentValue = position.performance?.currentValue || 0;
       const amountInvested = position.amountInvested || 0;
       const totalReturn = currentValue - amountInvested;
@@ -253,12 +246,13 @@ class PositionService {
       summary.totalReturn += totalReturn;
       summary.totalQuantity += position.quantity || 0;
 
-      // Calculate current price safely
       const currentPrice =
         position.quantity > 0 ? currentValue / position.quantity : 0;
 
       summary.positions.push({
         asset: position.asset,
+        wallet: position.wallet,
+        _id: position._id,
         quantity: position.quantity,
         averageEntryPrice:
           position.averageEntryPrice ||
@@ -274,20 +268,10 @@ class PositionService {
       });
     }
 
-    // Calculate overall totals
     if (summary.totalInvested > 0) {
       summary.totalReturnPercent =
         (summary.totalReturn / summary.totalInvested) * 100;
     }
-
-    // Debug log
-    console.log("Position Summary:", {
-      totalInvested: summary.totalInvested,
-      totalCurrentValue: summary.totalCurrentValue,
-      totalReturn: summary.totalReturn,
-      totalReturnPercent: summary.totalReturnPercent,
-      positionCount: summary.positions.length,
-    });
 
     return summary;
   }
