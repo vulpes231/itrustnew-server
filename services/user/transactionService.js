@@ -24,6 +24,13 @@ async function addFunds(userId, trnxData) {
     }
     const customMemo = `${method} deposit to ${receiver.name}`;
 
+    const meta = {
+      type: "cash deposit",
+      to: receiver.name,
+      method: method,
+      network: network,
+    };
+
     const trnx = await Transaction.create({
       method: {
         mode: method,
@@ -37,6 +44,7 @@ async function addFunds(userId, trnxData) {
       email: user.contactInfo.email,
       fullname: user.fullName,
       proof: proof || null,
+      meta: meta,
     });
     return trnx;
   } catch (error) {
@@ -46,7 +54,17 @@ async function addFunds(userId, trnxData) {
 }
 
 async function withdrawFunds(userId, trnxData) {
-  const { method, amount, account, memo, network } = trnxData;
+  const {
+    method,
+    amount,
+    account,
+    memo,
+    network,
+    address,
+    bankName,
+    accountNumber,
+    routing,
+  } = trnxData;
   if (!amount || !method || !account || !network)
     throw new CustomError("Bad request!", 400);
   try {
@@ -70,7 +88,17 @@ async function withdrawFunds(userId, trnxData) {
     if (withdrawFrom.balance.available < parseFloat(amount))
       throw new CustomError("Insufficient funds!", 400);
 
-    const customMemo = `${method} withdrawal from ${withdrawFrom.slug}`;
+    const customMemo = `${method} withdrawal from ${withdrawFrom.name}`;
+
+    const bankInfo = `${`${bankName}-acc:${accountNumber}-rou:${routing}`}`;
+
+    const meta = {
+      type: "withdraw",
+      to: withdrawFrom.name,
+      method: method,
+      network: network,
+      info: method === "bank" ? bankInfo : address,
+    };
 
     const trnx = await Transaction.create({
       method: {
@@ -84,6 +112,7 @@ async function withdrawFunds(userId, trnxData) {
       userId: userId,
       email: user.contactInfo.email,
       fullname: user.fullName,
+      meta: meta,
     });
     return trnx;
   } catch (error) {
@@ -121,6 +150,14 @@ async function moveFunds(userId, trnxData) {
 
     const customMemo = `Transfer from ${transferFrom.name} to ${transferTo.name}`;
 
+    const meta = {
+      type: "transfer",
+      to: transferTo.name,
+      method: "internal",
+      network: "internal",
+      info: "internal",
+    };
+
     const trnx = await Transaction.create({
       method: {
         mode: transferFrom.name,
@@ -134,6 +171,7 @@ async function moveFunds(userId, trnxData) {
       email: user.contactInfo.email,
       status: "processed",
       fullname: user.fullName,
+      meta: meta,
     });
     return trnx;
   } catch (error) {

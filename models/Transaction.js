@@ -45,6 +45,13 @@ const transactionSchema = new Schema(
       type: String,
       default: null,
     },
+    meta: {
+      type: { type: String },
+      to: { type: String },
+      method: { type: String },
+      network: { type: String },
+      info: { type: String },
+    },
   },
   {
     timestamps: true,

@@ -34,6 +34,8 @@ const positionSchema = new Schema(
       name: { type: String },
     },
     amountInvested: { type: Number, default: 0 },
+    quantity: { type: Number, default: 0 },
+    averageEntryPrice: { type: Number, default: 0 },
     marketType: { type: String },
     customDate: { type: Date },
     performance: {
@@ -49,7 +51,6 @@ const positionSchema = new Schema(
       enum: ["open", "closed"],
       default: "open",
     },
-
     fullname: {
       type: String,
       required: true,
@@ -58,11 +59,32 @@ const positionSchema = new Schema(
       type: [
         {
           percentClosed: Number,
+          quantityClosed: Number,
           principalClosed: Number,
           profitLossClosed: Number,
           closedAt: Date,
+          remainingQuantity: Number,
           remainingPrincipal: Number,
           remainingProfitLoss: Number,
+          priceAtClose: Number,
+        },
+      ],
+      default: [],
+    },
+    tradeIds: {
+      type: [Schema.Types.ObjectId],
+      ref: "Trade",
+      default: [],
+    },
+    history: {
+      type: [
+        {
+          action: { type: String, enum: ["create", "add", "remove", "close"] },
+          tradeId: { type: Schema.Types.ObjectId, ref: "Trade" },
+          quantity: Number,
+          amount: Number,
+          price: Number,
+          timestamp: Date,
         },
       ],
       default: [],
@@ -75,7 +97,18 @@ const positionSchema = new Schema(
   },
 );
 
-positionSchema.index({ userId: 1, status: 1, createdAt: -1, assetId: 1 });
+positionSchema.index({
+  userId: 1,
+  status: 1,
+  "asset.assetId": 1,
+  "wallet.id": 1,
+});
+positionSchema.index({ userId: 1, status: 1, createdAt: -1 });
+
+positionSchema.virtual("currentAveragePrice").get(function () {
+  if (this.quantity === 0) return 0;
+  return this.amountInvested / this.quantity;
+});
 
 const Position = mongoose.model("Position", positionSchema);
 module.exports = Position;

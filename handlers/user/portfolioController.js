@@ -11,7 +11,7 @@ const getUserChartData = async (req, res, next) => {
     }
 
     let chartData;
-    if (timeframe === "all") {
+    if (timeframe.toLowerCase() === "all") {
       const snapshots = await Portfolio.find({
         userId: req.userId,
       }).sort({ timestamp: 1 });

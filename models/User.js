@@ -239,7 +239,7 @@ const userSchema = new Schema(
         image: { type: String },
         duration: { type: String },
         start: { type: Date },
-        amount: { type: NUmber, default: 0 },
+        amount: { type: Number, default: 0 },
         end: { type: Date },
         planId: { type: Schema.Types.ObjectId, ref: "Autoplan" },
         analytics: {

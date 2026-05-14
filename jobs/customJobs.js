@@ -4,7 +4,8 @@ const User = require("../models/User");
 const { logEvent } = require("../middlewares/loggers");
 const axios = require("axios");
 const Asset = require("../models/Asset");
-const portFolioTracker = require("../services/user/chartService");
+const portFolioTracker = require("../services/user/portfolioService");
+const Position = require("../models/Position");
 
 const BATCH_SIZE = process.env.CRON_BATCH_SIZE || 50;
 const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
@@ -796,6 +797,103 @@ const updateTradePerformance = async () => {
   }
 };
 
+const updatePositionsPerformance = async () => {
+  try {
+    console.log("Starting position performance update...");
+    const startTime = Date.now();
+
+    const openPositions = await Position.find({
+      status: "open",
+      "asset.symbol": { $exists: true, $ne: null },
+    }).lean();
+
+    if (openPositions.length === 0) {
+      console.log("No open positions found.");
+      return;
+    }
+
+    const assetSymbols = [
+      ...new Set(openPositions.map((p) => p.asset.symbol.toUpperCase())),
+    ];
+
+    let currentAssets;
+    try {
+      currentAssets = await fetchAssetsWithRetry(assetSymbols);
+    } catch (error) {
+      console.error("Error fetching assets:", error.message);
+      return;
+    }
+
+    const assetPriceMap = new Map();
+    for (const asset of currentAssets) {
+      if (asset?.symbol && asset?.priceData?.current) {
+        assetPriceMap.set(asset.symbol.toUpperCase(), asset.priceData.current);
+      }
+    }
+
+    const positionUpdates = [];
+    for (const position of openPositions) {
+      const currentPrice = assetPriceMap.get(
+        position.asset.symbol.toUpperCase(),
+      );
+      if (!currentPrice) continue;
+
+      const avgEntryPrice =
+        position.amountInvested /
+        (position.performance.currentValue / position.performance.currentValue);
+      const currentValue =
+        position.amountInvested *
+        (currentPrice /
+          (position.performance.currentValue / position.amountInvested));
+      const totalReturn = currentValue - position.amountInvested;
+      const totalReturnPercent = (totalReturn / position.amountInvested) * 100;
+
+      const todayReturn =
+        currentValue - (position.performance.currentValue || currentValue);
+      const todayReturnPercent = position.performance.currentValue
+        ? (todayReturn / position.performance.currentValue) * 100
+        : 0;
+
+      positionUpdates.push({
+        updateOne: {
+          filter: { _id: position._id },
+          update: {
+            $set: {
+              "performance.currentValue": parseFloat(currentValue.toFixed(4)),
+              "performance.totalReturn": parseFloat(totalReturn.toFixed(4)),
+              "performance.totalReturnPercent": parseFloat(
+                totalReturnPercent.toFixed(4),
+              ),
+              "performance.todayReturn": parseFloat(todayReturn.toFixed(4)),
+              "performance.todayReturnPercent": parseFloat(
+                todayReturnPercent.toFixed(4),
+              ),
+              updatedAt: new Date(),
+            },
+          },
+        },
+      });
+    }
+
+    if (positionUpdates.length > 0) {
+      const BATCH_SIZE = 500;
+      for (let i = 0; i < positionUpdates.length; i += BATCH_SIZE) {
+        const batch = positionUpdates.slice(i, i + BATCH_SIZE);
+        await Position.bulkWrite(batch, { ordered: false });
+        console.log(
+          `Updated ${batch.length} positions in batch ${Math.floor(i / BATCH_SIZE) + 1}`,
+        );
+      }
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`Position performance update completed in ${duration}ms.`);
+  } catch (error) {
+    console.error("Error in updatePositionsPerformance:", error);
+    throw error;
+  }
+};
+
 async function closeTradesInBatch(tradesToClose, closeTime) {
   const session = await mongoose.startSession();
 
@@ -919,4 +1017,5 @@ module.exports = {
   updateWalletPerformance,
   updateAssetsData,
   fetchAssetsWithRetry,
+  updatePositionsPerformance,
 };

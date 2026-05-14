@@ -31,6 +31,7 @@ class TradeService {
       entry,
       exit,
       interval,
+      extra,
     } = tradeData;
 
     if (!userId || !assetId || !walletId || !amount || !orderType) {
@@ -82,7 +83,6 @@ class TradeService {
       wallet.balance.available -= marginAmount;
       await wallet.save({ session });
 
-      // Create trade
       const newTrade = {
         userId: userId,
         asset: {
@@ -128,12 +128,10 @@ class TradeService {
       const createdTrade = await Trade.create([newTrade], { session });
       const trade = createdTrade[0];
 
-      // Update position using helper
       const position = await TradeHelpers.updatePositionOnBuy(trade, session);
 
       await session.commitTransaction();
 
-      // Async portfolio update
       portfolioService
         .updatePortfolioValue(
           trade.userId,
@@ -201,17 +199,14 @@ class TradeService {
 
       const currentPrice = asset.priceData.current;
 
-      // Calculate close values using helper
       const calculations = TradeHelpers.calculateCloseValues(
         trade,
         currentPrice,
         parserPercent,
       );
 
-      // Update wallet using helper
       await TradeHelpers.updateWalletOnClose(wallet, calculations, session);
 
-      // Update trade using helper
       const updatedTrade = await TradeHelpers.updateTradeOnClose(
         trade,
         calculations,
@@ -219,7 +214,6 @@ class TradeService {
         session,
       );
 
-      // Update position using helper
       const updatedPosition = await TradeHelpers.updatePositionOnSell(
         trade,
         parserPercent,
@@ -229,7 +223,6 @@ class TradeService {
 
       await session.commitTransaction();
 
-      // Async portfolio update
       portfolioService
         .updatePortfolioValue(
           trade.userId,

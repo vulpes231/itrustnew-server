@@ -1,5 +1,4 @@
 const { default: mongoose } = require("mongoose");
-const Chart = require("../../models/Chart");
 const Trade = require("../../models/Trade");
 const User = require("../../models/User");
 const Usersetting = require("../../models/Usersetting");
@@ -9,6 +8,8 @@ const Watchlist = require("../../models/Watchlist");
 const { CustomError } = require("../../utils/utils");
 const { getUserById } = require("../user/userService");
 const Transaction = require("../../models/Transaction");
+const Position = require("../../models/Position");
+const Portfolio = require("../../models/Portfolio");
 
 const fs = require("fs").promises;
 
@@ -158,7 +159,8 @@ async function deleteUser(userId) {
       Transaction.deleteMany({ userId }),
       Trade.deleteMany({ userId }),
       Wallet.deleteMany({ userId }),
-      Chart.deleteMany({ userId }),
+      Portfolio.deleteMany({ userId }),
+      Position.deleteMany({ userId }),
       Watchlist.deleteMany({ userId }),
       Usersetting.deleteMany({ userId }),
     ]);

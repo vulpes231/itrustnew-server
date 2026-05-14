@@ -69,7 +69,7 @@ async function getUserFinancialSummary(userId) {
     const totalProfitPercent =
       totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
-    const cashBalance = cash.availableBalance;
+    const cashBalance = cash.balance.available;
 
     const openTrades = userTrades.filter((trade) => trade.status === "open");
 

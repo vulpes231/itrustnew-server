@@ -3,6 +3,10 @@ const { CustomError } = require("../../utils/utils");
 const mongoose = require("mongoose");
 
 class PositionService {
+  /**
+   * Update position when a trade is created or closed
+   * Now properly tracks quantity and average entry price
+   */
   async updatePosition(trade, session = null) {
     const {
       userId,
@@ -18,30 +22,51 @@ class PositionService {
     const query = {
       userId,
       "asset.assetId": asset.assetId,
-      wallet: {
-        id: wallet.id,
-        name: wallet.name,
-      },
+      "wallet.id": wallet.id,
       status: "open",
     };
 
     let position = await Position.findOne(query).session(session);
 
     if (orderType === "buy") {
+      const tradeQuantity = execution.quantity;
+      const tradeAmount = execution.amount;
+      const tradePrice = execution.price;
+
       if (position) {
-        const newAmountInvested = position.amountInvested + execution.amount;
+        // Calculate new weighted average entry price
+        const existingValue = position.amountInvested;
+        const existingQuantity = position.quantity;
+        const newTotalAmount = existingValue + tradeAmount;
+        const newTotalQuantity = existingQuantity + tradeQuantity;
+        const newAveragePrice = newTotalAmount / newTotalQuantity;
         const newCurrentValue =
           position.performance.currentValue + execution.positionAmount;
 
-        position.amountInvested = newAmountInvested;
+        // Update position
+        position.amountInvested = newTotalAmount;
+        position.quantity = newTotalQuantity;
+        position.averageEntryPrice = newAveragePrice;
         position.performance.currentValue = newCurrentValue;
-        position.performance.totalReturn = newCurrentValue - newAmountInvested;
+        position.performance.totalReturn = newCurrentValue - newTotalAmount;
         position.performance.totalReturnPercent =
-          (position.performance.totalReturn / newAmountInvested) * 100;
+          (position.performance.totalReturn / newTotalAmount) * 100;
+
+        if (!position.tradeIds) position.tradeIds = [];
+        position.tradeIds.push(trade._id);
+
+        if (!position.history) position.history = [];
+        position.history.push({
+          action: "add",
+          tradeId: trade._id,
+          quantity: tradeQuantity,
+          amount: tradeAmount,
+          price: tradePrice,
+          timestamp: new Date(),
+        });
 
         await position.save({ session });
       } else {
-        // Create new position
         const positionData = {
           userId,
           asset: {
@@ -58,6 +83,8 @@ class PositionService {
             name: wallet.name,
           },
           amountInvested: execution.amount,
+          quantity: execution.quantity,
+          averageEntryPrice: execution.price,
           performance: {
             currentValue: execution.positionAmount,
             totalReturn: 0,
@@ -69,51 +96,86 @@ class PositionService {
           status: "open",
           fullname: fullname,
           partialCloses: [],
+          tradeIds: [trade._id],
+          history: [
+            {
+              action: "create",
+              tradeId: trade._id,
+              quantity: execution.quantity,
+              amount: execution.amount,
+              price: execution.price,
+              timestamp: new Date(),
+            },
+          ],
         };
 
-        position = await Position.create([positionData], { session });
-        position = position[0];
+        const createdPosition = await Position.create([positionData], {
+          session,
+        });
+        position = createdPosition[0];
       }
     } else if (orderType === "sell") {
       if (!position) {
         throw new CustomError("No open position found for this asset", 400);
       }
 
-      // Calculate closing details
+      const sellQuantity = execution.quantity;
       const sellAmount = execution.amount;
       const sellValue = execution.positionAmount;
       const profitLoss = sellValue - sellAmount;
 
-      // Check if this is a partial or full close
-      if (Math.abs(sellAmount - position.amountInvested) < 0.01) {
-        // Full close
+      if (Math.abs(sellQuantity - position.quantity) < 0.000001) {
         position.status = "closed";
         position.performance.totalReturn = profitLoss;
         position.performance.totalReturnPercent =
           (profitLoss / position.amountInvested) * 100;
         position.performance.currentValue = 0;
+        position.closedAt = new Date();
+
+        position.history.push({
+          action: "close",
+          tradeId: trade._id,
+          quantity: sellQuantity,
+          amount: sellAmount,
+          price: execution.price,
+          timestamp: new Date(),
+        });
       } else {
-        // Partial close - record in partialCloses
-        const percentClosed = (sellAmount / position.amountInvested) * 100;
+        const percentClosed = (sellQuantity / position.quantity) * 100;
+        const remainingQuantity = position.quantity - sellQuantity;
         const remainingPrincipal = position.amountInvested - sellAmount;
         const remainingProfitLoss =
           position.performance.totalReturn - profitLoss;
 
+        const newCurrentValue = position.performance.currentValue - sellValue;
+
         position.partialCloses.push({
           percentClosed: parseFloat(percentClosed.toFixed(2)),
+          quantityClosed: sellQuantity,
           principalClosed: sellAmount,
           profitLossClosed: profitLoss,
           closedAt: new Date(),
+          remainingQuantity: remainingQuantity,
           remainingPrincipal: remainingPrincipal,
           remainingProfitLoss: remainingProfitLoss,
+          priceAtClose: execution.price,
         });
 
-        // Update position with remaining values
+        position.quantity = remainingQuantity;
         position.amountInvested = remainingPrincipal;
-        position.performance.currentValue -= sellValue;
+        position.performance.currentValue = newCurrentValue;
         position.performance.totalReturn = remainingProfitLoss;
         position.performance.totalReturnPercent =
           (remainingProfitLoss / remainingPrincipal) * 100;
+
+        position.history.push({
+          action: "remove",
+          tradeId: trade._id,
+          quantity: sellQuantity,
+          amount: sellAmount,
+          price: execution.price,
+          timestamp: new Date(),
+        });
       }
 
       await position.save({ session });
@@ -122,89 +184,15 @@ class PositionService {
     return position;
   }
 
-  async closePositionFromSell(trade, currentPrice, session = null) {
-    const { userId, asset, execution, wallet, performance } = trade;
-
-    const position = await Position.findOne({
-      userId,
-      "asset.assetId": asset.assetId,
-      "wallet.id": wallet.id,
-      status: "open",
-    }).session(session);
-
-    if (!position) {
-      throw new CustomError("No open position found for this asset", 400);
-    }
-
-    // Calculate current position value
-    const currentPositionValue =
-      position.amountInvested *
-      (currentPrice /
-        (position.performance.currentValue / position.amountInvested));
-    const currentTotalReturn = currentPositionValue - position.amountInvested;
-
-    // Check if trade is closing fully or partially
-    const isFullClose =
-      Math.abs(execution.amount - position.amountInvested) < 0.01;
-
-    if (isFullClose) {
-      // Complete position closure
-      position.status = "closed";
-      position.performance.totalReturn = currentTotalReturn;
-      position.performance.totalReturnPercent =
-        (currentTotalReturn / position.amountInvested) * 100;
-      position.performance.currentValue = 0;
-      position.closedAt = new Date();
-    } else {
-      // Partial close
-      const closeRatio = execution.amount / position.amountInvested;
-      const principalToClose = position.amountInvested * closeRatio;
-      const valueToClose = currentPositionValue * closeRatio;
-      const profitToClose = currentTotalReturn * closeRatio;
-
-      const remainingPrincipal = position.amountInvested - principalToClose;
-      const remainingValue = currentPositionValue - valueToClose;
-      const remainingProfit = currentTotalReturn - profitToClose;
-
-      // Record partial closure
-      position.partialCloses.push({
-        percentClosed: closeRatio * 100,
-        principalClosed: principalToClose,
-        profitLossClosed: profitToClose,
-        closedAt: new Date(),
-        remainingPrincipal: remainingPrincipal,
-        remainingProfitLoss: remainingProfit,
-        priceAtClose: currentPrice,
-      });
-
-      // Update position
-      position.amountInvested = remainingPrincipal;
-      position.performance.currentValue = remainingValue;
-      position.performance.totalReturn = remainingProfit;
-      position.performance.totalReturnPercent =
-        (remainingProfit / remainingPrincipal) * 100;
-    }
-
-    await position.save({ session });
-    return position;
-  }
-
   async updatePositionPerformance(position, currentPrice) {
-    const currentValue =
-      position.orderType === "buy"
-        ? position.amountInvested *
-          (currentPrice /
-            (position.performance.currentValue / position.amountInvested))
-        : position.amountInvested;
-
+    const currentValue = position.quantity * currentPrice;
     const totalReturn = currentValue - position.amountInvested;
     const totalReturnPercent = (totalReturn / position.amountInvested) * 100;
 
-    const todayReturn =
-      currentValue - (position.performance.currentValue || currentValue);
-    const todayReturnPercent = position.performance.currentValue
-      ? (todayReturn / position.performance.currentValue) * 100
-      : 0;
+    const previousValue = position.performance.currentValue || currentValue;
+    const todayReturn = currentValue - previousValue;
+    const todayReturnPercent =
+      previousValue > 0 ? (todayReturn / previousValue) * 100 : 0;
 
     position.performance.currentValue = currentValue;
     position.performance.totalReturn = totalReturn;
@@ -244,6 +232,7 @@ class PositionService {
       totalCurrentValue: 0,
       totalReturn: 0,
       totalReturnPercent: 0,
+      totalQuantity: 0,
       positions: [],
     };
 
@@ -251,13 +240,19 @@ class PositionService {
       summary.totalInvested += position.amountInvested;
       summary.totalCurrentValue += position.performance.currentValue;
       summary.totalReturn += position.performance.totalReturn;
+      summary.totalQuantity += position.quantity;
 
       summary.positions.push({
         asset: position.asset,
+        quantity: position.quantity,
+        averageEntryPrice: position.averageEntryPrice,
         amountInvested: position.amountInvested,
         currentValue: position.performance.currentValue,
+        currentPrice: position.performance.currentValue / position.quantity,
         return: position.performance.totalReturn,
         returnPercent: position.performance.totalReturnPercent,
+        todayReturn: position.performance.todayReturn,
+        todayReturnPercent: position.performance.todayReturnPercent,
       });
     }
 
@@ -269,24 +264,60 @@ class PositionService {
     return summary;
   }
 
-  async getWalletPositions(walletId, userId) {
-    return await Position.find({
-      userId,
-      "wallet.id": walletId,
-      status: "open",
-    }).populate("asset.assetId");
-  }
-
   async getUserPositionByAsset(userId, assetId, walletId) {
-    return await Position.findOne({
+    const position = await Position.findOne({
       userId,
       "asset.assetId": assetId,
       "wallet.id": walletId,
       status: "open",
     });
+
+    if (!position) return null;
+
+    return {
+      ...position.toObject(),
+      currentAveragePrice: position.averageEntryPrice,
+      currentValue: position.performance.currentValue,
+      unrealizedPL: position.performance.totalReturn,
+      unrealizedPLPercent: position.performance.totalReturnPercent,
+    };
   }
 
-  async verifyPositionForSell(userId, assetId, walletId, sellAmount) {
+  async getWalletPositions(walletId, userId) {
+    const positions = await Position.find({
+      userId,
+      "wallet.id": walletId,
+      status: "open",
+    }).populate("asset.assetId");
+
+    const summary = {
+      totalInvested: 0,
+      totalCurrentValue: 0,
+      totalReturn: 0,
+      totalReturnPercent: 0,
+      positions: positions.map((p) => ({
+        ...p.toObject(),
+        currentAveragePrice: p.averageEntryPrice,
+        unrealizedPL: p.performance.totalReturn,
+        unrealizedPLPercent: p.performance.totalReturnPercent,
+      })),
+    };
+
+    for (const position of positions) {
+      summary.totalInvested += position.amountInvested;
+      summary.totalCurrentValue += position.performance.currentValue;
+      summary.totalReturn += position.performance.totalReturn;
+    }
+
+    if (summary.totalInvested > 0) {
+      summary.totalReturnPercent =
+        (summary.totalReturn / summary.totalInvested) * 100;
+    }
+
+    return summary;
+  }
+
+  async verifyPositionForSell(userId, assetId, walletId, sellQuantity) {
     const position = await Position.findOne({
       userId,
       "asset.assetId": assetId,
@@ -298,14 +329,66 @@ class PositionService {
       throw new CustomError("No open position found for this asset", 400);
     }
 
-    if (sellAmount > position.amountInvested) {
+    if (sellQuantity > position.quantity) {
       throw new CustomError(
-        `Cannot sell more than available. Available: ${position.amountInvested}, Requested: ${sellAmount}`,
+        `Cannot sell more than available. Available: ${position.quantity} units, Requested: ${sellQuantity} units`,
         400,
       );
     }
 
-    return position;
+    return {
+      position,
+      availableQuantity: position.quantity,
+      availableAmount: position.amountInvested,
+      averagePrice: position.averageEntryPrice,
+    };
+  }
+
+  async getPositionHistory(userId, assetId, walletId) {
+    const position = await Position.findOne({
+      userId,
+      "asset.assetId": assetId,
+      "wallet.id": walletId,
+    }).populate("tradeIds");
+
+    if (!position) {
+      throw new CustomError("Position not found", 404);
+    }
+
+    return {
+      position: {
+        asset: position.asset,
+        currentQuantity: position.quantity,
+        averageEntryPrice: position.averageEntryPrice,
+        totalInvested: position.amountInvested,
+        currentValue: position.performance.currentValue,
+      },
+      history: position.history,
+      trades: position.tradeIds,
+      partialCloses: position.partialCloses,
+    };
+  }
+
+  async getPositionValueAtTime(userId, assetId, walletId, timestamp) {
+    const position = await Position.findOne({
+      userId,
+      "asset.assetId": assetId,
+      "wallet.id": walletId,
+      createdAt: { $lte: timestamp },
+      $or: [{ status: "open" }, { closedAt: { $gte: timestamp } }],
+    });
+
+    if (!position) return null;
+
+    const tradesUpToDate = position.tradeIds.filter(
+      (trade) => trade.createdAt <= timestamp,
+    );
+
+    return {
+      asset: position.asset,
+      quantity: position.quantity,
+      value: position.performance.currentValue,
+    };
   }
 }
 

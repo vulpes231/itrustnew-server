@@ -14,6 +14,7 @@ const { default: mongoose } = require("mongoose");
 const queueService = require("../queueService");
 const { format } = require("date-fns");
 const portfolioService = require("./portfolioService");
+const Usersetting = require("../../models/Usersetting");
 
 async function registerService(userData) {
   const { firstname, lastname, username, email, password } = userData;
