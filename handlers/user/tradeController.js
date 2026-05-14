@@ -23,15 +23,15 @@ const openPosition = async (req, res, next) => {
 
 const closePosition = async (req, res, next) => {
   const userId = req.user.userId;
-  const { tradeId, percentToClose } = req.body;
+  const { positionId, amount } = req.body;
   try {
     const { trade, success, wallet } = await sellAsset({
       userId,
-      tradeId,
-      percentToClose,
+      positionId,
+      amount,
     });
     res.status(200).json({
-      message: `${trade.asset.name} position closed succesfully`,
+      message: `Trade position closed succesfully`,
       success: true,
       data: null,
     });

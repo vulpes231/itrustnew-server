@@ -19,35 +19,42 @@ class TradeHelpers {
     }).session(session);
 
     if (position) {
-      // Update existing position
-      const newAmountInvested = position.amountInvested + execution.amount;
+      // Calculate new values with quantity
+      const existingAmount = position.amountInvested;
+      const existingQuantity = position.quantity;
+      const existingExtra = position.performance.extra || 0;
+
+      const newAmount = existingAmount + execution.amount;
+      const newQuantity = existingQuantity + execution.quantity;
+      const newAveragePrice = newAmount / newQuantity;
       const newCurrentValue =
         position.performance.currentValue + execution.positionAmount;
+      const newExtra = existingExtra + (trade.extra || 0);
 
-      position.amountInvested = newAmountInvested;
+      position.amountInvested = newAmount;
+      position.quantity = newQuantity;
+      position.averageEntryPrice = newAveragePrice;
       position.performance.currentValue = newCurrentValue;
-      position.performance.totalReturn = newCurrentValue - newAmountInvested;
+      position.performance.extra = newExtra;
+      position.performance.totalReturn = newCurrentValue + newExtra - newAmount;
       position.performance.totalReturnPercent =
-        (position.performance.totalReturn / newAmountInvested) * 100;
+        (position.performance.totalReturn / newAmount) * 100;
 
-      // Track trade IDs
       if (!position.tradeIds) position.tradeIds = [];
       position.tradeIds.push(trade._id);
 
-      // Add to history
       if (!position.history) position.history = [];
       position.history.push({
         action: "add",
         tradeId: trade._id,
+        quantity: execution.quantity,
         amount: execution.amount,
-        positionAmount: execution.positionAmount,
         price: execution.price,
         timestamp: new Date(),
       });
 
       await position.save({ session });
     } else {
-      // Create new position
       const positionData = {
         userId,
         asset: {
@@ -64,13 +71,18 @@ class TradeHelpers {
           name: wallet.name,
         },
         amountInvested: execution.amount,
+        quantity: execution.quantity, // ✅ Add quantity
+        averageEntryPrice: execution.price, // ✅ Add average entry price
         performance: {
           currentValue: execution.positionAmount,
-          totalReturn: 0,
-          totalReturnPercent: 0,
+          totalReturn: trade.extra || 0, // Include extra if present
+          totalReturnPercent:
+            execution.amount > 0
+              ? ((trade.extra || 0) / execution.amount) * 100
+              : 0,
           todayReturn: 0,
           todayReturnPercent: 0,
-          extra: 0,
+          extra: trade.extra || 0,
         },
         status: "open",
         fullname: fullname,
@@ -80,8 +92,8 @@ class TradeHelpers {
           {
             action: "create",
             tradeId: trade._id,
+            quantity: execution.quantity,
             amount: execution.amount,
-            positionAmount: execution.positionAmount,
             price: execution.price,
             timestamp: new Date(),
           },
@@ -122,26 +134,41 @@ class TradeHelpers {
 
     const closeRatio = percentToClose / 100;
 
-    // Calculate trade's contribution to position
-    const tradeRatioToPosition = execution.amount / position.amountInvested;
+    // Calculate using quantity instead of amount
+    const quantityToClose = execution.quantity * closeRatio;
+    const tradeRatioToPosition = execution.quantity / position.quantity;
+    const positionQuantityToClose =
+      position.quantity * closeRatio * tradeRatioToPosition;
     const positionPrincipalToClose =
       position.amountInvested * closeRatio * tradeRatioToPosition;
     const positionValueToClose =
       position.performance.currentValue * closeRatio * tradeRatioToPosition;
+    const positionExtraToClose =
+      (position.performance.extra || 0) * closeRatio * tradeRatioToClose;
     const positionProfitToClose =
       position.performance.totalReturn * closeRatio * tradeRatioToPosition;
 
+    const remainingPositionQuantity =
+      position.quantity - positionQuantityToClose;
     const remainingPositionPrincipal =
       position.amountInvested - positionPrincipalToClose;
     const remainingPositionValue =
       position.performance.currentValue - positionValueToClose;
+    const remainingPositionExtra =
+      (position.performance.extra || 0) - positionExtraToClose;
     const remainingPositionProfit =
-      position.performance.totalReturn - positionProfitToClose;
+      remainingPositionValue +
+      remainingPositionExtra -
+      remainingPositionPrincipal;
 
-    if (percentToClose === 100 && Math.abs(remainingPositionPrincipal) < 0.01) {
+    if (
+      percentToClose === 100 &&
+      Math.abs(remainingPositionQuantity) < 0.000001
+    ) {
       // Full close of position
       position.status = "closed";
       position.performance.currentValue = 0;
+      position.performance.extra = 0;
       position.performance.totalReturn = position.performance.totalReturn;
       position.closedAt = new Date();
       position.closeReason = "trade_closed";
@@ -152,18 +179,24 @@ class TradeHelpers {
       position.partialCloses.push({
         tradeId: trade._id,
         percentClosed: percentToClose * tradeRatioToPosition,
+        quantityClosed: positionQuantityToClose,
         principalClosed: positionPrincipalToClose,
         profitLossClosed: positionProfitToClose,
+        extraClosed: positionExtraToClose,
         valueClosed: positionValueToClose,
         closedAt: new Date(),
         exitPrice: currentPrice,
+        remainingQuantity: remainingPositionQuantity,
         remainingPrincipal: remainingPositionPrincipal,
         remainingProfitLoss: remainingPositionProfit,
+        remainingExtra: remainingPositionExtra,
         remainingValue: remainingPositionValue,
       });
 
+      position.quantity = remainingPositionQuantity;
       position.amountInvested = remainingPositionPrincipal;
       position.performance.currentValue = remainingPositionValue;
+      position.performance.extra = remainingPositionExtra;
       position.performance.totalReturn = remainingPositionProfit;
       position.performance.totalReturnPercent =
         (remainingPositionProfit / remainingPositionPrincipal) * 100;
@@ -174,6 +207,7 @@ class TradeHelpers {
     position.tradeClosures.push({
       tradeId: trade._id,
       percentClosed: percentToClose,
+      quantityClosed: positionQuantityToClose,
       principalClosed: positionPrincipalToClose,
       profitLossClosed: positionProfitToClose,
       closedAt: new Date(),
