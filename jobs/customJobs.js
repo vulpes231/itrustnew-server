@@ -812,9 +812,12 @@ const updatePositionsPerformance = async () => {
       return;
     }
 
+    // Get unique asset symbols
     const assetSymbols = [
       ...new Set(openPositions.map((p) => p.asset.symbol.toUpperCase())),
     ];
+
+    console.log(`Fetching prices for ${assetSymbols.length} assets...`);
 
     let currentAssets;
     try {
@@ -824,6 +827,7 @@ const updatePositionsPerformance = async () => {
       return;
     }
 
+    // Create price map
     const assetPriceMap = new Map();
     for (const asset of currentAssets) {
       if (asset?.symbol && asset?.priceData?.current) {
@@ -832,27 +836,49 @@ const updatePositionsPerformance = async () => {
     }
 
     const positionUpdates = [];
+
     for (const position of openPositions) {
       const currentPrice = assetPriceMap.get(
         position.asset.symbol.toUpperCase(),
       );
-      if (!currentPrice) continue;
+      if (!currentPrice) {
+        console.warn(`No price found for ${position.asset.symbol}`);
+        continue;
+      }
 
-      const avgEntryPrice =
-        position.amountInvested /
-        (position.performance.currentValue / position.performance.currentValue);
-      const currentValue =
-        position.amountInvested *
-        (currentPrice /
-          (position.performance.currentValue / position.amountInvested));
+      // SIMPLE AND CORRECT CALCULATION:
+      // Current value = quantity × current price
+      const currentValue = position.quantity * currentPrice;
+
+      // Total return = current value - amount invested
       const totalReturn = currentValue - position.amountInvested;
-      const totalReturnPercent = (totalReturn / position.amountInvested) * 100;
 
-      const todayReturn =
-        currentValue - (position.performance.currentValue || currentValue);
-      const todayReturnPercent = position.performance.currentValue
-        ? (todayReturn / position.performance.currentValue) * 100
-        : 0;
+      // Total return percent = (total return / amount invested) × 100
+      const totalReturnPercent =
+        position.amountInvested > 0
+          ? (totalReturn / position.amountInvested) * 100
+          : 0;
+
+      // Today's return = current value - previous current value
+      const previousCurrentValue =
+        position.performance?.currentValue || currentValue;
+      const todayReturn = currentValue - previousCurrentValue;
+      const todayReturnPercent =
+        previousCurrentValue > 0
+          ? (todayReturn / previousCurrentValue) * 100
+          : 0;
+
+      // Debug logging for first few positions
+      if (positionUpdates.length < 3) {
+        console.log(`Position ${position.asset.symbol}:`, {
+          quantity: position.quantity,
+          currentPrice,
+          currentValue: currentValue.toFixed(2),
+          amountInvested: position.amountInvested,
+          totalReturn: totalReturn.toFixed(2),
+          totalReturnPercent: totalReturnPercent.toFixed(2),
+        });
+      }
 
       positionUpdates.push({
         updateOne: {
@@ -868,6 +894,7 @@ const updatePositionsPerformance = async () => {
               "performance.todayReturnPercent": parseFloat(
                 todayReturnPercent.toFixed(4),
               ),
+              "performance.currentPrice": currentPrice,
               updatedAt: new Date(),
             },
           },
@@ -887,7 +914,9 @@ const updatePositionsPerformance = async () => {
     }
 
     const duration = Date.now() - startTime;
-    console.log(`Position performance update completed in ${duration}ms.`);
+    console.log(
+      `Position performance update completed in ${duration}ms. Updated ${positionUpdates.length} positions.`,
+    );
   } catch (error) {
     console.error("Error in updatePositionsPerformance:", error);
     throw error;

@@ -185,11 +185,16 @@ class PositionService {
   }
 
   async updatePositionPerformance(position, currentPrice) {
+    // SIMPLE AND CORRECT: Use quantity × current price
     const currentValue = position.quantity * currentPrice;
     const totalReturn = currentValue - position.amountInvested;
-    const totalReturnPercent = (totalReturn / position.amountInvested) * 100;
+    const totalReturnPercent =
+      position.amountInvested > 0
+        ? (totalReturn / position.amountInvested) * 100
+        : 0;
 
-    const previousValue = position.performance.currentValue || currentValue;
+    // Calculate today's return
+    const previousValue = position.performance?.currentValue || currentValue;
     const todayReturn = currentValue - previousValue;
     const todayReturnPercent =
       previousValue > 0 ? (todayReturn / previousValue) * 100 : 0;
@@ -199,6 +204,7 @@ class PositionService {
     position.performance.totalReturnPercent = totalReturnPercent;
     position.performance.todayReturn = todayReturn;
     position.performance.todayReturnPercent = todayReturnPercent;
+    position.performance.currentPrice = currentPrice;
 
     await position.save();
     return position;
@@ -237,33 +243,54 @@ class PositionService {
     };
 
     for (const position of positions) {
-      summary.totalInvested += position.amountInvested;
-      summary.totalCurrentValue += position.performance.currentValue;
-      summary.totalReturn += position.performance.totalReturn;
-      summary.totalQuantity += position.quantity;
+      // Use the stored performance values (already calculated correctly)
+      const currentValue = position.performance?.currentValue || 0;
+      const amountInvested = position.amountInvested || 0;
+      const totalReturn = currentValue - amountInvested;
+
+      summary.totalInvested += amountInvested;
+      summary.totalCurrentValue += currentValue;
+      summary.totalReturn += totalReturn;
+      summary.totalQuantity += position.quantity || 0;
+
+      // Calculate current price safely
+      const currentPrice =
+        position.quantity > 0 ? currentValue / position.quantity : 0;
 
       summary.positions.push({
         asset: position.asset,
         quantity: position.quantity,
-        averageEntryPrice: position.averageEntryPrice,
-        amountInvested: position.amountInvested,
-        currentValue: position.performance.currentValue,
-        currentPrice: position.performance.currentValue / position.quantity,
-        return: position.performance.totalReturn,
-        returnPercent: position.performance.totalReturnPercent,
-        todayReturn: position.performance.todayReturn,
-        todayReturnPercent: position.performance.todayReturnPercent,
+        averageEntryPrice:
+          position.averageEntryPrice ||
+          amountInvested / (position.quantity || 1),
+        amountInvested: amountInvested,
+        currentValue: currentValue,
+        currentPrice: currentPrice,
+        return: totalReturn,
+        returnPercent:
+          amountInvested > 0 ? (totalReturn / amountInvested) * 100 : 0,
+        todayReturn: position.performance?.todayReturn || 0,
+        todayReturnPercent: position.performance?.todayReturnPercent || 0,
       });
     }
 
+    // Calculate overall totals
     if (summary.totalInvested > 0) {
       summary.totalReturnPercent =
         (summary.totalReturn / summary.totalInvested) * 100;
     }
 
+    // Debug log
+    console.log("Position Summary:", {
+      totalInvested: summary.totalInvested,
+      totalCurrentValue: summary.totalCurrentValue,
+      totalReturn: summary.totalReturn,
+      totalReturnPercent: summary.totalReturnPercent,
+      positionCount: summary.positions.length,
+    });
+
     return summary;
   }
-
   async getUserPositionByAsset(userId, assetId, walletId) {
     const position = await Position.findOne({
       userId,

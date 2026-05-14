@@ -8,8 +8,8 @@ const {
   getUserChartData,
 } = require("../../handlers/user/portfolioController");
 
+router.get("/:timeframe", getUserChartData);
 router.get("/current-value", getUserPortfolioValue);
 router.post("/record-deposit", recordFundDeposit);
-router.get("/:timeframe", getUserChartData);
 
 module.exports = router;

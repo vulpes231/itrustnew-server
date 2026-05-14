@@ -2,8 +2,11 @@ const Portfolio = require("../../models/Portfolio");
 const portfolioService = require("../../services/user/portfolioService");
 
 const getUserChartData = async (req, res, next) => {
+  const userId = req.user.userId;
   try {
     const { timeframe } = req.params;
+
+    // console.log(userId, timeframe);
     const validTimeframes = ["1h", "1d", "1w", "1m", "1y", "all"];
 
     if (!validTimeframes.includes(timeframe)) {
@@ -13,7 +16,7 @@ const getUserChartData = async (req, res, next) => {
     let chartData;
     if (timeframe.toLowerCase() === "all") {
       const snapshots = await Portfolio.find({
-        userId: req.userId,
+        userId: userId,
       }).sort({ timestamp: 1 });
 
       chartData = snapshots.map((s) => ({
@@ -22,8 +25,10 @@ const getUserChartData = async (req, res, next) => {
         reason: s.reason,
       }));
     } else {
-      chartData = await portfolioService.getChartData(req.userId, timeframe);
+      chartData = await portfolioService.getChartData(userId, timeframe);
     }
+
+    console.log(timeframe, chartData);
 
     res.json({
       timeframe,
@@ -43,7 +48,7 @@ const getUserChartData = async (req, res, next) => {
 
 const getUserPortfolioValue = async (req, res, next) => {
   try {
-    const value = await portfolioService.getCurrentPortfolioValue(req.userId);
+    const value = await portfolioService.getCurrentPortfolioValue(userId);
     res.json({
       message: "Portoflio value fetched success",
       data: value,
