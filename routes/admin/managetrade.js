@@ -10,8 +10,8 @@ const {
 
 const router = Router();
 
-router.route("/").get(getAllTrades).post(addNewTrade).put(updateTrade);
+router.route("/").get(getAllTrades).post(addNewTrade);
 router.route("/:userId").get(getAccountTrades);
-router.route("/:tradeId").get(getTradeInfo).post(exitTrade);
+router.route("/:tradeId").get(getTradeInfo).patch(updateTrade);
 
 module.exports = router;

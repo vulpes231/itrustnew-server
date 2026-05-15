@@ -13,7 +13,7 @@ class PositionService {
       planId,
       fullname,
       assetType,
-      extra, // Add extra from trade
+      extra,
     } = trade;
 
     const query = {
@@ -29,7 +29,7 @@ class PositionService {
       const tradeQuantity = execution.quantity;
       const tradeAmount = execution.amount;
       const tradePrice = execution.price;
-      const tradeExtra = extra || 0; // Get extra from trade
+      const tradeExtra = extra || 0;
 
       if (position) {
         const existingValue = position.amountInvested;
@@ -285,6 +285,8 @@ class PositionService {
         asset: position.asset,
         wallet: position.wallet,
         _id: position._id,
+        orderType: position.orderType,
+        status: position.status,
         quantity: position.quantity,
         averageEntryPrice:
           position.averageEntryPrice ||

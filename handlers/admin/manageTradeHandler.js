@@ -27,48 +27,6 @@ const addNewTrade = async (req, res, next) => {
   }
 };
 
-const exitTrade = async (req, res, next) => {
-  const { tradeId } = req.params;
-  const { amount, notifyUser } = req.body;
-
-  try {
-    const result = await tradeService.closeTrade({
-      tradeId,
-      percentToClose: amount || 100,
-    });
-
-    const user = await User.findById(result.trade.userId).lean();
-    if (!user) {
-      throw new CustomError("User not found!", 400);
-    }
-
-    const userEmail = user.contactInfo.email;
-
-    if (result.success && notifyUser) {
-      await queueService.sendToQueue("email_queue", {
-        type: "TRADE_EMAIL",
-        to: userEmail,
-        templateData: {
-          trade: result.trade,
-          closedPortion: result.closedPortion,
-          isPartialClose: result.closedPortion.percentClosed !== 100,
-        },
-      });
-    }
-
-    res.status(200).json({
-      message:
-        result.closedPortion.percentClosed === 100
-          ? "Trade closed successfully."
-          : `${result.closedPortion.percentClosed}% of trade closed successfully.`,
-      data: result,
-      success: true,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 const updateTrade = async (req, res, next) => {
   const tradeData = req.body;
   const { tradeId } = req.params;
@@ -140,7 +98,7 @@ const getAccountTrades = async (req, res, next) => {
 module.exports = {
   getAllTrades,
   getTradeInfo,
-  exitTrade,
+
   updateTrade,
   addNewTrade,
   getAccountTrades,

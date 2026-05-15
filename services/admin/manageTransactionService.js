@@ -5,6 +5,7 @@ const { CustomError } = require("../../utils/utils");
 const { fetchTransactionInfo } = require("../user/transactionService");
 
 const portfolioService = require("../user/portfolioService");
+const { default: mongoose } = require("mongoose");
 
 async function fetchAllTransactions(queryData) {
   const {
@@ -42,20 +43,36 @@ async function fetchAllTransactions(queryData) {
 
 async function editTransaction(transactionId, action) {
   if (!transactionId || !action) {
-    throw new CustomError("Bad request!", 400);
+    throw new CustomError(
+      "Bad request! Transaction ID and action are required.",
+      400,
+    );
   }
 
-  const session = await Transaction.startSession();
-  session.startTransaction();
+  if (!["approve", "reject"].includes(action)) {
+    throw new CustomError(
+      "Invalid action! Must be 'approve' or 'reject'.",
+      400,
+    );
+  }
+
+  const session = await mongoose.startSession();
 
   try {
+    session.startTransaction();
+
     const transaction =
       await Transaction.findById(transactionId).session(session);
     if (!transaction) {
       throw new CustomError("Transaction not found!", 404);
     }
+
     if (transaction.status === "processed") {
-      throw new CustomError("Action already completed!", 404);
+      throw new CustomError("Transaction already processed!", 400);
+    }
+
+    if (transaction.status === "failed") {
+      throw new CustomError("Transaction already failed/rejected!", 400);
     }
 
     const transactionWallet = await Wallet.findOne({
@@ -68,8 +85,24 @@ async function editTransaction(transactionId, action) {
     }
 
     if (action === "approve") {
-      transactionWallet.balance.available += transaction.amount;
-      transactionWallet.balance.total += transaction.amount;
+      if (
+        transaction.type === "withdrawal" &&
+        transactionWallet.balance.available < transaction.amount
+      ) {
+        throw new CustomError(
+          "Insufficient funds in wallet to approve withdrawal!",
+          400,
+        );
+      }
+
+      if (transaction.type === "deposit") {
+        transactionWallet.balance.available += transaction.amount;
+        transactionWallet.balance.total += transaction.amount;
+      } else if (transaction.type === "withdrawal") {
+        transactionWallet.balance.available -= transaction.amount;
+        transactionWallet.balance.total -= transaction.amount;
+      }
+
       await transactionWallet.save({ session });
 
       transaction.status = "processed";
@@ -90,38 +123,44 @@ async function editTransaction(transactionId, action) {
           await portfolioService.updatePortfolioValue(
             transaction.userId,
             transaction.amount,
-            "deposit",
+            "withdrawal",
             {
               transactionId: transaction._id,
               paymentMethod: transaction.method.mode,
             },
           );
+
           await PortfolioTracker.updatePortfolioValue(
             transaction.userId,
             -transaction.amount,
             {
               transactionId: transaction._id,
             },
+            session,
           );
         }
       } catch (trackerError) {
-        console.error("PortfolioTracker error:", trackerError.message);
+        console.error("Portfolio service error:", trackerError.message);
       }
     } else if (action === "reject") {
       transaction.status = "failed";
       await transaction.save({ session });
-    } else {
-      throw new CustomError("Invalid action!", 400);
     }
 
     await session.commitTransaction();
-    session.endSession();
-
     return transaction;
   } catch (error) {
     await session.abortTransaction();
+
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(
+      error.message || "Failed to process transaction action!",
+      500,
+    );
+  } finally {
     session.endSession();
-    throw new CustomError(error.message, 500);
   }
 }
 
@@ -154,17 +193,29 @@ async function updateTransactionStatus({ formData }) {
 async function createTransaction(transactionData) {
   const { method, amount, accountId, memo, network, userId, type } =
     transactionData;
-  if (!amount || !method || !accountId || !userId)
-    throw new CustomError("Bad request!", 400);
-  try {
-    const user = await User.findById(userId);
-    if (!user) throw new CustomError("Invalid credentials!", 404);
 
-    const wallets = await Wallet.find({ userId });
-    if (wallets.length < 1) {
-      throw new CustomError("Contact support for more info!", {
-        statusCode: 404,
-      });
+  // Validation
+  if (!amount || !method || !accountId || !userId || !type) {
+    throw new CustomError("Missing required fields!", 400);
+  }
+
+  if (!["deposit", "withdrawal"].includes(type)) {
+    throw new CustomError("Invalid transaction type!", 400);
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    session.startTransaction();
+
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      throw new CustomError("User not found!", 404);
+    }
+
+    const wallets = await Wallet.find({ userId }).session(session);
+    if (wallets.length === 0) {
+      throw new CustomError("No wallets found for this user!", 404);
     }
 
     const receiver = wallets.find(
@@ -174,30 +225,89 @@ async function createTransaction(transactionData) {
       throw new CustomError("Invalid wallet!", 400);
     }
 
+    if (
+      type === "withdrawal" &&
+      receiver.balance.available < parseFloat(amount)
+    ) {
+      throw new CustomError("Insufficient funds!", 400);
+    }
+
     const customMemo = `${method} ${type} to ${receiver.name}`;
 
-    const trnx = await Transaction.create({
-      method: {
-        mode: method,
-        network: network,
-      },
-      amount: amount,
-      account: receiver.name,
-      memo: memo || customMemo,
-      type: type,
-      userId: userId,
-      email: user.contactInfo.email,
-      fullname: user.fullName,
-      status: "processed",
-    });
+    const trnx = await Transaction.create(
+      [
+        {
+          method: {
+            mode: method,
+            network: network || null,
+          },
+          amount: parseFloat(amount),
+          account: receiver.name,
+          memo: memo || customMemo,
+          type: type,
+          userId: userId,
+          email: user.contactInfo.email,
+          fullname: user.fullName,
+          status: "processed",
+        },
+      ],
+      { session },
+    );
 
-    receiver.balance.total = parseFloat(amount);
-    receiver.balance.available = parseFloat(amount);
-    await receiver.save();
+    const transaction = trnx[0];
 
-    return trnx;
+    if (type === "deposit") {
+      receiver.balance.total += parseFloat(amount);
+      receiver.balance.available += parseFloat(amount);
+    } else {
+      receiver.balance.total -= parseFloat(amount);
+      receiver.balance.available -= parseFloat(amount);
+    }
+
+    await receiver.save({ session });
+
+    if (type === "deposit") {
+      await portfolioService.updatePortfolioValue(
+        transaction.userId,
+        parseFloat(amount),
+        "deposit",
+        {
+          transactionId: transaction._id,
+          paymentMethod: transaction.method.mode,
+        },
+      );
+    } else if (type === "withdrawal") {
+      await portfolioService.updatePortfolioValue(
+        transaction.userId,
+        parseFloat(transaction.amount),
+        "withdrawal",
+        {
+          transactionId: transaction._id,
+          paymentMethod: transaction.method.mode,
+        },
+      );
+
+      await PortfolioTracker.updatePortfolioValue(
+        transaction.userId,
+        -parseFloat(transaction.amount),
+        {
+          transactionId: transaction._id,
+        },
+      );
+    }
+
+    await session.commitTransaction();
+
+    return transaction;
   } catch (error) {
-    throw new CustomError(error.message, 500);
+    await session.abortTransaction();
+
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message || "Transaction failed!", 500);
+  } finally {
+    session.endSession();
   }
 }
 

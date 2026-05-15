@@ -34,6 +34,7 @@ class TradeService {
       exit,
       interval,
       extra,
+      customDate,
     } = tradeData;
 
     if (!userId || !assetId || !walletId || !amount || !orderType) {
@@ -112,6 +113,7 @@ class TradeService {
           entryPoint: entry || null,
           exitPoint: exit || null,
         },
+        customDate: customDate,
         performance: {
           currentValue: positionAmount,
           currentPrice: currentPrice,
@@ -154,10 +156,6 @@ class TradeService {
         trade: trade,
         position: position,
         email: user.contactInfo.email,
-        wallet: {
-          availableBalance: wallet.balance.available,
-          totalBalance: wallet.balance.total,
-        },
       };
     } catch (error) {
       await session.abortTransaction();
@@ -167,7 +165,7 @@ class TradeService {
   }
 
   async closePosition(formData) {
-    const { positionId, amount, percentToClose } = formData;
+    const { positionId, amount } = formData;
 
     if (!positionId) {
       throw new CustomError("Invalid position! positionId is required", 400);
@@ -179,6 +177,7 @@ class TradeService {
 
     let closeRatio;
     let closePercentage;
+    let closeAmount;
 
     if (amount) {
       closeAmount = parseFloat(amount);
@@ -350,12 +349,11 @@ class TradeService {
         },
         status: "closed",
         closedAt: new Date(),
-        closeReason: isAdmin ? "admin_close" : "user_sell",
+        closeReason: "admin_close",
         extra: extraToClose,
         fullname: position.fullname,
         positionId: position._id,
         closedTradesIds: closedTrades.map((t) => t._id),
-        ...(isAdmin && { closedBy: "admin" }),
       };
 
       const sellTrade = await Trade.create([sellTradeRecord], { session });
@@ -393,7 +391,6 @@ class TradeService {
           tradeAmount: totalProfitLoss,
           quantity: quantityToClose,
           pricePerUnit: currentPrice,
-          isAdmin: isAdmin,
         })
         .catch((err) => console.error("Portfolio update failed:", err));
 
@@ -405,6 +402,7 @@ class TradeService {
         sellTrade: sellTrade[0],
       };
     } catch (error) {
+      console.log(error);
       await session.abortTransaction();
       session.endSession();
       throw new CustomError(error.message, 500);
@@ -417,14 +415,18 @@ class TradeService {
     return trade;
   }
 
-  async editTrade(tradeId) {
+  async editTrade(formData) {
+    const { tradeId, customDate } = formData;
     const trade = await Trade.findById(tradeId);
     if (!trade) throw new CustomError("Trade not found!", 404);
+
+    trade.customDate = customDate;
+    await trade.save();
     return trade;
   }
 
   async getAllTrades(filters = {}) {
-    const { status, assetType, limit = 50, skip = 0, page } = filters;
+    const { status, assetType, limit = 15, skip = 0, page } = filters;
     const query = {};
 
     if (status) query.status = status;
@@ -435,14 +437,14 @@ class TradeService {
       .limit(limit)
       .skip(skip);
 
-    const total = await Trade.countDocuments(query);
+    const totalTrades = await Asset.countDocuments(query);
+    const totalPages = Math.ceil(totalTrades / limit);
 
     return {
       trades,
-      totalItems: total,
+      totalItems: totalTrades,
       totalPages,
       currentPage: page,
-      hasMore: skip + limit < total,
     };
   }
 
