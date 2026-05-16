@@ -30,14 +30,14 @@ async function addSavingsAccount(userId, accountId) {
     const userCountryId = user.contactInfo.country.countryId;
 
     const canOpenAccount = acct.eligibleCountries.find(
-      (countryId) => countryId.toString() === userCountryId.toString()
+      (countryId) => countryId.toString() === userCountryId.toString(),
     );
 
     if (!canOpenAccount)
       throw new CustomError("Account not available in your location!", 400);
 
     const acctExistsInUserSavings = user.savingsAccounts.find(
-      (userAcct) => userAcct.accountId.toString() === acct._id.toString()
+      (userAcct) => userAcct.accountId.toString() === acct._id.toString(),
     );
 
     if (acctExistsInUserSavings)
@@ -50,7 +50,20 @@ async function addSavingsAccount(userId, accountId) {
       title: acct.title,
       rate: acct.interestRate,
       canTrade: acct.canTrade,
-      tag: acct.category,
+      tag: acct.tag,
+      apy: acct.yearlyAPY,
+      slug: acct.slug,
+      designTag: acct.designTag,
+      jointMax: acct.jointMaxSelection,
+      depositLimit: {
+        min: acct.contributionLimits.min,
+        max: acct.contributionLimits.max,
+      },
+      withdrawLimit: {
+        min: acct.withdrawalLimits.min,
+        max: acct.withdrawalLimits.max,
+      },
+
       analytics: {
         totalReturn: 0,
         dailyChange: 0,
@@ -84,7 +97,7 @@ async function fetchUserSavingsAccount(userId) {
   } catch (error) {
     throw new CustomError(
       "Failed to get user savings accounts. Try again",
-      500
+      500,
     );
   }
 }
@@ -135,14 +148,14 @@ async function fundSavings(userId, fundData) {
     }
 
     const wallet = await Wallet.findOne({ name: "cash", userId }).session(
-      session
+      session,
     );
     if (!wallet) {
       throw new CustomError("Invalid wallet selected!", 404);
     }
 
     const accountIndex = user.savingsAccounts.findIndex(
-      (acct) => acct.accountId.toString() === accountId
+      (acct) => acct.accountId.toString() === accountId,
     );
 
     if (accountIndex === -1) {
@@ -186,7 +199,7 @@ async function fundSavings(userId, fundData) {
           fullname: user.fullName,
         },
       ],
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -231,14 +244,14 @@ async function withdrawSavings(userId, withdrawData) {
     }
 
     const wallet = await Wallet.findOne({ _id: walletId, userId }).session(
-      session
+      session,
     );
     if (!wallet) {
       throw new CustomError("Invalid wallet selected!", 404);
     }
 
     const accountIndex = user.savingsAccounts.findIndex(
-      (acct) => acct.accountId.toString() === accountId
+      (acct) => acct.accountId.toString() === accountId,
     );
 
     if (accountIndex === -1) {
@@ -282,7 +295,7 @@ async function withdrawSavings(userId, withdrawData) {
           fullname: user.fullName,
         },
       ],
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -307,10 +320,10 @@ async function fetchSavingsAnalytics(userId) {
     const userSavingsAccount = user.savingsAccounts || [];
 
     const retirementAccts = userSavingsAccount.filter(
-      (acct) => acct.tag === "retirement"
+      (acct) => acct.tag === "retirement",
     );
     const savingsAccts = userSavingsAccount.filter(
-      (acct) => acct.tag === "savings"
+      (acct) => acct.tag === "savings",
     );
 
     const saveBal = savingsAccts.reduce((total, value) => {
@@ -337,6 +350,45 @@ async function fetchSavingsAnalytics(userId) {
   }
 }
 
+async function deleteUserSavingAccount(formData) {
+  const { userId, accountId } = formData;
+
+  if (!userId || !accountId) {
+    throw new CustomError("userId and accountId are required", 400);
+  }
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw new CustomError("User not found!", 404);
+
+    const accountExists = user.savingsAccounts.some(
+      (acct) => acct._id.toString() === accountId,
+    );
+
+    if (!accountExists) {
+      throw new CustomError("Account not found!", 404);
+    }
+
+    const newAccounts = user.savingsAccounts.filter(
+      (acct) => acct._id.toString() !== accountId.toString(),
+    );
+
+    user.savingsAccounts = newAccounts;
+    await user.save();
+
+    return user.savingsAccounts;
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(
+      error.message || "Failed to delete account",
+      error.statusCode || 500,
+    );
+  }
+}
+
 module.exports = {
   fetchAvailableSavings,
   fetchSavingsAnalytics,
@@ -345,4 +397,5 @@ module.exports = {
   addSavingsAccount,
   fundSavings,
   withdrawSavings,
+  deleteUserSavingAccount,
 };

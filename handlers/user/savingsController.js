@@ -5,6 +5,7 @@ const {
   fundSavings,
   withdrawSavings,
   fetchSavingsAnalytics,
+  deleteUserSavingAccount,
 } = require("../../services/user/savingsService");
 
 const getSavingsAccounts = async (req, res, next) => {
@@ -107,6 +108,21 @@ const getSavingAnalytics = async (req, res, next) => {
   }
 };
 
+const removeUserSavingsAccounts = async (req, res, next) => {
+  const { userId } = req.user;
+  const { accountId } = req.params;
+  try {
+    const accounts = await deleteUserSavingAccount({ userId, accountId });
+    res.status(200).json({
+      message: "Savings account deleted successfully",
+      data: accounts,
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   cashoutSavings,
   contributeSavings,
@@ -114,4 +130,5 @@ module.exports = {
   getSavingsAccounts,
   createSavingsAccounts,
   getSavingAnalytics,
+  removeUserSavingsAccounts,
 };

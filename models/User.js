@@ -211,8 +211,19 @@ const userSchema = new Schema(
         name: { type: String },
         slug: { type: String },
         title: { type: String },
+        designTag: { type: String },
+        depositLimit: {
+          min: { type: Number, default: 0 },
+          max: { type: Number, default: 0 },
+        },
+        withdrawLimit: {
+          min: { type: Number, default: 0 },
+          max: { type: Number, default: 0 },
+        },
         tag: { type: String },
         rate: { type: Number },
+        apy: { type: Number },
+        jointMax: { type: Number },
         canTrade: { type: Boolean },
         accountId: { type: Schema.Types.ObjectId, ref: "Savingsaccount" },
         analytics: {
