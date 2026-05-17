@@ -177,7 +177,9 @@ async function fundSavings(userId, fundData) {
     wallet.totalBalance -= parsedAmount;
     await wallet.save({ session });
 
-    user.savingsAccounts[accountIndex].analytics.balance += parsedAmount;
+    user.savingsAccounts[accountIndex].analytics.balance.total += parsedAmount;
+    user.savingsAccounts[accountIndex].analytics.balance.available +=
+      parsedAmount;
     user.savingsAccounts[accountIndex].analytics.contributions += parsedAmount;
 
     await user.save({ session });
@@ -207,10 +209,7 @@ async function fundSavings(userId, fundData) {
     return {
       success: true,
       message: "Savings account funded successfully",
-      data: {
-        newWalletBalance: wallet.availableBalance,
-        newSavingsBalance: user.savingsAccounts[accountIndex].analytics.balance,
-      },
+      data: null,
     };
   } catch (error) {
     if (session.inTransaction()) {
