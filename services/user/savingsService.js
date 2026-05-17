@@ -327,11 +327,11 @@ async function fetchSavingsAnalytics(userId) {
     );
 
     const saveBal = savingsAccts.reduce((total, value) => {
-      return total + (value.analytics?.balance || 0);
+      return total + (value.analytics?.balance?.available || 0);
     }, 0);
 
     const retireBal = retirementAccts.reduce((total, value) => {
-      return total + (value.analytics?.balance || 0);
+      return total + (value.analytics?.balance?.available || 0);
     }, 0);
 
     const analytics = {
