@@ -197,7 +197,7 @@ async function fundSavings(userId, fundData) {
           memo: memo || `Cash contribution to ${account.name}`,
           amount: parsedAmount,
           status: "processed",
-          email: user.credentials.email,
+          email: user.contactInfo.email,
           fullname: user.fullName,
         },
       ],
