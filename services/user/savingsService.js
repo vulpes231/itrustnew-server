@@ -147,7 +147,7 @@ async function fundSavings(userId, fundData) {
       throw new CustomError("Invalid credentials!", 401);
     }
 
-    const wallet = await Wallet.findOne({ name: "cash", userId }).session(
+    const wallet = await Wallet.findOne({ slug: "cash", userId }).session(
       session,
     );
     if (!wallet) {
