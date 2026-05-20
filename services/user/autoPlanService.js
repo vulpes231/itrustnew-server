@@ -1,5 +1,6 @@
 const Autoplan = require("../../models/Autoplan");
 const User = require("../../models/User");
+const Wallet = require("../../models/Wallet");
 const { CustomError, getDurationInMs } = require("../../utils/utils");
 
 async function fetchPlans(queryData) {
@@ -34,8 +35,9 @@ async function fetchPlanById(planId) {
   }
 }
 
-async function activatePlan(planId, userId) {
-  if (!planId || !userId) throw new CustomError("Bad request!", 400);
+async function activatePlan(formData) {
+  const { planId, userId, amount } = formData;
+  if (!planId || !userId || !amount) throw new CustomError("Bad request!", 400);
   try {
     const plan = await Autoplan.findById(planId);
     if (!plan) throw new CustomError("Plan not found!", 404);
@@ -43,11 +45,17 @@ async function activatePlan(planId, userId) {
     const user = await User.findById(userId);
     if (!user) throw new CustomError("User not found!", 404);
 
+    const wallet = await Wallet.findOne({ userId, slug: "auto" });
+    if (!wallet) throw new CustomError("User not found!", 404);
+
+    if (wallet.balance.available < parseFloat(amount))
+      throw new CustomError("Insufficient funds!", 400);
+
     const startDate = Date.now();
 
     const durationMs = getDurationInMs(
       plan.expiresIn.milestone,
-      plan.expiresIn.duration
+      plan.expiresIn.duration,
     );
 
     const endDate = startDate + durationMs;
@@ -69,10 +77,14 @@ async function activatePlan(planId, userId) {
         expectedReturn: plan.performance.expectedReturnPercent,
         winRate: plan.performance.winRate,
       },
+      balance: {
+        total: amount,
+        available: amount,
+      },
     };
 
     const planExists = user.activePlans.find(
-      (p) => p.planId.toString() === planId.toString()
+      (p) => p.planId.toString() === planId.toString(),
     );
 
     if (planExists) throw new CustomError("Plan already exists!", 409);

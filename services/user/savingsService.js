@@ -169,12 +169,12 @@ async function fundSavings(userId, fundData) {
       throw new CustomError("Invalid amount!", 400);
     }
 
-    if (wallet.availableBalance < parsedAmount) {
+    if (wallet.balance.available < parsedAmount) {
       throw new CustomError("Insufficient funds!", 400);
     }
 
-    wallet.availableBalance -= parsedAmount;
-    wallet.totalBalance -= parsedAmount;
+    wallet.balance.available -= parsedAmount;
+    wallet.balance.total -= parsedAmount;
     await wallet.save({ session });
 
     user.savingsAccounts[accountIndex].analytics.balance.total += parsedAmount;
@@ -242,13 +242,12 @@ async function withdrawSavings(userId, withdrawData) {
       throw new CustomError("Invalid credentials!", 404);
     }
 
-    const wallet = await Wallet.findOne({ _id: walletId, userId }).session(
+    const wallet = await Wallet.findOne({ slug: "cash", userId }).session(
       session,
     );
     if (!wallet) {
-      throw new CustomError("Invalid wallet selected!", 404);
+      throw new CustomError("Wallet not found!", 404);
     }
-
     const accountIndex = user.savingsAccounts.findIndex(
       (acct) => acct.accountId.toString() === accountId,
     );
@@ -264,7 +263,7 @@ async function withdrawSavings(userId, withdrawData) {
       throw new CustomError("Invalid amount!", 400);
     }
 
-    if (account.analytics.balance < parsedAmount) {
+    if (account.analytics.balance.available < parsedAmount) {
       throw new CustomError("Insufficient funds!", 400);
     }
 
@@ -273,8 +272,8 @@ async function withdrawSavings(userId, withdrawData) {
 
     await user.save({ session });
 
-    wallet.availableBalance += parsedAmount;
-    wallet.totalBalance += parsedAmount;
+    wallet.balance.available += parsedAmount;
+    wallet.balance.total += parsedAmount;
 
     await wallet.save({ session });
 

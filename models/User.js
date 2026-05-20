@@ -258,6 +258,10 @@ const userSchema = new Schema(
           expectedReturn: { type: Number },
           winRate: { type: Number },
         },
+        balance: {
+          total: { type: Number, default: 0 },
+          available: { type: Number, default: 0 },
+        },
       },
     ],
     watchList: [

@@ -21,9 +21,8 @@ const getPlan = async (req, res, next) => {
 
 const startPlan = async (req, res, next) => {
   const userId = req.user.userId;
-  const { planId } = req.body;
   try {
-    await activatePlan(planId, userId);
+    await activatePlan({ ...req.body, userId });
     res.status(200).json({
       message: `plan started successfully`,
       success: true,
