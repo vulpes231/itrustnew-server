@@ -38,18 +38,30 @@ async function fetchPlanById(planId) {
 async function activatePlan(formData) {
   const { planId, userId, amount } = formData;
   if (!planId || !userId || !amount) throw new CustomError("Bad request!", 400);
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const plan = await Autoplan.findById(planId);
+    const plan = await Autoplan.findById(planId).session(session);
     if (!plan) throw new CustomError("Plan not found!", 404);
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).session(session);
     if (!user) throw new CustomError("User not found!", 404);
 
-    const wallet = await Wallet.findOne({ userId, slug: "auto" });
-    if (!wallet) throw new CustomError("User not found!", 404);
+    const wallet = await Wallet.findOne({ userId, slug: "auto" }).session(
+      session,
+    );
+    if (!wallet) throw new CustomError("Wallet not found!", 404);
 
-    if (wallet.balance.available < parseFloat(amount))
+    const parsedAmt = parseFloat(amount);
+    if (wallet.balance.available < parsedAmt)
       throw new CustomError("Insufficient funds!", 400);
+
+    wallet.balance.total -= parsedAmt;
+    wallet.balance.available -= parsedAmt;
+
+    await wallet.save({ session });
 
     const startDate = Date.now();
 
@@ -90,11 +102,17 @@ async function activatePlan(formData) {
     if (planExists) throw new CustomError("Plan already exists!", 409);
 
     user.activePlans.push(newPlanData);
+    await user.save({ session });
 
-    await user.save();
+    // Commit the transaction if all operations succeed
+    await session.commitTransaction();
+    session.endSession();
 
     return plan;
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);
   }
