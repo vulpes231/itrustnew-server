@@ -3,12 +3,14 @@ const {
   removePlan,
   editPlan,
   fetchSinglePlan,
+  editUserPlan,
 } = require("../../services/admin/managePlansService");
 const { fetchPlans } = require("../../services/user/autoPlanService");
 
 const sharp = require("sharp");
 const path = require("path");
 const { generateFileName } = require("../../utils/utils");
+const Autoplan = require("../../models/Autoplan");
 const fs = require("fs").promises;
 
 const STORAGE_PATH = path.join(__dirname, "../../storage/plans");
@@ -176,6 +178,21 @@ const deletePlan = async (req, res, next) => {
   }
 };
 
+const updateUserPlan = async (req, res, next) => {
+  const form = req.body;
+
+  try {
+    await editUserPlan(form);
+    res.status(200).json({
+      message: `Plan edited successfully`,
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const singlePlan = async (req, res, next) => {
   const { planId } = req.params;
   try {
@@ -217,4 +234,11 @@ const getMyPlans = async (req, res, next) => {
   }
 };
 
-module.exports = { createPlan, updatePlan, deletePlan, singlePlan, getMyPlans };
+module.exports = {
+  createPlan,
+  updatePlan,
+  deletePlan,
+  singlePlan,
+  getMyPlans,
+  updateUserPlan,
+};

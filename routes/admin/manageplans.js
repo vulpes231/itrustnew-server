@@ -5,6 +5,7 @@ const {
   deletePlan,
   singlePlan,
   getMyPlans,
+  updateUserPlan,
 } = require("../../handlers/admin/managePlansHandler");
 
 const multer = require("multer");
@@ -26,6 +27,11 @@ const upload = multer({
 const router = Router();
 
 router.route("/").get(getMyPlans).post(upload.single("planImg"), createPlan);
-router.route("/:planId").get(singlePlan).patch(updatePlan).delete(deletePlan);
+router.route("/user").patch(updateUserPlan);
+router
+  .route("/:planId")
+  .get(singlePlan)
+  .patch(upload.single("planImg"), updatePlan)
+  .delete(deletePlan);
 
 module.exports = router;

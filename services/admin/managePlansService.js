@@ -1,5 +1,6 @@
 const Autoplan = require("../../models/Autoplan");
 const Trade = require("../../models/Trade");
+const User = require("../../models/User");
 const { CustomError } = require("../../utils/utils");
 const fs = require("fs").promises;
 const path = require("path");
@@ -213,4 +214,49 @@ async function fetchSinglePlan(planId) {
   }
 }
 
-module.exports = { addNewPlan, editPlan, removePlan, fetchSinglePlan };
+async function editUserPlan(form) {
+  const { planId, userId, start, end } = form;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new CustomError("User not found!", 404);
+    }
+
+    const userPlan = user.activePlans.id(planId);
+
+    if (!userPlan) {
+      throw new CustomError("Plan not found!", 404);
+    }
+
+    if (start) {
+      userPlan.start = new Date(start);
+    }
+
+    if (end) {
+      userPlan.end = new Date(end);
+    }
+
+    const now = new Date();
+    if (userPlan.end && userPlan.end <= now) {
+      userPlan.status = "closed";
+    }
+
+    await user.save();
+
+    return userPlan;
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
+  }
+}
+
+module.exports = {
+  addNewPlan,
+  editPlan,
+  removePlan,
+  fetchSinglePlan,
+  editUserPlan,
+};

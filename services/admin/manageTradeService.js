@@ -89,7 +89,6 @@ class TradeService {
           throw new CustomError("Plan balance not sufficient!", 400);
         }
 
-        plan.balance.total -= marginAmount;
         plan.balance.available -= marginAmount;
         await user.save({ session });
       } else {
