@@ -84,7 +84,7 @@ const getAllTrades = async (req, res, next) => {
 const getAccountTrades = async (req, res, next) => {
   const { userId } = req.params;
   try {
-    const { trades } = await tradeService.getUserTrades({ userId });
+    const { trades } = await tradeService.getUserTrades(userId);
     res.status(200).json({
       message: "Trades fetched successfully.",
       data: trades,
@@ -95,10 +95,50 @@ const getAccountTrades = async (req, res, next) => {
   }
 };
 
+const closeSingleOrder = async (req, res, next) => {
+  const { tradeId } = req.params;
+  const { amount, notifyUser, userId } = req.body;
+
+  try {
+    const result = await tradeService.closeTradeOrder({
+      tradeId,
+      closeAmount: amount,
+    });
+
+    if (result.success && notifyUser) {
+      const user = await User.findById(userId).lean();
+      if (!user) {
+        throw new Error("User not found!", 400);
+      }
+
+      const userEmail = user.contactInfo.email;
+      await queueService.sendToQueue("email_queue", {
+        type: "TRADE_EMAIL",
+        to: userEmail,
+        templateData: {
+          trade: result.originalTrade,
+          closedPortion: result.closedAmount,
+          isPartialClose: result.isFullClose,
+        },
+      });
+    }
+
+    res.status(200).json({
+      message: result.isFullClose
+        ? "Trade closed successfully."
+        : `${result.closedAmount} of trade closed successfully.`,
+      data: result.sellTrade,
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllTrades,
   getTradeInfo,
-
+  closeSingleOrder,
   updateTrade,
   addNewTrade,
   getAccountTrades,

@@ -422,6 +422,192 @@ class TradeService {
     }
   }
 
+  async closeTradeOrder(formData) {
+    const { tradeId, closeAmount } = formData;
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      const trade = await Trade.findById(tradeId).session(session);
+      if (!trade) throw new CustomError("Trade not found!", 404);
+      if (trade.status === "closed")
+        throw new CustomError("Trade already closed!", 400);
+
+      const position = await Position.findOne({
+        tradeIds: trade._id,
+        status: "open",
+      }).session(session);
+
+      if (!position)
+        throw new CustomError("Position not found for this trade!", 404);
+
+      const asset = await Asset.findById(trade.asset.assetId).session(session);
+      if (!asset) throw new CustomError("Asset not found!", 404);
+
+      const currentPrice = asset.priceData.current;
+      const currentTradeValue =
+        trade.performance.currentValue || trade.execution.positionAmount;
+
+      let closeRatio;
+      let isFullClose = false;
+
+      if (closeAmount && closeAmount > 0) {
+        if (Math.abs(closeAmount - currentTradeValue) < 0.001) {
+          closeRatio = 1;
+          isFullClose = true;
+        } else if (closeAmount < currentTradeValue) {
+          closeRatio = closeAmount / currentTradeValue;
+          isFullClose = false;
+        } else {
+          console.warn(
+            `Close amount (${closeAmount}) exceeds trade value (${currentTradeValue}), closing fully`,
+          );
+          closeRatio = 1;
+          isFullClose = true;
+        }
+      } else {
+        closeRatio = 1;
+        isFullClose = true;
+      }
+
+      if (Math.abs(closeRatio - 1) < 0.0001) {
+        closeRatio = 1;
+        isFullClose = true;
+      }
+
+      const tradeValueToClose = currentTradeValue * closeRatio;
+      const tradeAmountToClose = trade.execution.amount * closeRatio;
+      const tradeProfitLoss = tradeValueToClose - tradeAmountToClose;
+      const quantityToClose = trade.execution.quantity * closeRatio;
+      const extraToClose = (trade.extra || 0) * closeRatio;
+
+      const wallet = await Wallet.findById(trade.wallet.id).session(session);
+      if (!wallet) throw new CustomError("Wallet not found!", 404);
+
+      wallet.balance.available += tradeValueToClose;
+      wallet.balance.total += tradeProfitLoss;
+      if (wallet.balance.available < 0) wallet.balance.available = 0;
+      if (wallet.balance.total < 0) wallet.balance.total = 0;
+      await wallet.save({ session });
+
+      if (isFullClose) {
+        trade.status = "closed";
+        trade.closedAt = new Date();
+        trade.performance.currentValue = tradeValueToClose;
+        trade.performance.totalReturn = tradeProfitLoss;
+        trade.performance.totalReturnPercent =
+          (tradeProfitLoss / trade.execution.amount) * 100;
+      } else {
+        const remainingRatio = 1 - closeRatio;
+
+        trade.execution.amount = trade.execution.amount * remainingRatio;
+        trade.execution.quantity = trade.execution.quantity * remainingRatio;
+        trade.execution.positionAmount =
+          trade.execution.positionAmount * remainingRatio;
+        trade.performance.currentValue = currentTradeValue * remainingRatio;
+        trade.performance.totalReturn =
+          (trade.performance.totalReturn || 0) * remainingRatio;
+        trade.extra = (trade.extra || 0) * remainingRatio;
+
+        if (!trade.partialCloses) trade.partialCloses = [];
+        trade.partialCloses.push({
+          percentClosed: closeRatio * 100,
+          principalClosed: tradeAmountToClose,
+          profitLossClosed: tradeProfitLoss,
+          extraClosed: extraToClose,
+          closedAt: new Date(),
+          remainingPrincipal: trade.execution.amount,
+          remainingProfitLoss: trade.performance.totalReturn,
+          priceAtClose: currentPrice,
+        });
+      }
+
+      await trade.save({ session });
+
+      const sellTradeRecord = {
+        userId: trade.userId,
+        asset: trade.asset,
+        planId: trade.planId,
+        assetType: trade.assetType,
+        orderType: "sell",
+        wallet: trade.wallet,
+        execution: {
+          price: currentPrice,
+          quantity: quantityToClose,
+          amount: tradeAmountToClose,
+          positionAmount: tradeValueToClose,
+          leverage: trade.execution.leverage || 1,
+        },
+        targets: {
+          takeProfit: null,
+          stopLoss: null,
+          entryPoint: trade.execution.price,
+          exitPoint: currentPrice,
+        },
+        performance: {
+          currentValue: tradeValueToClose,
+          totalReturn: tradeProfitLoss,
+          totalReturnPercent: (tradeProfitLoss / tradeAmountToClose) * 100,
+          todayReturn: 0,
+          todayReturnPercent: 0,
+          currentPrice: currentPrice,
+        },
+        status: "closed",
+        closedAt: new Date(),
+        closeReason: "trade_close",
+        extra: extraToClose,
+        fullname: trade.fullname,
+        positionId: position._id,
+        originalTradeId: trade._id,
+      };
+
+      const sellTrade = await Trade.create([sellTradeRecord], { session });
+
+      const updatedPosition = await positionService.updatePosition(
+        {
+          ...sellTradeRecord,
+          _id: sellTrade[0]._id,
+        },
+        session,
+      );
+
+      await session.commitTransaction();
+
+      portfolioService
+        .updatePortfolioValue(trade.userId, tradeProfitLoss, "trade_close", {
+          transactionId: sellTrade[0]._id,
+          positionId: position._id,
+          tradeId: trade._id,
+          assetSymbol: trade.asset.symbol,
+          tradeAmount: tradeProfitLoss,
+          quantity: quantityToClose,
+          pricePerUnit: currentPrice,
+          isPartialClose: !isFullClose,
+        })
+        .catch((err) => console.error("Portfolio update failed:", err));
+
+      session.endSession();
+
+      return {
+        success: true,
+        originalTrade: trade,
+        sellTrade: sellTrade[0],
+        position: updatedPosition,
+        isFullClose,
+        profitLoss: tradeProfitLoss,
+        closedAmount: tradeValueToClose,
+      };
+    } catch (error) {
+      console.error("Close trade order error:", error);
+      await session.abortTransaction();
+      session.endSession();
+      throw new CustomError(
+        error.message || "Failed to close trade",
+        error.statusCode || 500,
+      );
+    }
+  }
+
   async getTradeById(tradeId) {
     const trade = await Trade.findById(tradeId);
     if (!trade) throw new CustomError("Trade not found!", 404);
