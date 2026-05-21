@@ -73,6 +73,7 @@ async function editPlan(planData) {
     dailyReturn,
     milestone,
     duration,
+    newImg,
   } = planData;
 
   if (!planId) {
@@ -96,6 +97,9 @@ async function editPlan(planData) {
 
     if (min !== undefined && min !== "") {
       updateFields.minInvestment = parseFloat(min);
+    }
+    if (newImg !== undefined && newImg !== "") {
+      updateFields.img = newImg;
     }
 
     if (winRate !== undefined && winRate !== "") {

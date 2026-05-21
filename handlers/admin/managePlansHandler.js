@@ -78,16 +78,86 @@ const createPlan = async (req, res, next) => {
 };
 
 const updatePlan = async (req, res, next) => {
+  let savedImagePath = null;
+  let oldImagePath = null;
   const { planId } = req.params;
+
   try {
+    const existingPlan = await Autoplan.findById(planId);
+    if (!existingPlan) {
+      return res.status(404).json({
+        message: "Plan not found.",
+        success: false,
+      });
+    }
+
     const planData = { ...req.body, planId };
+
+    if (req.file) {
+      const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+      const planImg = req.file;
+
+      if (!allowedMimeTypes.includes(planImg.mimetype)) {
+        return res.status(400).json({
+          message: "Only image files are allowed.",
+          success: false,
+        });
+      }
+
+      await fs.mkdir(STORAGE_PATH, { recursive: true });
+
+      const planImageName = generateFileName(
+        planImg.originalname,
+        "planImg",
+        planData.name || existingPlan.name,
+      );
+
+      const planImgPath = path.join(STORAGE_PATH, planImageName);
+      savedImagePath = planImgPath;
+
+      await sharp(planImg.buffer)
+        .resize(800, 600, { fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toFile(planImgPath);
+
+      planData.newImg = `/storage/plans/${planImageName}`;
+
+      if (existingPlan.img) {
+        oldImagePath = path.join(process.cwd(), existingPlan.img);
+      }
+    }
+
     const plan = await editPlan(planData);
+
+    if (oldImagePath) {
+      try {
+        await fs.unlink(oldImagePath);
+        console.log(`Removed old image at ${oldImagePath}`);
+      } catch (unlinkError) {
+        console.error(
+          `Failed to remove old image at ${oldImagePath}:`,
+          unlinkError,
+        );
+      }
+    }
+
     res.status(200).json({
-      message: `plan updated successfully`,
+      message: `Plan updated successfully`,
       success: true,
       data: plan,
     });
   } catch (error) {
+    if (savedImagePath) {
+      try {
+        await fs.unlink(savedImagePath);
+        console.log(`Removed new image at ${savedImagePath} due to error`);
+      } catch (unlinkError) {
+        console.error(
+          `Failed to remove image at ${savedImagePath}:`,
+          unlinkError,
+        );
+      }
+    }
     next(error);
   }
 };
