@@ -111,4 +111,22 @@ async function editLimit(data) {
   }
 }
 
-module.exports = { createSettings, editBank, editLimit, editWallets };
+async function fetchGlobalSettings() {
+  try {
+    const settings = await WalletSetting.findOne({ name: "global" });
+    return settings;
+  } catch (error) {
+    throw new CustomError(
+      error.message || "Failed to fetch settings",
+      error.statusCode || 500,
+    );
+  }
+}
+
+module.exports = {
+  createSettings,
+  editBank,
+  editLimit,
+  editWallets,
+  fetchGlobalSettings,
+};

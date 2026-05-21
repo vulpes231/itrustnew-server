@@ -94,6 +94,7 @@ async function activatePlan(formData) {
         total: amount,
         available: amount,
       },
+      risk: plan.planType,
     };
 
     const planExists = user.activePlans.find(

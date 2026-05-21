@@ -14,6 +14,20 @@ const createSettings = async (req, res, next) => {
   }
 };
 
+const getGlobalSettingByAdmin = async (req, res, next) => {
+  const data = req.body;
+  try {
+    const settings = await adminManageSettings.fetchGlobalSettings();
+    res.status(200).json({
+      message: "Settings fetched successfully.",
+      data: settings,
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updateBank = async (req, res, next) => {
   const data = req.body;
   try {
@@ -56,4 +70,10 @@ const updateLimits = async (req, res, next) => {
   }
 };
 
-module.exports = { createSettings, updateBank, updateWallet, updateLimits };
+module.exports = {
+  createSettings,
+  updateBank,
+  updateWallet,
+  updateLimits,
+  getGlobalSettingByAdmin,
+};

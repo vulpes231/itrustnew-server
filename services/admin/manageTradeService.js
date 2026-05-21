@@ -80,8 +80,22 @@ class TradeService {
         throw new CustomError("Insufficient funds!", 400);
       }
 
-      wallet.balance.available -= marginAmount;
-      await wallet.save({ session });
+      if (wallet.slug === "auto" && planId) {
+        const plan = user.activePlans.find(
+          (plan) => plan.planId.toString() === planId,
+        );
+
+        if (plan.balance.available < marginAmount) {
+          throw new CustomError("Plan balance not sufficient!", 400);
+        }
+
+        plan.balance.total -= marginAmount;
+        plan.balance.available -= marginAmount;
+        await user.save({ session });
+      } else {
+        wallet.balance.available -= marginAmount;
+        await wallet.save({ session });
+      }
 
       const newTrade = {
         userId: userId,
