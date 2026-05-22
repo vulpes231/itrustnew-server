@@ -262,6 +262,13 @@ const userSchema = new Schema(
           total: { type: Number, default: 0 },
           available: { type: Number, default: 0 },
         },
+        performance: {
+          totalReturn: { type: Number, default: 0 },
+          totalReturnPercent: { type: Number, default: 0 },
+          dailyReturn: { type: Number, default: 0 },
+          dailyreturnPercent: { type: Number, default: 0 },
+        },
+        risk: { type: String },
       },
     ],
     watchList: [

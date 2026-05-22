@@ -104,6 +104,7 @@ async function getWalletInvestData(userId) {
     const [accounts, trades] = await Promise.all([
       Wallet.find({ userId }),
       Trade.find({ userId }),
+      // Trade.find({ userId }),
     ]);
 
     const brokerageAcct = accounts.find((acct) => acct.slug === "brokerage");
@@ -118,49 +119,41 @@ async function getWalletInvestData(userId) {
 
     const openTrades = trades.filter((trade) => trade.status === "open");
 
-    // const totalOpenProfit = openTrades.reduce(
-    //   (sum, trade) => sum + (trade.performance?.totalReturn || 0),
-    //   0,
-    // );
-    const totals = trades.reduce(
+    const totals = openTrades.reduce(
       (acc, trade) => {
         const walletId = trade.wallet.id.toString();
-        const amount = trade.execution.amount;
         const interest = trade.extra || 0;
+        const currentValue = trade.performance.currentValue || 0;
         const profitLoss = (trade.performance?.totalReturn || 0) + interest;
 
         if (walletId === brokerageId) {
-          acc.brokerage.invested += amount;
           acc.brokerage.profitLoss += profitLoss;
+          acc.brokerage.currentValue += currentValue;
         } else if (walletId === investId) {
-          acc.auto.invested += amount;
           acc.auto.profitLoss += profitLoss;
+          acc.auto.currentValue += currentValue;
         }
 
         return acc;
       },
       {
-        brokerage: { invested: 0, profitLoss: 0 },
-        auto: { invested: 0, profitLoss: 0 },
+        brokerage: { profitLoss: 0, currentValue: 0 },
+        auto: { profitLoss: 0, currentValue: 0 },
       },
     );
-
-    const totalBrokerage =
-      totals.brokerage.profitLoss + totals.brokerage.invested;
-    const totalAuto = totals.auto.profitLoss + totals.auto.invested;
 
     return {
       brokerage: {
         totalProfitLoss: totals.brokerage.profitLoss,
-        totalInvested: totalBrokerage,
+        totalInvested: totals.brokerage.currentValue,
       },
       auto: {
         totalProfitLoss: totals.auto.profitLoss,
-        totalInvested: totalAuto,
+        totalInvested: totals.auto.currentValue,
       },
       default: {
         totalProfitLoss: totals.auto.profitLoss + totals.brokerage.profitLoss,
-        totalInvested: totalBrokerage + totalAuto,
+        totalInvested: totals.brokerage.currentValue + totals.auto.currentValue,
       },
     };
   } catch (error) {

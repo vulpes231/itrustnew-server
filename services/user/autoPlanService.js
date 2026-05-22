@@ -59,7 +59,7 @@ async function activatePlan(formData) {
     if (wallet.balance.available < parsedAmt)
       throw new CustomError("Insufficient funds!", 400);
 
-    wallet.balance.total -= parsedAmt;
+    // wallet.balance.total -= parsedAmt;
     wallet.balance.available -= parsedAmt;
 
     await wallet.save({ session });
@@ -94,6 +94,12 @@ async function activatePlan(formData) {
         total: amount,
         available: amount,
       },
+      performance: {
+        totalReturn: 0,
+        totalReturnPercent: 0,
+        dailyReturn: 0,
+        dailyreturnPercent: 0,
+      },
       risk: plan.planType,
     };
 
@@ -106,7 +112,6 @@ async function activatePlan(formData) {
     user.activePlans.push(newPlanData);
     await user.save({ session });
 
-    // Commit the transaction if all operations succeed
     await session.commitTransaction();
     session.endSession();
 

@@ -123,27 +123,13 @@ async function sendWelcomeMessage(email, username) {
   }
 }
 
-async function sendDepositAlert(email, amount, paymentMethod, currency) {
-  const paymentMethodDetails = {
-    btc: { name: "Bitcoin", icon: "🟠" },
-    eth: { name: "Ethereum", icon: "🔷" },
-    usdt: { name: "USDT", icon: "💲" },
-    bank: { name: "Bank Transfer", icon: "🏦" },
-  };
+async function sendDepositAlert(email, transaction, currency) {
+  const method = transaction?.method?.mode;
+  const symbol = currency?.sign;
+  const currencyName = currency?.symbol?.toUpperCase();
+  const amount = transaction?.amount;
 
-  const currencySymbols = {
-    usd: "$",
-    eur: "€",
-    gbp: "£",
-  };
-
-  const symbol = currencySymbols[currency.toLowerCase()] || currency;
-  const method = paymentMethodDetails[paymentMethod.toLowerCase()] || {
-    name: paymentMethod,
-    icon: "",
-  };
-
-  const subject = `Deposit Successful - ${symbol}${amount} ${currency.toUpperCase()} Received`;
+  const subject = `Deposit Successful - ${symbol}${amount} ${currencyName} Received`;
 
   const message = `
     <!DOCTYPE html>
@@ -174,9 +160,9 @@ async function sendDepositAlert(email, amount, paymentMethod, currency) {
         
         <div class="highlight-box">
             <p style="font-size: 18px; margin: 0;">
-                <span class="method-icon">${method.icon}</span>
-                <strong>${symbol}${amount} ${currency.toUpperCase()}</strong> via ${
-                  method.name
+              
+                <strong>${symbol}${amount} ${currencyName}</strong> via ${
+                  method
                 }
             </p>
         </div>
@@ -185,8 +171,8 @@ async function sendDepositAlert(email, amount, paymentMethod, currency) {
         
         <p><strong>Transaction Details:</strong></p>
         <ul>
-            <li>Amount: ${symbol}${amount} ${currency.toUpperCase()}</li>
-            <li>Payment Method: ${method.name} ${method.icon}</li>
+            <li>Amount: ${symbol}${amount} ${currencyName}</li>
+            <li>Payment Method: ${method}</li>
             <li>Status: Completed</li>
             <li>Date: ${new Date().toLocaleString()}</li>
         </ul>
@@ -211,9 +197,68 @@ async function sendDepositAlert(email, amount, paymentMethod, currency) {
   }
 }
 
-async function sendWithdrawalAlert(email, amount, paymentMethod, currency) {
-  const subject = "Withdrawal completed.";
-  const message = ``;
+async function sendWithdrawalAlert(email, transaction, currency) {
+  const method = transaction?.method?.mode;
+  const symbol = currency?.sign;
+  const currencyName = currency?.symbol?.toUpperCase();
+  const amount = transaction?.amount;
+
+  const subject = `Withdrawal Successful - ${symbol}${amount} ${currencyName} Received`;
+
+  const message = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .logo { max-height: 50px; }
+            .highlight-box { 
+                background-color: #f8f9fa; 
+                border-left: 4px solid #28a745;
+                padding: 15px;
+                margin: 20px 0;
+            }
+            .method-icon { font-size: 24px; margin-right: 10px; vertical-align: middle; }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <img src="https://www.itrustinvestments.com/logo.png" alt="iTrust Investments" class="logo">
+        </div>
+        
+        <h2 style="color: #2c3e50;">Withdrawal Processed</h2>
+        
+        <p>Hello,</p>
+        
+        <div class="highlight-box">
+            <p style="font-size: 18px; margin: 0;">
+              
+                <strong>${symbol}${amount} ${currencyName}</strong> via ${
+                  method
+                }
+            </p>
+        </div>
+        
+        <p>Your withdrawal request has been successfully processed.</p>
+        
+        <p><strong>Transaction Details:</strong></p>
+        <ul>
+            <li>Amount: ${symbol}${amount} ${currencyName}</li>
+            <li>Payment Method: ${method}</li>
+            <li>Status: Processed</li>
+            <li>Date: ${new Date().toLocaleString()}</li>
+        </ul>
+        
+        <div style="margin-top: 40px; font-size: 12px; color: #7f8c8d;">
+            <p>If you didn't initiate this deposit, please contact our <a href="https://www.itrustinvestments.com/support">security team</a> immediately.</p>
+            <p>© ${new Date().getFullYear()} iTrust Investments. All rights reserved.</p>
+        </div>
+    </body>
+    </html>
+    `;
+
   try {
     await sendMail(email, subject, message);
   } catch (error) {

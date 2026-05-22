@@ -1,12 +1,11 @@
 const User = require("../../models/User");
 const managePositionService = require("../../services/admin/managePositionService");
-const tradeService = require("../../services/admin/manageTradeService");
 const queueService = require("../../services/queueService");
 
 const getAllPositions = async (req, res, next) => {
   try {
     const positions = await managePositionService.fetchAllPositions();
-    // console.log(positions);
+
     res
       .status(200)
       .json({ message: "Fetched positions", data: positions, success: true });
@@ -19,18 +18,17 @@ const getPositionInfo = async (req, res, next) => {
   const { positionId } = req.params;
   try {
     const position = await managePositionService.fetchPositionInfo(positionId);
-    // console.log(positions);
-    res
-      .status(200)
-      .json({
-        message: "Fetched position info",
-        data: position,
-        success: true,
-      });
+
+    res.status(200).json({
+      message: "Fetched position info",
+      data: position,
+      success: true,
+    });
   } catch (error) {
     next(error);
   }
 };
+
 const editPositionInfo = async (req, res, next) => {
   const { positionId } = req.params;
   const { customDate, extra } = req.body;
@@ -40,14 +38,12 @@ const editPositionInfo = async (req, res, next) => {
       customDate,
       extra,
     });
-    // console.log(positions);
-    res
-      .status(200)
-      .json({
-        message: "Updated position info",
-        data: position,
-        success: true,
-      });
+
+    res.status(200).json({
+      message: "Updated position info",
+      data: position,
+      success: true,
+    });
   } catch (error) {
     next(error);
   }
@@ -57,7 +53,7 @@ const removePositionInfo = async (req, res, next) => {
   const { positionId } = req.params;
   try {
     const isDeleted = await managePositionService.deletePosition(positionId);
-    // console.log(positions);
+
     res
       .status(200)
       .json({ message: "Position delete success", data: null, success: true });
@@ -72,7 +68,7 @@ const exitTrade = async (req, res, next) => {
   console.log("processing");
 
   try {
-    const result = await tradeService.closePosition({
+    const result = await managePositionService.closePosition({
       positionId,
       amount,
     });

@@ -58,12 +58,12 @@ const deposit = async (req, res, next) => {
       proof = `/storage/deposits/${filename}`;
     }
 
-    await addFunds(userId, { ...trnxData, proof });
+    const result = await addFunds(userId, { ...trnxData, proof });
 
     res.status(200).json({
       message: "Deposit initiated.",
       success: true,
-      data: null,
+      data: result.transaction,
     });
   } catch (error) {
     next(error);

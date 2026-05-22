@@ -140,7 +140,25 @@ async function buyAsset(userId, assetData) {
 
     const trade = await Trade.create([tradeData], { session });
 
-    await positionService.updatePosition(trade[0], session);
+    const buyTradeForPosition = {
+      _id: trade[0]._id,
+      userId: trade[0].userId,
+      asset: trade[0].asset,
+      orderType: "buy",
+      execution: {
+        quantity: trade[0].execution.quantity,
+        amount: trade[0].execution.amount,
+        positionAmount: trade[0].execution.positionAmount,
+        price: currentPrice,
+      },
+      wallet: trade[0].wallet,
+      planId: trade[0].planId,
+      fullname: trade[0].fullname,
+      assetType: trade[0].assetType,
+      extra: trade[0].extra,
+    };
+
+    await positionService.updatePosition(buyTradeForPosition, session);
 
     await session.commitTransaction();
 
@@ -157,10 +175,15 @@ async function buyAsset(userId, assetData) {
       },
     );
 
+    const userInfo = {
+      sendTradeAlert: user.mailing.orderNotification,
+      email: user.contactInfo.email,
+    };
+
     return {
-      assetName: trade[0].asset.name,
-      assetQty: trade[0].execution.quantity,
-      tradeId: trade[0]._id,
+      success: true,
+      trade: trade[0],
+      user: userInfo,
     };
   } catch (error) {
     await session.abortTransaction();
@@ -194,6 +217,10 @@ async function sellAsset(formData) {
     const position = await Position.findById(positionId).session(session);
     if (!position) {
       throw new CustomError("Position not found", 404);
+    }
+    const user = await User.findById(userId).session(session);
+    if (!user) {
+      throw new CustomError("User not found", 404);
     }
 
     if (position.userId.toString() !== userId) {
@@ -404,10 +431,15 @@ async function sellAsset(formData) {
 
     session.endSession();
 
+    const userInfo = {
+      sendTradeAlert: user.mailing.orderNotification,
+      email: user.contactInfo.email,
+    };
+
     return {
       success: true,
-      position: updatedPosition,
       sellTrade: sellTrade[0],
+      user: userInfo,
     };
   } catch (error) {
     console.log(error);

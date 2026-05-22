@@ -5,6 +5,7 @@ const {
   createTransaction,
   updateTransactionStatus,
 } = require("../../services/admin/manageTransactionService");
+const queueService = require("../../services/queueService");
 
 const getTransactionData = async (req, res, next) => {
   const { transactionId } = req.params;
@@ -68,9 +69,42 @@ const updateTransaction = async (req, res, next) => {
   const { transactionId } = req.params;
   const { action } = req.body;
 
-  console.log(action, transactionId);
   try {
-    await editTransaction(transactionId, action);
+    const result = await editTransaction(transactionId, action);
+
+    if (
+      result.success &&
+      result.userInfo.sendAlert &&
+      result.transaction.type === "deposit"
+    ) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "DEPOSIT_EMAIL",
+          to: result.userInfo.email,
+          templateData: {
+            transaction: result.transaction,
+            currency: result.userInfo.currency,
+          },
+        })
+        .catch((err) => console.error("Failed to send deposit email:", err));
+    }
+
+    if (
+      result.success &&
+      result.userInfo.sendAlert &&
+      result.transaction.type === "withdraw"
+    ) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "WITHDRAW_EMAIL",
+          to: result.userInfo.email,
+          templateData: {
+            transaction: result.transaction,
+            currency: result.userInfo.currency,
+          },
+        })
+        .catch((err) => console.error("Failed to send withdrawal email:", err));
+    }
     res.status(200).json({
       data: null,
       success: true,

@@ -67,6 +67,11 @@ async function editTransaction(transactionId, action) {
       throw new CustomError("Transaction not found!", 404);
     }
 
+    const user = await User.findById(transaction.userId).session(session);
+    if (!user) {
+      throw new CustomError("User not found!", 404);
+    }
+
     if (transaction.status === "processed") {
       throw new CustomError("Transaction already processed!", 400);
     }
@@ -148,7 +153,16 @@ async function editTransaction(transactionId, action) {
     }
 
     await session.commitTransaction();
-    return transaction;
+
+    return {
+      transaction,
+      success: true,
+      userInfo: {
+        sendAlert: user.mailing.emailNotification,
+        email: user.contactInfo.email,
+        currency: user.currency,
+      },
+    };
   } catch (error) {
     await session.abortTransaction();
 

@@ -58,8 +58,14 @@ class EmailWorkerService {
           case "DEPOSIT_EMAIL":
             await emailService.sendDepositAlert(
               emailData.to,
-              emailData.templateData.amount,
-              emailData.templateData.paymentMethod,
+              emailData.templateData.transaction,
+              emailData.templateData.currency,
+            );
+            break;
+          case "WITHDRAW_EMAIL":
+            await emailService.sendWithdrawalAlert(
+              emailData.to,
+              emailData.templateData.transaction,
               emailData.templateData.currency,
             );
             break;

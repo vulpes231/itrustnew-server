@@ -46,7 +46,8 @@ async function addFunds(userId, trnxData) {
       proof: proof || null,
       meta: meta,
     });
-    return trnx;
+
+    return { transaction: trnx, success: true };
   } catch (error) {
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);

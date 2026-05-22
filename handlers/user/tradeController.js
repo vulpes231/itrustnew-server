@@ -10,9 +10,21 @@ const openPosition = async (req, res, next) => {
   const userId = req.user.userId;
   try {
     const assetData = req.body;
-    const { assetName, assetQty } = await buyAsset(userId, assetData);
+    const result = await buyAsset(userId, assetData);
+
+    if (result.success && result.user.sendTradeAlert) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "TRADE_EMAIL",
+          to: result.user.email,
+          templateData: {
+            trade: result.trade,
+          },
+        })
+        .catch((err) => console.error("Failed to send trade email:", err));
+    }
     res.status(201).json({
-      message: `${assetName} position opened`,
+      message: `${result.trade.asset.name} position opened`,
       success: true,
       data: null,
     });
@@ -25,11 +37,23 @@ const closePosition = async (req, res, next) => {
   const userId = req.user.userId;
   const { positionId, amount } = req.body;
   try {
-    const { trade, success, wallet } = await sellAsset({
+    const result = await sellAsset({
       userId,
       positionId,
       amount,
     });
+
+    if (result.success && result.user.sendTradeAlert) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "TRADE_EMAIL",
+          to: result.user.email,
+          templateData: {
+            trade: result.sellTrade,
+          },
+        })
+        .catch((err) => console.error("Failed to send trade email:", err));
+    }
     res.status(200).json({
       message: `Trade position closed succesfully`,
       success: true,
