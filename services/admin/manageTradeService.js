@@ -624,6 +624,13 @@ class TradeService {
     return trade;
   }
 
+  async deleteTradeOrder(tradeId) {
+    const deletedTrade = await Trade.findByIdAndDelete(tradeId);
+    if (!deletedTrade) throw new CustomError("Trade not found!", 404);
+
+    return true;
+  }
+
   async getAllTrades(filters = {}) {
     const { status, assetType, limit = 15, skip = 0, page } = filters;
     const query = {};

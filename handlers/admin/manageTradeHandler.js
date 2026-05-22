@@ -135,6 +135,21 @@ const closeSingleOrder = async (req, res, next) => {
   }
 };
 
+const deleteTrade = async (req, res, next) => {
+  const { tradeId } = req.params;
+
+  try {
+    const isDeleted = await tradeService.deleteTradeOrder(tradeId);
+    res.status(200).json({
+      message: "Trade deleted successfully.",
+      data: null,
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllTrades,
   getTradeInfo,
@@ -142,4 +157,5 @@ module.exports = {
   updateTrade,
   addNewTrade,
   getAccountTrades,
+  deleteTrade,
 };

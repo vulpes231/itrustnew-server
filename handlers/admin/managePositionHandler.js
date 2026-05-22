@@ -9,19 +9,58 @@ const getAllPositions = async (req, res, next) => {
     // console.log(positions);
     res
       .status(200)
-      .json({ message: "fetched positions", data: positions, success: true });
+      .json({ message: "Fetched positions", data: positions, success: true });
   } catch (error) {
     next(error);
   }
 };
 
 const getPositionInfo = async (req, res, next) => {
+  const { positionId } = req.params;
   try {
-    const positions = await managePositionService.fetchAllPositions();
+    const position = await managePositionService.fetchPositionInfo(positionId);
     // console.log(positions);
     res
       .status(200)
-      .json({ message: "fetched positions", data: positions, success: true });
+      .json({
+        message: "Fetched position info",
+        data: position,
+        success: true,
+      });
+  } catch (error) {
+    next(error);
+  }
+};
+const editPositionInfo = async (req, res, next) => {
+  const { positionId } = req.params;
+  const { customDate, extra } = req.body;
+  try {
+    const position = await managePositionService.editPositionData({
+      positionId,
+      customDate,
+      extra,
+    });
+    // console.log(positions);
+    res
+      .status(200)
+      .json({
+        message: "Updated position info",
+        data: position,
+        success: true,
+      });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const removePositionInfo = async (req, res, next) => {
+  const { positionId } = req.params;
+  try {
+    const isDeleted = await managePositionService.deletePosition(positionId);
+    // console.log(positions);
+    res
+      .status(200)
+      .json({ message: "Position delete success", data: null, success: true });
   } catch (error) {
     next(error);
   }
@@ -69,4 +108,10 @@ const exitTrade = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllPositions, exitTrade, getPositionInfo };
+module.exports = {
+  getAllPositions,
+  exitTrade,
+  getPositionInfo,
+  editPositionInfo,
+  removePositionInfo,
+};

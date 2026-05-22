@@ -6,6 +6,7 @@ const {
   getTradeInfo,
   getAccountTrades,
   closeSingleOrder,
+  deleteTrade,
 } = require("../../handlers/admin/manageTradeHandler");
 
 const router = Router();
@@ -16,6 +17,7 @@ router
   .route("/:tradeId")
   .get(getTradeInfo)
   .patch(updateTrade)
-  .post(closeSingleOrder);
+  .post(closeSingleOrder)
+  .delete(deleteTrade);
 
 module.exports = router;
