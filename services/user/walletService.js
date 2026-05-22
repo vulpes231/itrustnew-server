@@ -1,3 +1,4 @@
+const Position = require("../../models/Position");
 const Trade = require("../../models/Trade");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
@@ -101,10 +102,10 @@ async function getUserFinancialSummary(userId) {
 
 async function getWalletInvestData(userId) {
   try {
-    const [accounts, trades] = await Promise.all([
+    const [accounts, trades, positions] = await Promise.all([
       Wallet.find({ userId }),
       Trade.find({ userId }),
-      // Trade.find({ userId }),
+      Position.find({ userId }),
     ]);
 
     const brokerageAcct = accounts.find((acct) => acct.slug === "brokerage");
@@ -117,12 +118,12 @@ async function getWalletInvestData(userId) {
     const brokerageId = brokerageAcct._id.toString();
     const investId = investAcct._id.toString();
 
-    const openTrades = trades.filter((trade) => trade.status === "open");
+    const openTrades = positions.filter((trade) => trade.status === "open");
 
     const totals = openTrades.reduce(
       (acc, trade) => {
         const walletId = trade.wallet.id.toString();
-        const interest = trade.extra || 0;
+        const interest = trade.performance.extra || 0;
         const currentValue = trade.performance.currentValue || 0;
         const profitLoss = (trade.performance?.totalReturn || 0) + interest;
 
