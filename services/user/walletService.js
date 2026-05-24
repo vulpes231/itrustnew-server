@@ -102,7 +102,7 @@ async function getUserFinancialSummary(userId) {
 
 async function getWalletInvestData(userId) {
   try {
-    const [accounts, trades, positions] = await Promise.all([
+    const [accounts, positions] = await Promise.all([
       Wallet.find({ userId }),
       Trade.find({ userId }),
       Position.find({ userId }),
@@ -119,6 +119,8 @@ async function getWalletInvestData(userId) {
     const investId = investAcct._id.toString();
 
     const openTrades = positions.filter((trade) => trade.status === "open");
+
+    console.log(openTrades);
 
     const totals = openTrades.reduce(
       (acc, trade) => {
