@@ -31,12 +31,11 @@ const getPositionInfo = async (req, res, next) => {
 
 const editPositionInfo = async (req, res, next) => {
   const { positionId } = req.params;
-  const { customDate, extra } = req.body;
+
   try {
     const position = await managePositionService.editPositionData({
+      ...req.body,
       positionId,
-      customDate,
-      extra,
     });
 
     res.status(200).json({

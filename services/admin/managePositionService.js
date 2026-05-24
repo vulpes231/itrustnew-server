@@ -269,43 +269,68 @@ class ManagePositionService {
   async editPositionData(positionData) {
     const { positionId, customDate, extra } = positionData;
 
+    // console.log(positionData);
+
     if (!positionId) throw new CustomError("Position ID required!", 400);
 
-    const position = await Position.findById(positionId);
-    if (!position) throw new CustomError("Position not found!", 404);
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (customDate) position.customDate = customDate;
+    try {
+      const position = await Position.findById(positionId).session(session);
+      if (!position) throw new CustomError("Position not found!", 404);
 
-    if (extra !== undefined) {
-      const trades = await Trade.find({ _id: { $in: position.tradeIds } });
+      if (customDate !== undefined) {
+        position.customDate = customDate;
+      }
 
-      if (trades.length === 0) {
-        position.performance.extra = extra;
-      } else {
-        const totalInvested = trades.reduce(
-          (sum, trade) => sum + trade.amount,
-          0,
-        );
+      if (extra !== undefined && extra !== null && extra !== "") {
+        const parsedExtra = parseFloat(extra);
 
-        if (totalInvested === 0) {
-          trades.forEach((trade) => {
-            trade.extra = extra / trades.length;
-          });
-        } else {
-          trades.forEach((trade) => {
-            const proportion = trade.amount / totalInvested;
-            trade.extra = extra * proportion;
-          });
+        if (isNaN(parsedExtra)) {
+          throw new CustomError("Extra P&L must be a valid number", 400);
         }
 
-        await Promise.all(trades.map((trade) => trade.save()));
+        const trades = await Trade.find({
+          _id: { $in: position.tradeIds },
+        }).session(session);
 
-        position.performance.extra = extra;
+        if (trades.length === 0) {
+          position.performance.extra = parsedExtra;
+        } else {
+          const totalInvested = trades.reduce(
+            (sum, trade) => sum + (trade.amount || 0),
+            0,
+          );
+
+          if (totalInvested === 0) {
+            trades.forEach((trade) => {
+              trade.extra = parsedExtra / trades.length;
+            });
+          } else {
+            trades.forEach((trade) => {
+              const proportion = (trade.amount || 0) / totalInvested;
+              trade.extra = parsedExtra * proportion;
+            });
+          }
+
+          await Promise.all(trades.map((trade) => trade.save({ session })));
+
+          position.performance.extra = parsedExtra;
+        }
       }
-    }
 
-    await position.save();
-    return position;
+      await position.save({ session });
+
+      await session.commitTransaction();
+
+      return position;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   }
 
   async deletePosition(positionId) {

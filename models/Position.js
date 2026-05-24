@@ -29,6 +29,7 @@ const positionSchema = new Schema(
       enum: ["buy", "sell"],
       required: true,
     },
+    customDate: { type: Date },
     wallet: {
       id: { type: Schema.Types.ObjectId, ref: "Wallet" },
       name: { type: String },

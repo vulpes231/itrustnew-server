@@ -120,7 +120,7 @@ async function getWalletInvestData(userId) {
 
     const openTrades = positions.filter((trade) => trade.status === "open");
 
-    console.log(openTrades);
+    // console.log(openTrades);
 
     const totals = openTrades.reduce(
       (acc, trade) => {
