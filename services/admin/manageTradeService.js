@@ -1,5 +1,5 @@
 // trade.service.js
-const mongoose = require("mongoose");
+const { default: mongoose } = require("mongoose");
 const Trade = require("../../models/Trade");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
@@ -400,10 +400,32 @@ class TradeService {
   }
 
   async deleteTradeOrder(tradeId) {
-    const deletedTrade = await Trade.findByIdAndDelete(tradeId);
-    if (!deletedTrade) throw new CustomError("Trade not found!", 404);
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    return true;
+    try {
+      const trade = await Trade.findById(tradeId).session(session);
+      if (!trade) throw new CustomError("Trade not found!", 404);
+
+      const tradeAcct = await Wallet.findById(trade.wallet.id).session(session);
+      if (!tradeAcct) throw new CustomError("Wallet not found!", 404);
+
+      tradeAcct.balance.available += trade.execution.amount;
+      await tradeAcct.save({ session });
+
+      const deletedTrade =
+        await Trade.findByIdAndDelete(tradeId).session(session);
+      if (!deletedTrade) throw new CustomError("Trade not found!", 404);
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return true;
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
+    }
   }
 
   async getAllTrades(filters = {}) {

@@ -59,11 +59,6 @@ async function activatePlan(formData) {
     if (wallet.balance.available < parsedAmt)
       throw new CustomError("Insufficient funds!", 400);
 
-    // wallet.balance.total -= parsedAmt;
-    wallet.balance.available -= parsedAmt;
-
-    await wallet.save({ session });
-
     const startDate = Date.now();
 
     const durationMs = getDurationInMs(
@@ -125,4 +120,31 @@ async function activatePlan(formData) {
   }
 }
 
-module.exports = { fetchPlanById, fetchPlans, activatePlan };
+async function getUserPlanInvestment(userId) {
+  if (!userId) throw new CustomError("Bad request!", 400);
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw new CustomError("User not found!", 404);
+
+    const userPlans = user.activePlans;
+
+    const activePlans = userPlans.filter((plan) => plan.status === "active");
+
+    const totalInvested = activePlans.reduce(
+      (sum, plan) => sum + (plan.analytics.balance.total || 0),
+      0,
+    );
+    return totalInvested;
+  } catch (error) {
+    if (error instanceof CustomError) throw error;
+    throw new CustomError("Failed to fetch plan total", error.statusCode);
+  }
+}
+
+module.exports = {
+  fetchPlanById,
+  fetchPlans,
+  activatePlan,
+  getUserPlanInvestment,
+};

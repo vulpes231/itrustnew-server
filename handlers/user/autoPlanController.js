@@ -2,6 +2,7 @@ const {
   fetchPlanById,
   fetchPlans,
   activatePlan,
+  getUserPlanInvestment,
 } = require("../../services/user/autoPlanService");
 
 const getPlan = async (req, res, next) => {
@@ -13,6 +14,20 @@ const getPlan = async (req, res, next) => {
       success: true,
       data: plan,
       formattedDuration: plan.formattedDuration,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAutoTotalInvested = async (req, res, next) => {
+  const { userId } = req.user;
+  try {
+    const total = await getUserPlanInvestment(userId);
+    res.status(200).json({
+      message: `plan total fetched successfully`,
+      success: true,
+      data: total,
     });
   } catch (error) {
     next(error);
@@ -59,4 +74,4 @@ const getAllPlans = async (req, res, next) => {
   }
 };
 
-module.exports = { getAllPlans, getPlan, startPlan };
+module.exports = { getAllPlans, getPlan, startPlan, getAutoTotalInvested };

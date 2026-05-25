@@ -1,5 +1,7 @@
 const Position = require("../../models/Position");
 const Trade = require("../../models/Trade");
+const Transaction = require("../../models/Transaction");
+const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 
@@ -20,10 +22,18 @@ async function getUserFinancialSummary(userId) {
       throw new CustomError("User ID is required", 400);
     }
 
-    const [wallets, userTrades] = await Promise.all([
+    const [wallets, userTrades, user, transactions] = await Promise.all([
       Wallet.find({ userId }),
       Trade.find({ userId }),
+      User.findById(userId),
+      Transaction.find({ userId }),
     ]);
+
+    if (!user) {
+      throw new CustomError("User not found", 404);
+    }
+
+    const userSavingsAccounts = user.savingsAccounts;
 
     if (wallets.length === 0 && userTrades.length === 0) {
       return {
@@ -35,6 +45,7 @@ async function getUserFinancialSummary(userId) {
         totalInvested: 0,
         totalProfit: 0,
         cashBalance: 0,
+        totalSavings: 0,
       };
     }
 
@@ -44,6 +55,26 @@ async function getUserFinancialSummary(userId) {
       (sum, wallet) => sum + (wallet.balance.total || 0),
       0,
     );
+
+    const savingsTransactions = transactions.filter(
+      (trx) => trx.type === "savings",
+    );
+
+    const totalSavingsDeposit = savingsTransactions.reduce(
+      (sum, trx) => sum + (trx.amount || 0),
+      0,
+    );
+
+    const totalSavingsBalance = userSavingsAccounts.reduce(
+      (sum, acct) => sum + (acct.analytics.balance.total || 0),
+      0,
+    );
+
+    const availableSavingsBalance = userSavingsAccounts.reduce(
+      (sum, acct) => sum + (acct.analytics.balance.available || 0),
+      0,
+    );
+
     const availableBalance = wallets.reduce(
       (sum, wallet) => sum + (wallet.balance.available || 0),
       0,
@@ -82,14 +113,15 @@ async function getUserFinancialSummary(userId) {
     const totalAccountBalance = totalBalance + totalProfit;
 
     return {
-      totalBalance: totalAccountBalance,
-      availableBalance,
+      totalBalance: totalAccountBalance + totalSavingsBalance,
+      availableBalance: availableBalance + availableSavingsBalance,
       dailyProfit,
       dailyProfitPercent: Number(dailyProfitPercent.toFixed(2)),
       totalProfit,
       totalProfitPercent: Number(totalProfitPercent.toFixed(2)),
       totalInvested,
       cashBalance,
+      totalSavings: totalSavingsDeposit,
       assetsOwned: openTrades.length,
     };
   } catch (error) {

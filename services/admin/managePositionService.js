@@ -334,14 +334,53 @@ class ManagePositionService {
   }
 
   async deletePosition(positionId) {
-    const deletedPosition = await Position.findByIdAndDelete(positionId);
-    if (!deletedPosition) throw new CustomError("Position not found!", 404);
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (deletedPosition.tradeIds && deletedPosition.tradeIds.length > 0) {
-      await Trade.deleteMany({ _id: { $in: deletedPosition.tradeIds } });
+    try {
+      const position = await Position.findById(positionId).session(session);
+      if (!position) throw new CustomError("Position not found!", 404);
+
+      const trades = await Trade.find({
+        _id: { $in: position.tradeIds },
+      }).session(session);
+
+      if (trades.length === 0) {
+        const deletedPosition =
+          await Position.findByIdAndDelete(positionId).session(session);
+        if (!deletedPosition) throw new CustomError("Position not found!", 404);
+
+        await session.commitTransaction();
+        session.endSession();
+        return true;
+      }
+
+      const wallet = await Wallet.findById(position.wallet.id).session(session);
+      if (!wallet) throw new CustomError("Wallet not found!", 404);
+
+      for (const trade of trades) {
+        wallet.balance.available += trade.execution.amount;
+      }
+
+      await wallet.save({ session });
+
+      const deletedPosition =
+        await Position.findByIdAndDelete(positionId).session(session);
+      if (!deletedPosition) throw new CustomError("Position not found!", 404);
+
+      await Trade.deleteMany({
+        _id: { $in: deletedPosition.tradeIds },
+      }).session(session);
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return true;
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      throw error;
     }
-
-    return true;
   }
 }
 
