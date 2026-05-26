@@ -22,12 +22,14 @@ async function getUserFinancialSummary(userId) {
       throw new CustomError("User ID is required", 400);
     }
 
-    const [wallets, userTrades, user, transactions] = await Promise.all([
-      Wallet.find({ userId }),
-      Trade.find({ userId }),
-      User.findById(userId),
-      Transaction.find({ userId }),
-    ]);
+    const [wallets, userTrades, positions, user, transactions] =
+      await Promise.all([
+        Wallet.find({ userId }),
+        Trade.find({ userId }),
+        Position.find({ userId }),
+        User.findById(userId),
+        Transaction.find({ userId }),
+      ]);
 
     if (!user) {
       throw new CustomError("User not found", 404);
@@ -103,14 +105,14 @@ async function getUserFinancialSummary(userId) {
 
     const cashBalance = cash.balance.available;
 
-    const openTrades = userTrades.filter((trade) => trade.status === "open");
+    const openTrades = positions.filter((trade) => trade.status === "open");
 
     const totalOpenProfit = openTrades.reduce(
       (sum, trade) => sum + (trade.performance?.totalReturn || 0),
       0,
     );
 
-    const totalAccountBalance = totalBalance + totalProfit;
+    const totalAccountBalance = totalBalance + totalProfit + totalOpenProfit;
 
     return {
       totalBalance: totalAccountBalance + totalSavingsBalance,
