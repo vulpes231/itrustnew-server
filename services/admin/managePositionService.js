@@ -6,6 +6,7 @@ const Wallet = require("../../models/Wallet");
 const Asset = require("../../models/Asset");
 const Trade = require("../../models/Trade");
 const positionService = require("../user/positionService");
+const User = require("../../models/User");
 
 class ManagePositionService {
   async fetchAllPositions() {
@@ -355,13 +356,25 @@ class ManagePositionService {
         return true;
       }
 
-      const wallet = await Wallet.findById(position.wallet.id).session(session);
+      const [user, wallet] = await Promise.all([
+        await User.findById(position.userId).session(session),
+        await Wallet.findById(position.wallet.id).session(session),
+      ]);
+      if (!user) throw new CustomError("User not found!", 404);
       if (!wallet) throw new CustomError("Wallet not found!", 404);
 
+      const userPlans = user.activePlans;
+
       for (const trade of trades) {
-        wallet.balance.available += trade.execution.amount;
+        if (trade.planId) {
+          const plan = userPlans.find((pl) => pl.planId === trade.planId);
+          plan.balance.available += trade.execution.amount;
+        } else {
+          wallet.balance.available += trade.execution.amount;
+        }
       }
 
+      await user.save({ session });
       await wallet.save({ session });
 
       const deletedPosition =

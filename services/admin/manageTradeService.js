@@ -407,10 +407,24 @@ class TradeService {
       const trade = await Trade.findById(tradeId).session(session);
       if (!trade) throw new CustomError("Trade not found!", 404);
 
-      const tradeAcct = await Wallet.findById(trade.wallet.id).session(session);
+      const [user, tradeAcct] = await Promise.all([
+        await User.findById(trade.userId).session(session),
+        await Wallet.findById(trade.wallet.id).session(session),
+      ]);
+
+      if (!user) throw new CustomError("User not found!", 404);
       if (!tradeAcct) throw new CustomError("Wallet not found!", 404);
 
-      tradeAcct.balance.available += trade.execution.amount;
+      const userPlans = user.activePlans;
+
+      if (trade.planId) {
+        const plan = userPlans.find((pl) => pl.planId === trade.planId);
+        plan.balance.available += trade.execution.amount;
+      } else {
+        tradeAcct.balance.available += trade.execution.amount;
+      }
+
+      await user.save({ session });
       await tradeAcct.save({ session });
 
       const deletedTrade =

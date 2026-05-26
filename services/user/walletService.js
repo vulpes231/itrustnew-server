@@ -136,7 +136,6 @@ async function getWalletInvestData(userId) {
   try {
     const [accounts, positions] = await Promise.all([
       Wallet.find({ userId }),
-
       Position.find({ userId }),
     ]);
 
@@ -160,7 +159,7 @@ async function getWalletInvestData(userId) {
         const extra = pos.performance?.extra || 0;
         const currentValue = pos.performance?.currentValue || 0;
 
-        const profitLoss = totalReturn + extra;
+        const profitLoss = totalReturn;
         const invested = currentValue + extra;
 
         if (walletId === brokerageId) {
