@@ -135,7 +135,7 @@ class PortfolioService {
   }
 
   async getChartData(userId, timeframe) {
-    return await PortfolioSnapshot.getFullHistory(userId, timeframe);
+    return await PortfolioSnapshot.getTimeframeData(userId, timeframe);
   }
 }
 

@@ -56,80 +56,60 @@ portfolioSchema.index({ userId: 1, timestamp: -1 });
 
 portfolioSchema.statics.getTimeframeData = async function (userId, timeframe) {
   const now = new Date();
-  let startDate = new Date();
-  let intervalFormat = {};
+  let startDate;
 
   switch (timeframe) {
     case "1h":
-      startDate.setHours(now.getHours() - 1);
-      intervalFormat = {
-        $dateToString: { format: "%Y-%m-%d %H:00:00", date: "$timestamp" },
-      };
+      startDate = new Date(now.getTime() - 60 * 60 * 1000);
       break;
+
     case "1d":
-      startDate.setDate(now.getDate() - 1);
-      intervalFormat = {
-        $dateToString: { format: "%Y-%m-%d %H:00:00", date: "$timestamp" },
-      };
+      startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       break;
+
     case "1w":
-      startDate.setDate(now.getDate() - 7);
-      intervalFormat = {
-        $dateToString: { format: "%Y-%m-%d", date: "$timestamp" },
-      };
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       break;
+
     case "1m":
-      startDate.setMonth(now.getMonth() - 1);
-      intervalFormat = {
-        $dateToString: { format: "%Y-%m-%d", date: "$timestamp" },
-      };
+      startDate = new Date(now);
+      startDate.setMonth(startDate.getMonth() - 1);
       break;
+
     case "1y":
-      startDate.setFullYear(now.getFullYear() - 1);
-      intervalFormat = {
-        $dateToString: { format: "%Y-%m", date: "$timestamp" },
-      };
+      startDate = new Date(now);
+      startDate.setFullYear(startDate.getFullYear() - 1);
       break;
+
+    case "all":
+      startDate = new Date(0);
+      break;
+
     default:
-      startDate.setDate(now.getDate() - 7);
-      intervalFormat = {
-        $dateToString: { format: "%Y-%m-%d", date: "$timestamp" },
-      };
+      throw new Error("Invalid timeframe");
   }
 
-  return this.aggregate([
-    {
-      $match: {
-        userId: userId,
-        timestamp: { $gte: startDate, $lte: now },
-      },
+  const snapshots = await this.find({
+    userId: new mongoose.Types.ObjectId(userId),
+    timestamp: {
+      $gte: startDate,
+      $lte: now,
     },
-    {
-      $group: {
-        _id: intervalFormat,
-        value: { $last: "$portfolioValue" },
-        timestamp: { $last: "$timestamp" },
-      },
-    },
-    {
-      $sort: { timestamp: 1 },
-    },
-    {
-      $project: {
-        x: "$_id",
-        y: "$value",
-        timestamp: 1,
-        _id: 0,
-      },
-    },
-  ]);
+  })
+    .sort({ timestamp: 1 })
+    .lean();
+
+  return snapshots.map((snapshot) => ({
+    x: snapshot.timestamp,
+    y: snapshot.portfolioValue,
+    reason: snapshot.reason,
+  }));
 };
 
 portfolioSchema.statics.getFullHistory = async function (userId, timeframe) {
   const now = new Date();
   let startDate;
 
-  // Calculate start date based on timeframe
   switch (timeframe) {
     case "1h":
       startDate = new Date(now.getTime() - 60 * 60 * 1000);

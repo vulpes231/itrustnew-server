@@ -2,42 +2,34 @@ const Portfolio = require("../../models/Portfolio");
 const portfolioService = require("../../services/user/portfolioService");
 
 const getUserChartData = async (req, res, next) => {
-  const userId = req.user.userId;
   try {
+    const userId = req.user.userId;
     const { timeframe } = req.params;
 
-    // console.log(userId, timeframe);
     const validTimeframes = ["1h", "1d", "1w", "1m", "1y", "all"];
 
-    if (!validTimeframes.includes(timeframe)) {
-      return res.status(400).json({ error: "Invalid timeframe" });
+    if (!validTimeframes.includes(timeframe.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid timeframe",
+      });
     }
 
-    let chartData;
-    if (timeframe.toLowerCase() === "all") {
-      const snapshots = await Portfolio.find({
-        userId: userId,
-      }).sort({ timestamp: 1 });
+    const chartData = await Portfolio.getTimeframeData(
+      userId,
+      timeframe.toLowerCase(),
+    );
 
-      chartData = snapshots.map((s) => ({
-        x: s.timestamp,
-        y: s.portfolioValue,
-        reason: s.reason,
-      }));
-    } else {
-      chartData = await portfolioService.getChartData(userId, timeframe);
-    }
-
-    res.json({
+    return res.status(200).json({
+      success: true,
+      message: "Chart data fetched successfully",
       timeframe,
       data: chartData,
       metadata: {
-        startDate: chartData[0]?.x,
-        endDate: chartData[chartData.length - 1]?.x,
+        startDate: chartData[0]?.x || null,
+        endDate: chartData[chartData.length - 1]?.x || null,
         totalPoints: chartData.length,
       },
-      success: true,
-      message: "chart data fecthed succesfully",
     });
   } catch (error) {
     next(error);
