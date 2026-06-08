@@ -113,12 +113,18 @@ async function editTransaction(transactionId, action) {
       transaction.status = "processed";
       await transaction.save({ session });
 
+      const porfolioWallet = {
+        id: transactionWallet._id,
+        name: transactionWallet.name,
+      };
+
       try {
         if (transaction.type === "deposit") {
           await portfolioService.updatePortfolioValue(
             transaction.userId,
             transaction.amount,
             "deposit",
+            porfolioWallet,
             {
               transactionId: transaction._id,
               paymentMethod: transaction.method.mode,
@@ -129,6 +135,7 @@ async function editTransaction(transactionId, action) {
             transaction.userId,
             transaction.amount,
             "withdrawal",
+            porfolioWallet,
             {
               transactionId: transaction._id,
               paymentMethod: transaction.method.mode,
@@ -298,14 +305,6 @@ async function createTransaction(transactionData) {
         {
           transactionId: transaction._id,
           paymentMethod: transaction.method.mode,
-        },
-      );
-
-      await PortfolioTracker.updatePortfolioValue(
-        transaction.userId,
-        -parseFloat(transaction.amount),
-        {
-          transactionId: transaction._id,
         },
       );
     }

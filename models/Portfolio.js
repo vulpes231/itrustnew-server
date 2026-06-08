@@ -14,18 +14,15 @@ const portfolioSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    portfolioValue: {
+    currentNetWorth: {
       type: Number,
       required: true,
       min: 0,
     },
-    cashBalance: {
-      type: Number,
-      required: true,
-    },
-    assetValue: {
-      type: Number,
-      required: true,
+    wallet: {
+      name: { type: String },
+      id: { type: mongoose.Schema.Types.ObjectId, ref: "Wallet" },
+      // index: true,
     },
     reason: {
       type: String,
@@ -101,7 +98,7 @@ portfolioSchema.statics.getTimeframeData = async function (userId, timeframe) {
 
   return snapshots.map((snapshot) => ({
     x: snapshot.timestamp,
-    y: snapshot.portfolioValue,
+    y: snapshot.currentNetWorth,
     reason: snapshot.reason,
   }));
 };
@@ -139,7 +136,7 @@ portfolioSchema.statics.getFullHistory = async function (userId, timeframe) {
 
   return snapshots.map((s) => ({
     x: s.timestamp,
-    y: s.portfolioValue,
+    y: s.currentNetWorth,
     reason: s.reason,
   }));
 };

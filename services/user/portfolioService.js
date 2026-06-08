@@ -5,115 +5,38 @@ class PortfolioService {
     const snapshot = new PortfolioSnapshot({
       userId: userId,
       timestamp: new Date(),
-      portfolioValue: 0,
-      cashBalance: 0,
-      assetValue: 0,
+      currentNetWorth: 0,
       reason: "account_creation",
     });
     await snapshot.save();
     return snapshot;
   }
 
-  async updatePortfolioValue(userId, changeAmount, reason, metadata = {}) {
+  async updatePortfolioValue(
+    userId,
+    changeAmount,
+    reason,
+    wallet,
+    metadata = {},
+  ) {
     const current = await this.getCurrentPortfolioValue(userId);
-    const newValue = current.portfolioValue + changeAmount;
+    const newValue =
+      reason === "trade_buy"
+        ? current.currentNetWorth
+        : current.currentNetWorth + changeAmount;
 
     const snapshot = new PortfolioSnapshot({
       userId: userId,
       timestamp: new Date(),
-      portfolioValue: newValue,
-      cashBalance:
-        current.cashBalance +
-        (reason === "deposit"
-          ? changeAmount
-          : reason === "withdrawal"
-            ? -changeAmount
-            : reason === "trade_buy"
-              ? -changeAmount
-              : reason === "trade_sell"
-                ? changeAmount
-                : 0),
-      assetValue:
-        current.assetValue +
-        (reason === "trade_buy"
-          ? changeAmount
-          : reason === "trade_sell"
-            ? -changeAmount
-            : reason === "profit_loss"
-              ? changeAmount
-              : 0),
+      currentNetWorth: newValue,
       reason: reason,
+      wallet: {
+        id: wallet?.id || null,
+        name: wallet?.name || null,
+      },
       metadata: metadata,
     });
 
-    await snapshot.save();
-    return snapshot;
-  }
-
-  async recordDeposit(userId, amount, transactionId) {
-    const currentPortfolio = await this.getCurrentPortfolioValue(userId);
-    const newValue = currentPortfolio.portfolioValue + amount;
-
-    const snapshot = new PortfolioSnapshot({
-      userId: userId,
-      timestamp: new Date(),
-      portfolioValue: newValue,
-      cashBalance: currentPortfolio.cashBalance + amount,
-      assetValue: currentPortfolio.assetValue,
-      reason: "deposit",
-      metadata: { transactionId },
-    });
-    await snapshot.save();
-    return snapshot;
-  }
-
-  async recordTradeBuy(userId, amount, assetSymbol, transactionId) {
-    const currentPortfolio = await this.getCurrentPortfolioValue(userId);
-    const newValue = currentPortfolio.portfolioValue - amount;
-
-    const snapshot = new PortfolioSnapshot({
-      userId: userId,
-      timestamp: new Date(),
-      portfolioValue: newValue,
-      cashBalance: currentPortfolio.cashBalance - amount,
-      assetValue: currentPortfolio.assetValue + amount,
-      reason: "trade_buy",
-      metadata: { transactionId, assetSymbol, tradeAmount: amount },
-    });
-    await snapshot.save();
-    return snapshot;
-  }
-
-  async recordTradeSell(userId, amount, assetSymbol, transactionId) {
-    const currentPortfolio = await this.getCurrentPortfolioValue(userId);
-    const newValue = currentPortfolio.portfolioValue + amount;
-
-    const snapshot = new PortfolioSnapshot({
-      userId: userId,
-      timestamp: new Date(),
-      portfolioValue: newValue,
-      cashBalance: currentPortfolio.cashBalance + amount,
-      assetValue: currentPortfolio.assetValue - amount,
-      reason: "trade_sell",
-      metadata: { transactionId, assetSymbol, tradeAmount: amount },
-    });
-    await snapshot.save();
-    return snapshot;
-  }
-
-  async recordProfitLoss(userId, pnlAmount, assetSymbol) {
-    const currentPortfolio = await this.getCurrentPortfolioValue(userId);
-    const newValue = currentPortfolio.portfolioValue + pnlAmount;
-
-    const snapshot = new PortfolioSnapshot({
-      userId: userId,
-      timestamp: new Date(),
-      portfolioValue: newValue,
-      cashBalance: currentPortfolio.cashBalance,
-      assetValue: currentPortfolio.assetValue + pnlAmount,
-      reason: "profit_loss",
-      metadata: { assetSymbol, pnlAmount },
-    });
     await snapshot.save();
     return snapshot;
   }
@@ -124,13 +47,11 @@ class PortfolioService {
     });
 
     if (!latest) {
-      return { portfolioValue: 0, cashBalance: 0, assetValue: 0 };
+      return { currentNetWorth: 0 };
     }
 
     return {
-      portfolioValue: latest.portfolioValue,
-      cashBalance: latest.cashBalance,
-      assetValue: latest.assetValue,
+      currentNetWorth: latest.currentNetWorth,
     };
   }
 
@@ -140,3 +61,63 @@ class PortfolioService {
 }
 
 module.exports = new PortfolioService();
+
+// async recordDeposit(userId, amount, transactionId) {
+//   const currentPortfolio = await this.getCurrentPortfolioValue(userId);
+//   const newValue = currentPortfolio.currentNetWorth + amount;
+
+//   const snapshot = new PortfolioSnapshot({
+//     userId: userId,
+//     timestamp: new Date(),
+//     currentNetWorth: newValue,
+//     reason: "deposit",
+//     metadata: { transactionId },
+//   });
+//   await snapshot.save();
+//   return snapshot;
+// }
+
+// async recordTradeBuy(userId, amount, assetSymbol, transactionId) {
+//   const currentPortfolio = await this.getCurrentPortfolioValue(userId);
+//   const newValue = currentPortfolio.currentNetWorth;
+
+//   const snapshot = new PortfolioSnapshot({
+//     userId: userId,
+//     timestamp: new Date(),
+//     currentNetWorth: newValue,
+//     reason: "trade_buy",
+//     metadata: { transactionId, assetSymbol, tradeAmount: amount },
+//   });
+//   await snapshot.save();
+//   return snapshot;
+// }
+
+// async recordTradeSell(userId, amount, assetSymbol, transactionId) {
+//   const currentPortfolio = await this.getCurrentPortfolioValue(userId);
+//   const newValue = currentPortfolio.currentNetWorth + amount;
+
+//   const snapshot = new PortfolioSnapshot({
+//     userId: userId,
+//     timestamp: new Date(),
+//     currentNetWorth: newValue,
+//     reason: "trade_sell",
+//     metadata: { transactionId, assetSymbol, tradeAmount: amount },
+//   });
+//   await snapshot.save();
+//   return snapshot;
+// }
+
+// async recordProfitLoss(userId, pnlAmount, assetSymbol) {
+//   const currentPortfolio = await this.getCurrentPortfolioValue(userId);
+//   const newValue = currentPortfolio.currentNetWorth + pnlAmount;
+
+//   const snapshot = new PortfolioSnapshot({
+//     userId: userId,
+//     timestamp: new Date(),
+//     currentNetWorth: newValue,
+//     reason: "profit_loss",
+//     metadata: { assetSymbol, pnlAmount },
+//   });
+//   await snapshot.save();
+//   return snapshot;
+// }

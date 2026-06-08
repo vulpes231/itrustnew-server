@@ -6,6 +6,7 @@ const axios = require("axios");
 const Asset = require("../models/Asset");
 const portFolioTracker = require("../services/user/portfolioService");
 const Position = require("../models/Position");
+const portfolioService = require("../services/user/portfolioService");
 
 const BATCH_SIZE = process.env.CRON_BATCH_SIZE || 50;
 const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
@@ -812,7 +813,6 @@ const updatePositionsPerformance = async () => {
       return;
     }
 
-    // Get unique asset symbols
     const assetSymbols = [
       ...new Set(openPositions.map((p) => p.asset.symbol.toUpperCase())),
     ];
@@ -835,6 +835,9 @@ const updatePositionsPerformance = async () => {
       }
     }
 
+    // Track P&L by user for portfolio snapshots
+    const userPnLMap = new Map();
+
     const positionUpdates = [];
 
     for (const position of openPositions) {
@@ -846,20 +849,13 @@ const updatePositionsPerformance = async () => {
         continue;
       }
 
-      // SIMPLE AND CORRECT CALCULATION:
-      // Current value = quantity × current price
       const currentValue = position.quantity * currentPrice;
-
-      // Total return = current value - amount invested
       const totalReturn = currentValue - position.amountInvested;
-
-      // Total return percent = (total return / amount invested) × 100
       const totalReturnPercent =
         position.amountInvested > 0
           ? (totalReturn / position.amountInvested) * 100
           : 0;
 
-      // Today's return = current value - previous current value
       const previousCurrentValue =
         position.performance?.currentValue || currentValue;
       const todayReturn = currentValue - previousCurrentValue;
@@ -868,17 +864,21 @@ const updatePositionsPerformance = async () => {
           ? (todayReturn / previousCurrentValue) * 100
           : 0;
 
-      // Debug logging for first few positions
-      if (positionUpdates.length < 3) {
-        console.log(`Position ${position.asset.symbol}:`, {
-          quantity: position.quantity,
-          currentPrice,
-          currentValue: currentValue.toFixed(2),
-          amountInvested: position.amountInvested,
-          totalReturn: totalReturn.toFixed(2),
-          totalReturnPercent: totalReturnPercent.toFixed(2),
+      if (!userPnLMap.has(position.userId)) {
+        userPnLMap.set(position.userId, {
+          userId: position.userId,
+          totalPnL: 0,
+          positions: [],
+          walletIds: new Set(),
+          symbols: new Set(),
         });
       }
+
+      const userData = userPnLMap.get(position.userId);
+      userData.totalPnL += todayReturn;
+      userData.positions.push(position);
+      userData.walletIds.add(position.wallet?.id || "unknown");
+      userData.symbols.add(position.asset.symbol);
 
       positionUpdates.push({
         updateOne: {
@@ -913,9 +913,32 @@ const updatePositionsPerformance = async () => {
       }
     }
 
+    for (const [_, userData] of userPnLMap) {
+      if (Math.abs(userData.totalPnL) > 0.0001) {
+        await portfolioService.updatePortfolioValue(
+          userData.userId,
+          userData.totalPnL,
+          "profit_loss",
+          null,
+          {
+            pnlAmount: userData.totalPnL,
+            affectedSymbols: Array.from(userData.symbols),
+            positionCount: userData.positions.length,
+            affectedWallets: Array.from(userData.walletIds),
+            calculationMethod: "position_aggregation",
+            timestamp: new Date(),
+          },
+        );
+
+        console.log(
+          `Created portfolio snapshot for user ${userData.userId} with P&L: ${userData.totalPnL.toFixed(2)}`,
+        );
+      }
+    }
+
     const duration = Date.now() - startTime;
     console.log(
-      `Position performance update completed in ${duration}ms. Updated ${positionUpdates.length} positions.`,
+      `Position performance update completed in ${duration}ms. Updated ${positionUpdates.length} positions, created ${userPnLMap.size} portfolio snapshots.`,
     );
   } catch (error) {
     console.error("Error in updatePositionsPerformance:", error);

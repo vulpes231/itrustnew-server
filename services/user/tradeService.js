@@ -8,7 +8,7 @@ const User = require("../../models/User");
 const portfolioService = require("./portfolioService");
 const positionService = require("./positionService");
 const Position = require("../../models/Position");
-// Position
+
 async function buyAsset(userId, assetData) {
   if (!userId) throw new CustomError("Bad credentials!", 400);
 
@@ -166,6 +166,7 @@ async function buyAsset(userId, assetData) {
       trade[0].userId,
       -trade[0].execution.amount,
       "trade_buy",
+      trade[0].wallet,
       {
         transactionId: trade[0]._id,
         assetSymbol: trade[0].asset.symbol,
@@ -419,14 +420,20 @@ async function sellAsset(formData) {
     await session.commitTransaction();
 
     portfolioService
-      .updatePortfolioValue(userId, totalProfitLoss, "trade_sell", {
-        transactionId: sellTrade[0]._id,
-        positionId: position._id,
-        assetSymbol: position.asset.symbol,
-        tradeAmount: totalProfitLoss,
-        quantity: quantityToClose,
-        pricePerUnit: currentPrice,
-      })
+      .updatePortfolioValue(
+        userId,
+        totalProfitLoss,
+        "trade_sell",
+        sellTrade[0].wallet,
+        {
+          transactionId: sellTrade[0]._id,
+          positionId: position._id,
+          assetSymbol: position.asset.symbol,
+          tradeAmount: totalProfitLoss,
+          quantity: quantityToClose,
+          pricePerUnit: currentPrice,
+        },
+      )
       .catch((err) => console.error("Portfolio update failed:", err));
 
     session.endSession();
