@@ -7,6 +7,7 @@ const Asset = require("../../models/Asset");
 const Trade = require("../../models/Trade");
 const positionService = require("../user/positionService");
 const User = require("../../models/User");
+const walletSnapshotService = require("../user/walletSnapshotService");
 
 class ManagePositionService {
   async fetchAllPositions() {
@@ -241,16 +242,25 @@ class ManagePositionService {
 
       await session.commitTransaction();
 
-      portfolioService
-        .updatePortfolioValue(position.userId, totalProfitLoss, "trade_sell", {
-          transactionId: sellTrade[0]._id,
-          positionId: position._id,
+      await portfolioService.createPortfolioSnapshot(
+        position.userId,
+        "trade_sell",
+        {
+          tradeId: position._id,
           assetSymbol: position.asset.symbol,
-          tradeAmount: totalProfitLoss,
-          quantity: quantityToClose,
-          pricePerUnit: currentPrice,
-        })
-        .catch((err) => console.error("Portfolio update failed:", err));
+        },
+        session,
+      );
+
+      await walletSnapshotService.createWalletSnapshot(
+        position.wallet.id,
+        "trade_sell",
+        {
+          tradeId: position._id,
+          assetSymbol: position.asset.symbol,
+        },
+        session,
+      );
 
       session.endSession();
 
@@ -270,58 +280,96 @@ class ManagePositionService {
   async editPositionData(positionData) {
     const { positionId, customDate, extra } = positionData;
 
-    // console.log(positionData);
-
-    if (!positionId) throw new CustomError("Position ID required!", 400);
+    if (!positionId) {
+      throw new CustomError("Position ID required!", 400);
+    }
 
     const session = await mongoose.startSession();
-    session.startTransaction();
 
     try {
+      await session.startTransaction();
+
       const position = await Position.findById(positionId).session(session);
-      if (!position) throw new CustomError("Position not found!", 404);
+
+      if (!position) {
+        throw new CustomError("Position not found!", 404);
+      }
+
+      let shouldCreateSnapshots = false;
+      let parsedExtra = null;
 
       if (customDate !== undefined) {
         position.customDate = customDate;
       }
 
       if (extra !== undefined && extra !== null && extra !== "") {
-        const parsedExtra = parseFloat(extra);
+        parsedExtra = Number(extra);
 
-        if (isNaN(parsedExtra)) {
+        if (Number.isNaN(parsedExtra)) {
           throw new CustomError("Extra P&L must be a valid number", 400);
         }
 
-        const trades = await Trade.find({
-          _id: { $in: position.tradeIds },
-        }).session(session);
+        const currentExtra = position.performance?.extra || 0;
 
-        if (trades.length === 0) {
-          position.performance.extra = parsedExtra;
-        } else {
-          const totalInvested = trades.reduce(
-            (sum, trade) => sum + (trade.amount || 0),
-            0,
-          );
+        if (currentExtra !== parsedExtra) {
+          shouldCreateSnapshots = true;
 
-          if (totalInvested === 0) {
-            trades.forEach((trade) => {
-              trade.extra = parsedExtra / trades.length;
-            });
+          const trades = await Trade.find({
+            _id: { $in: position.tradeIds },
+          }).session(session);
+
+          if (trades.length === 0) {
+            position.performance.extra = parsedExtra;
           } else {
-            trades.forEach((trade) => {
-              const proportion = (trade.amount || 0) / totalInvested;
-              trade.extra = parsedExtra * proportion;
-            });
+            const totalInvested = trades.reduce(
+              (sum, trade) => sum + (trade.amount || 0),
+              0,
+            );
+
+            if (totalInvested === 0) {
+              trades.forEach((trade) => {
+                trade.extra = parsedExtra / trades.length;
+              });
+            } else {
+              trades.forEach((trade) => {
+                const proportion = (trade.amount || 0) / totalInvested;
+
+                trade.extra = parsedExtra * proportion;
+              });
+            }
+
+            await Promise.all(trades.map((trade) => trade.save({ session })));
+
+            position.performance.extra = parsedExtra;
           }
-
-          await Promise.all(trades.map((trade) => trade.save({ session })));
-
-          position.performance.extra = parsedExtra;
         }
       }
 
       await position.save({ session });
+
+      if (shouldCreateSnapshots) {
+        await portfolioService.createPortfolioSnapshot(
+          position.userId,
+          "extra_bonus",
+          {
+            positionId: position._id,
+            assetSymbol: position.asset.symbol,
+            extraAmount: parsedExtra,
+          },
+          session,
+        );
+
+        await walletSnapshotService.createWalletSnapshot(
+          position.wallet.id,
+          "extra_bonus",
+          {
+            positionId: position._id,
+            assetSymbol: position.asset.symbol,
+            extraAmount: parsedExtra,
+          },
+          session,
+        );
+      }
 
       await session.commitTransaction();
 

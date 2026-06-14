@@ -3,11 +3,11 @@ const { default: mongoose } = require("mongoose");
 const Trade = require("../../models/Trade");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
-const portfolioService = require("../user/portfolioService");
 const { CustomError } = require("../../utils/utils");
 const Asset = require("../../models/Asset");
 const Position = require("../../models/Position");
 const positionService = require("../user/positionService");
+const walletSnapshotService = require("../user/walletSnapshotService");
 
 class TradeService {
   constructor() {
@@ -167,20 +167,25 @@ class TradeService {
 
       await session.commitTransaction();
 
-      portfolioService
-        .updatePortfolioValue(
-          trade.userId,
-          -trade.execution.amount,
-          "trade_buy",
-          {
-            transactionId: trade._id,
-            assetSymbol: trade.asset.symbol,
-            tradeAmount: trade.execution.amount,
-            quantity: trade.execution.quantity,
-            pricePerUnit: currentPrice,
-          },
-        )
-        .catch((err) => console.error("Portfolio update failed:", err));
+      await portfolioService.createPortfolioSnapshot(
+        trade.userId,
+        "trade_buy",
+        {
+          tradeId: trade._id,
+          assetSymbol: trade.asset.symbol,
+        },
+        session,
+      );
+
+      await walletSnapshotService.createWalletSnapshot(
+        trade.wallet.id,
+        "trade_buy",
+        {
+          tradeId: trade._id,
+          assetSymbol: trade.asset.symbol,
+        },
+        session,
+      );
 
       session.endSession();
 
@@ -348,18 +353,25 @@ class TradeService {
 
       await session.commitTransaction();
 
-      portfolioService
-        .updatePortfolioValue(trade.userId, tradeProfitLoss, "trade_close", {
-          transactionId: sellTrade[0]._id,
-          positionId: position._id,
+      await portfolioService.createPortfolioSnapshot(
+        trade.userId,
+        "trade_sell",
+        {
           tradeId: trade._id,
           assetSymbol: trade.asset.symbol,
-          tradeAmount: tradeProfitLoss,
-          quantity: quantityToClose,
-          pricePerUnit: currentPrice,
-          isPartialClose: !isFullClose,
-        })
-        .catch((err) => console.error("Portfolio update failed:", err));
+        },
+        session,
+      );
+
+      await walletSnapshotService.createWalletSnapshot(
+        trade.wallet.id,
+        "trade_sell",
+        {
+          tradeId: trade._id,
+          assetSymbol: trade.asset.symbol,
+        },
+        session,
+      );
 
       session.endSession();
 

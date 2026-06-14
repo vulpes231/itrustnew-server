@@ -33,6 +33,7 @@ const portfolioSchema = new mongoose.Schema(
         "trade_buy",
         "trade_sell",
         "profit_loss",
+        "extra_bonus",
         "manual_adjustment",
       ],
       required: true,
@@ -51,94 +52,5 @@ const portfolioSchema = new mongoose.Schema(
 
 portfolioSchema.index({ userId: 1, timestamp: -1 });
 
-portfolioSchema.statics.getTimeframeData = async function (userId, timeframe) {
-  const now = new Date();
-  let startDate;
-
-  switch (timeframe) {
-    case "1h":
-      startDate = new Date(now.getTime() - 60 * 60 * 1000);
-      break;
-
-    case "1d":
-      startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      break;
-
-    case "1w":
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-
-    case "1m":
-      startDate = new Date(now);
-      startDate.setMonth(startDate.getMonth() - 1);
-      break;
-
-    case "1y":
-      startDate = new Date(now);
-      startDate.setFullYear(startDate.getFullYear() - 1);
-      break;
-
-    case "all":
-      startDate = new Date(0);
-      break;
-
-    default:
-      throw new Error("Invalid timeframe");
-  }
-
-  const snapshots = await this.find({
-    userId: new mongoose.Types.ObjectId(userId),
-    timestamp: {
-      $gte: startDate,
-      $lte: now,
-    },
-  })
-    .sort({ timestamp: 1 })
-    .lean();
-
-  return snapshots.map((snapshot) => ({
-    x: snapshot.timestamp,
-    y: snapshot.currentNetWorth,
-    reason: snapshot.reason,
-  }));
-};
-
-portfolioSchema.statics.getFullHistory = async function (userId, timeframe) {
-  const now = new Date();
-  let startDate;
-
-  switch (timeframe) {
-    case "1h":
-      startDate = new Date(now.getTime() - 60 * 60 * 1000);
-      break;
-    case "1d":
-      startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      break;
-    case "1w":
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case "1m":
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
-    case "1y":
-      startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
-      break;
-    default:
-      startDate = null;
-  }
-
-  const query = { userId };
-  if (startDate) {
-    query.timestamp = { $gte: startDate };
-  }
-
-  const snapshots = await this.find(query).sort({ timestamp: 1 });
-
-  return snapshots.map((s) => ({
-    x: s.timestamp,
-    y: s.currentNetWorth,
-    reason: s.reason,
-  }));
-};
 const Portfolio = mongoose.model("PortFolio", portfolioSchema);
 module.exports = Portfolio;

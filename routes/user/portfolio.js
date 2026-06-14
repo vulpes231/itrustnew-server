@@ -5,10 +5,15 @@ const router = express.Router();
 const {
   recordFundDeposit,
   getUserPortfolioValue,
-  getUserChartData,
+  getPortfolioChartData,
+  getDashChartData,
+  getAllPortfolioChartData,
 } = require("../../handlers/user/portfolioController");
 
-router.get("/:timeframe", getUserChartData);
+router.get("/dashboard/:timeframe", getDashChartData);
+router.get("/portfolio/all", getAllPortfolioChartData);
+router.get("/portfolio/:walletId", getPortfolioChartData);
+
 router.get("/current-value", getUserPortfolioValue);
 router.post("/record-deposit", recordFundDeposit);
 

@@ -3,9 +3,9 @@ const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 const { fetchTransactionInfo } = require("../user/transactionService");
-
-const portfolioService = require("../user/portfolioService");
 const { default: mongoose } = require("mongoose");
+const walletSnapshotService = require("../user/walletSnapshotService");
+const portfolioService = require("../user/portfolioService");
 
 async function fetchAllTransactions(queryData) {
   const {
@@ -113,38 +113,36 @@ async function editTransaction(transactionId, action) {
       transaction.status = "processed";
       await transaction.save({ session });
 
-      const porfolioWallet = {
-        id: transactionWallet._id,
-        name: transactionWallet.name,
-      };
-
       try {
-        if (transaction.type === "deposit") {
-          await portfolioService.updatePortfolioValue(
+        if (type === "deposit") {
+          await portfolioService.createPortfolioSnapshot(
             transaction.userId,
-            transaction.amount,
             "deposit",
-            porfolioWallet,
             {
               transactionId: transaction._id,
-              paymentMethod: transaction.method.mode,
             },
+            session,
           );
-        } else if (transaction.type === "withdrawal") {
-          await portfolioService.updatePortfolioValue(
+          await walletSnapshotService.createWalletSnapshot(
+            transactionWallet._id,
+            "deposit",
+            {
+              transactionId: transaction._id,
+            },
+            session,
+          );
+        } else if (type === "withdrawal") {
+          await portfolioService.createPortfolioSnapshot(
             transaction.userId,
-            transaction.amount,
             "withdrawal",
-            porfolioWallet,
             {
               transactionId: transaction._id,
-              paymentMethod: transaction.method.mode,
             },
+            session,
           );
-
-          await PortfolioTracker.updatePortfolioValue(
-            transaction.userId,
-            -transaction.amount,
+          await walletSnapshotService.createWalletSnapshot(
+            transactionWallet._id,
+            "withdrawal",
             {
               transactionId: transaction._id,
             },
@@ -215,7 +213,6 @@ async function createTransaction(transactionData) {
   const { method, amount, accountId, memo, network, userId, type } =
     transactionData;
 
-  // Validation
   if (!amount || !method || !accountId || !userId || !type) {
     throw new CustomError("Missing required fields!", 400);
   }
@@ -288,24 +285,38 @@ async function createTransaction(transactionData) {
     await receiver.save({ session });
 
     if (type === "deposit") {
-      await portfolioService.updatePortfolioValue(
+      await portfolioService.createPortfolioSnapshot(
         transaction.userId,
-        parseFloat(amount),
         "deposit",
         {
           transactionId: transaction._id,
-          paymentMethod: transaction.method.mode,
         },
+        session,
+      );
+      await walletSnapshotService.createWalletSnapshot(
+        receiver._id,
+        "deposit",
+        {
+          transactionId: transaction._id,
+        },
+        session,
       );
     } else if (type === "withdrawal") {
-      await portfolioService.updatePortfolioValue(
+      await portfolioService.createPortfolioSnapshot(
         transaction.userId,
-        parseFloat(transaction.amount),
         "withdrawal",
         {
           transactionId: transaction._id,
-          paymentMethod: transaction.method.mode,
         },
+        session,
+      );
+      await walletSnapshotService.createWalletSnapshot(
+        receiver._id,
+        "withdrawal",
+        {
+          transactionId: transaction._id,
+        },
+        session,
       );
     }
 

@@ -5,9 +5,10 @@ const { CustomError } = require("../../utils/utils");
 const { fetchPlanById } = require("./autoPlanService");
 const Asset = require("../../models/Asset");
 const User = require("../../models/User");
-const portfolioService = require("./portfolioService");
 const positionService = require("./positionService");
 const Position = require("../../models/Position");
+const walletSnapshotService = require("./walletSnapshotService");
+const portfolioService = require("./portfolioService");
 
 async function buyAsset(userId, assetData) {
   if (!userId) throw new CustomError("Bad credentials!", 400);
@@ -160,21 +161,29 @@ async function buyAsset(userId, assetData) {
 
     await positionService.updatePosition(buyTradeForPosition, session);
 
-    await session.commitTransaction();
+    const curTrade = trade[0];
 
-    await portfolioService.updatePortfolioValue(
-      trade[0].userId,
-      -trade[0].execution.amount,
+    await portfolioService.createPortfolioSnapshot(
+      curTrade.userId,
       "trade_buy",
-      trade[0].wallet,
       {
-        transactionId: trade[0]._id,
-        assetSymbol: trade[0].asset.symbol,
-        tradeAmount: trade[0].execution.amount,
-        quantity: trade[0].execution.quantity,
-        pricePerUnit: asset.priceData.current,
+        tradeId: curTrade._id,
+        assetSymbol: curTrade.asset.symbol,
       },
+      session,
     );
+
+    await walletSnapshotService.createWalletSnapshot(
+      curTrade.wallet.id,
+      "trade_buy",
+      {
+        tradeId: curTrade._id,
+        assetSymbol: curTrade.asset.symbol,
+      },
+      session,
+    );
+
+    await session.commitTransaction();
 
     const userInfo = {
       sendTradeAlert: user.mailing.orderNotification,
@@ -417,24 +426,27 @@ async function sellAsset(formData) {
     const updatedPosition =
       await Position.findById(positionId).session(session);
 
-    await session.commitTransaction();
+    await portfolioService.createPortfolioSnapshot(
+      position.userId,
+      "trade_sell",
+      {
+        tradeId: position._id,
+        assetSymbol: position.asset.symbol,
+      },
+      session,
+    );
 
-    portfolioService
-      .updatePortfolioValue(
-        userId,
-        totalProfitLoss,
-        "trade_sell",
-        sellTrade[0].wallet,
-        {
-          transactionId: sellTrade[0]._id,
-          positionId: position._id,
-          assetSymbol: position.asset.symbol,
-          tradeAmount: totalProfitLoss,
-          quantity: quantityToClose,
-          pricePerUnit: currentPrice,
-        },
-      )
-      .catch((err) => console.error("Portfolio update failed:", err));
+    await walletSnapshotService.createWalletSnapshot(
+      position.wallet.id,
+      "trade_sell",
+      {
+        tradeId: position._id,
+        assetSymbol: position.asset.symbol,
+      },
+      session,
+    );
+
+    await session.commitTransaction();
 
     session.endSession();
 

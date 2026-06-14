@@ -1,10 +1,12 @@
-const Portfolio = require("../../models/Portfolio");
 const portfolioService = require("../../services/user/portfolioService");
+const walletSnapshotService = require("../../services/user/walletSnapshotService");
 
-const getUserChartData = async (req, res, next) => {
+const getDashChartData = async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const { timeframe } = req.params;
+
+    // console.log(req.params);
 
     const validTimeframes = ["1h", "1d", "1w", "1m", "1y", "all"];
 
@@ -15,7 +17,7 @@ const getUserChartData = async (req, res, next) => {
       });
     }
 
-    const chartData = await Portfolio.getTimeframeData(
+    const chartData = await portfolioService.getDashboardSnapshot(
       userId,
       timeframe.toLowerCase(),
     );
@@ -29,6 +31,82 @@ const getUserChartData = async (req, res, next) => {
         startDate: chartData[0]?.x || null,
         endDate: chartData[chartData.length - 1]?.x || null,
         totalPoints: chartData.length,
+        hasData: chartData.length > 0,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPortfolioChartData = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { walletId } = req.params;
+    const { timeframe } = req.query;
+
+    const validTimeframes = ["1h", "1d", "1w", "1m", "1y", "all"];
+
+    if (!validTimeframes.includes(timeframe.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid timeframe",
+      });
+    }
+
+    const chartData = await walletSnapshotService.getAccountSnapshot(
+      userId,
+      walletId,
+      timeframe.toLowerCase(),
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Chart data fetched successfully",
+      timeframe,
+      data: chartData,
+      metadata: {
+        startDate: chartData[0]?.x || null,
+        endDate: chartData[chartData.length - 1]?.x || null,
+        totalPoints: chartData.length,
+        hasData: chartData.length > 0,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getAllPortfolioChartData = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+
+    const { timeframe } = req.query;
+
+    const validTimeframes = ["1h", "1d", "1w", "1m", "1y", "all"];
+
+    if (!validTimeframes.includes(timeframe.toLowerCase())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid timeframe",
+      });
+    }
+
+    const chartData = await walletSnapshotService.getAllSnapshot(
+      userId,
+      timeframe.toLowerCase(),
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Chart data fetched successfully",
+      timeframe,
+      data: chartData,
+      metadata: {
+        startDate: chartData[0]?.x || null,
+        endDate: chartData[chartData.length - 1]?.x || null,
+        totalPoints: chartData.length,
+        hasData: chartData.length > 0,
       },
     });
   } catch (error) {
@@ -67,4 +145,10 @@ const recordFundDeposit = async (req, res) => {
   }
 };
 
-module.exports = { recordFundDeposit, getUserPortfolioValue, getUserChartData };
+module.exports = {
+  recordFundDeposit,
+  getUserPortfolioValue,
+  getDashChartData,
+  getPortfolioChartData,
+  getAllPortfolioChartData,
+};

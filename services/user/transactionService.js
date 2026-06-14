@@ -1,7 +1,9 @@
+const { default: mongoose } = require("mongoose");
 const Transaction = require("../../models/Transaction");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
+const walletSnapshotService = require("./walletSnapshotService");
 
 async function addFunds(userId, trnxData) {
   const { method, amount, memo, network, proof } = trnxData;
@@ -124,60 +126,139 @@ async function withdrawFunds(userId, trnxData) {
 
 async function moveFunds(userId, trnxData) {
   const { fromWallet, amount, toWallet, memo } = trnxData;
-  if (!amount || !fromWallet || !toWallet)
+
+  if (!amount || !fromWallet || !toWallet) {
     throw new CustomError("Bad request!", 400);
+  }
+
+  if (fromWallet.toString() === toWallet.toString()) {
+    throw new CustomError("Cannot transfer to the same account!", 400);
+  }
+
+  const parsedAmount = Number(amount);
+
+  if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+    throw new CustomError("Invalid amount!", 400);
+  }
+
+  const session = await mongoose.startSession();
+
   try {
-    const user = await User.findById(userId);
-    if (!user) throw new CustomError("Invalid credentials!", 404);
+    await session.startTransaction();
 
-    const transferFrom = await Wallet.findById(fromWallet);
-    if (!transferFrom) throw new CustomError("Invalid from account!", 400);
+    const [user, transferFrom, transferTo] = await Promise.all([
+      User.findById(userId).session(session),
 
-    if (transferFrom.balance.available < parseFloat(amount))
+      Wallet.findOne({
+        _id: fromWallet,
+        userId,
+      }).session(session),
+
+      Wallet.findOne({
+        _id: toWallet,
+        userId,
+      }).session(session),
+    ]);
+
+    if (!user) {
+      throw new CustomError("Invalid credentials!", 404);
+    }
+
+    if (!transferFrom) {
+      throw new CustomError("Invalid source account!", 400);
+    }
+
+    if (!transferTo) {
+      throw new CustomError("Invalid receiving account!", 400);
+    }
+
+    if (transferFrom.balance.available < parsedAmount) {
       throw new CustomError("Insufficient funds!", 400);
-
-    const transferTo = await Wallet.findById(toWallet);
-    if (!transferTo) throw new CustomError("Invalid receiving account!", 400);
-
-    const parsedAmount = parseFloat(amount);
+    }
 
     transferFrom.balance.total -= parsedAmount;
     transferFrom.balance.available -= parsedAmount;
-    await transferFrom.save();
 
     transferTo.balance.total += parsedAmount;
     transferTo.balance.available += parsedAmount;
-    await transferTo.save();
+
+    await Promise.all([
+      transferFrom.save({ session }),
+      transferTo.save({ session }),
+    ]);
 
     const customMemo = `Transfer from ${transferFrom.name} to ${transferTo.name}`;
 
-    const meta = {
-      type: "transfer",
-      to: transferTo.name,
-      method: "internal",
-      network: "internal",
-      info: "internal",
-    };
+    const transaction = await Transaction.create(
+      [
+        {
+          method: {
+            mode: transferFrom.name,
+            network: "transfer",
+          },
+          amount: parsedAmount,
+          account: transferTo.name,
+          memo: memo || customMemo,
+          type: "transfer",
+          userId,
+          email: user.contactInfo.email,
+          fullname: user.fullName,
+          status: "processed",
+          meta: {
+            type: "transfer",
+            fromWalletId: transferFrom._id,
+            toWalletId: transferTo._id,
+            from: transferFrom.name,
+            to: transferTo.name,
+            method: "internal",
+            network: "internal",
+          },
+        },
+      ],
+      { session },
+    );
 
-    const trnx = await Transaction.create({
-      method: {
-        mode: transferFrom.name,
-        network: "transfer",
-      },
-      amount: amount,
-      account: transferTo.name,
-      memo: memo || customMemo,
-      type: "transfer",
-      userId: userId,
-      email: user.contactInfo.email,
-      status: "processed",
-      fullname: user.fullName,
-      meta: meta,
-    });
+    const trnx = transaction[0];
+
+    await Promise.all([
+      walletSnapshotService.createWalletSnapshot(
+        transferFrom._id,
+        "transfer_out",
+        {
+          transactionId: trnx._id,
+          amount: parsedAmount,
+          toWalletId: transferTo._id,
+          toWalletName: transferTo.name,
+        },
+        session,
+      ),
+
+      walletSnapshotService.createWalletSnapshot(
+        transferTo._id,
+        "transfer_in",
+        {
+          transactionId: trnx._id,
+          amount: parsedAmount,
+          fromWalletId: transferFrom._id,
+          fromWalletName: transferFrom.name,
+        },
+        session,
+      ),
+    ]);
+
+    await session.commitTransaction();
+
     return trnx;
   } catch (error) {
-    if (error instanceof CustomError) throw error;
-    throw new CustomError(error.message, error.statusCode);
+    await session.abortTransaction();
+
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message || "Transfer failed!", 500);
+  } finally {
+    await session.endSession();
   }
 }
 

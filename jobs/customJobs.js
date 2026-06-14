@@ -6,8 +6,8 @@ const axios = require("axios");
 const Asset = require("../models/Asset");
 const portFolioTracker = require("../services/user/portfolioService");
 const Position = require("../models/Position");
+const walletSnapshotService = require("../services/user/walletSnapshotService");
 const portfolioService = require("../services/user/portfolioService");
-
 const BATCH_SIZE = process.env.CRON_BATCH_SIZE || 50;
 const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
 const COIN_GECKO_API_URL = "https://api.coingecko.com/api/v3";
@@ -827,7 +827,6 @@ const updatePositionsPerformance = async () => {
       return;
     }
 
-    // Create price map
     const assetPriceMap = new Map();
     for (const asset of currentAssets) {
       if (asset?.symbol && asset?.priceData?.current) {
@@ -835,22 +834,31 @@ const updatePositionsPerformance = async () => {
       }
     }
 
-    // Track P&L by user for portfolio snapshots
-    const userPnLMap = new Map();
+    const affectedWalletIds = new Set();
+    const affectedUserIds = new Set();
 
     const positionUpdates = [];
 
     for (const position of openPositions) {
+      affectedUserIds.add(position.userId.toString());
+
+      if (position.wallet?.id) {
+        affectedWalletIds.add(position.wallet.id.toString());
+      }
+
       const currentPrice = assetPriceMap.get(
         position.asset.symbol.toUpperCase(),
       );
+
       if (!currentPrice) {
         console.warn(`No price found for ${position.asset.symbol}`);
         continue;
       }
 
       const currentValue = position.quantity * currentPrice;
+
       const totalReturn = currentValue - position.amountInvested;
+
       const totalReturnPercent =
         position.amountInvested > 0
           ? (totalReturn / position.amountInvested) * 100
@@ -858,40 +866,26 @@ const updatePositionsPerformance = async () => {
 
       const previousCurrentValue =
         position.performance?.currentValue || currentValue;
+
       const todayReturn = currentValue - previousCurrentValue;
+
       const todayReturnPercent =
         previousCurrentValue > 0
           ? (todayReturn / previousCurrentValue) * 100
           : 0;
-
-      if (!userPnLMap.has(position.userId)) {
-        userPnLMap.set(position.userId, {
-          userId: position.userId,
-          totalPnL: 0,
-          positions: [],
-          walletIds: new Set(),
-          symbols: new Set(),
-        });
-      }
-
-      const userData = userPnLMap.get(position.userId);
-      userData.totalPnL += todayReturn;
-      userData.positions.push(position);
-      userData.walletIds.add(position.wallet?.id || "unknown");
-      userData.symbols.add(position.asset.symbol);
 
       positionUpdates.push({
         updateOne: {
           filter: { _id: position._id },
           update: {
             $set: {
-              "performance.currentValue": parseFloat(currentValue.toFixed(4)),
-              "performance.totalReturn": parseFloat(totalReturn.toFixed(4)),
-              "performance.totalReturnPercent": parseFloat(
+              "performance.currentValue": Number(currentValue.toFixed(4)),
+              "performance.totalReturn": Number(totalReturn.toFixed(4)),
+              "performance.totalReturnPercent": Number(
                 totalReturnPercent.toFixed(4),
               ),
-              "performance.todayReturn": parseFloat(todayReturn.toFixed(4)),
-              "performance.todayReturnPercent": parseFloat(
+              "performance.todayReturn": Number(todayReturn.toFixed(4)),
+              "performance.todayReturnPercent": Number(
                 todayReturnPercent.toFixed(4),
               ),
               "performance.currentPrice": currentPrice,
@@ -913,28 +907,23 @@ const updatePositionsPerformance = async () => {
       }
     }
 
-    for (const [_, userData] of userPnLMap) {
-      if (Math.abs(userData.totalPnL) > 0.0001) {
-        await portfolioService.updatePortfolioValue(
-          userData.userId,
-          userData.totalPnL,
-          "profit_loss",
-          null,
-          {
-            pnlAmount: userData.totalPnL,
-            affectedSymbols: Array.from(userData.symbols),
-            positionCount: userData.positions.length,
-            affectedWallets: Array.from(userData.walletIds),
-            calculationMethod: "position_aggregation",
-            timestamp: new Date(),
-          },
-        );
+    const snapshotTime = new Date();
 
-        console.log(
-          `Created portfolio snapshot for user ${userData.userId} with P&L: ${userData.totalPnL.toFixed(2)}`,
-        );
-      }
-    }
+    await Promise.allSettled(
+      [...affectedWalletIds].map((walletId) =>
+        walletSnapshotService.createWalletSnapshot(walletId, "cron_update", {
+          timestamp: snapshotTime,
+        }),
+      ),
+    );
+
+    await Promise.allSettled(
+      [...affectedUserIds].map((userId) =>
+        portfolioService.createPortfolioSnapshot(userId, "cron_update", {
+          timestamp: snapshotTime,
+        }),
+      ),
+    );
 
     const duration = Date.now() - startTime;
     console.log(
