@@ -57,25 +57,26 @@ class WalletSnapshotService {
       return lastSnapshot;
     }
 
-    const snapshot = await WalletSnapshot.create({
-      userId: wallet.userId,
-      walletId: wallet._id,
-      walletName: wallet.name,
+    const snapshot = await WalletSnapshot.create(
+      [
+        {
+          userId: wallet.userId,
+          walletId: wallet._id,
+          walletName: wallet.name,
+          cashValue,
+          positionValue,
+          totalValue,
+          totalInvested,
+          unrealizedPnL,
+          source,
+          metadata,
+          snapshotAt: new Date(),
+        },
+      ],
+      { session },
+    );
 
-      cashValue,
-      positionValue,
-      totalValue,
-
-      totalInvested,
-      unrealizedPnL,
-
-      source,
-      metadata,
-
-      snapshotAt: new Date(),
-    });
-
-    return snapshot;
+    return snapshot[0];
   }
 
   getStartDate(timeframe) {

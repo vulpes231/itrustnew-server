@@ -98,7 +98,7 @@ function getDurationInMs(milestone, duration) {
 
 function getPositionValue(position) {
   return (
-    (position.performance?.currentValue || 0) +
+    (position.performance?.totalReturn || 0) +
     (position.performance?.extra || 0)
   );
 }

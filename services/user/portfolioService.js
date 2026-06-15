@@ -5,15 +5,13 @@ const { getPositionValue } = require("../../utils/utils");
 
 class PortfolioService {
   async createPortfolioSnapshot(userId, reason, metadata = {}, session = null) {
-    const [wallets, positions] = await Promise.all([
-      Wallet.find({ userId }).session(session).lean(),
-      Position.find({
-        userId,
-        status: "open",
-      })
-        .session(session)
-        .lean(),
-    ]);
+    const wallets = await Wallet.find({ userId }).session(session).lean();
+    const positions = await Position.find({
+      userId,
+      status: "open",
+    })
+      .session(session)
+      .lean();
 
     const totalCashValue = wallets.reduce(
       (sum, wallet) => sum + (wallet.balance?.total || 0),
@@ -30,6 +28,7 @@ class PortfolioService {
     const lastSnapshot = await PortfolioSnapshot.findOne({
       userId,
     })
+      .session(session)
       .sort({ timestamp: -1 })
       .select("currentNetWorth")
       .lean();
@@ -43,13 +42,20 @@ class PortfolioService {
 
     const snapshotTimestamp = metadata.timestamp || new Date();
 
-    return await PortfolioSnapshot.create({
-      userId,
-      timestamp: snapshotTimestamp,
-      currentNetWorth,
-      reason,
-      metadata,
-    });
+    const snap = await PortfolioSnapshot.create(
+      [
+        {
+          userId,
+          timestamp: snapshotTimestamp,
+          currentNetWorth,
+          reason,
+          metadata,
+        },
+      ],
+      { session },
+    );
+
+    return snap[0];
   }
   getStartDate(timeframe) {
     const now = new Date();

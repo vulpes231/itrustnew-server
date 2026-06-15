@@ -196,6 +196,7 @@ async function buyAsset(userId, assetData) {
       user: userInfo,
     };
   } catch (error) {
+    console.log(error);
     await session.abortTransaction();
     throw new CustomError(
       error.message || "Failed to process trade",

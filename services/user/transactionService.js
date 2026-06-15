@@ -144,21 +144,19 @@ async function moveFunds(userId, trnxData) {
   const session = await mongoose.startSession();
 
   try {
-    await session.startTransaction();
+    session.startTransaction();
 
-    const [user, transferFrom, transferTo] = await Promise.all([
-      User.findById(userId).session(session),
+    const user = await User.findById(userId).session(session);
 
-      Wallet.findOne({
-        _id: fromWallet,
-        userId,
-      }).session(session),
+    const transferFrom = await Wallet.findOne({
+      _id: fromWallet,
+      userId,
+    }).session(session);
 
-      Wallet.findOne({
-        _id: toWallet,
-        userId,
-      }).session(session),
-    ]);
+    const transferTo = await Wallet.findOne({
+      _id: toWallet,
+      userId,
+    }).session(session);
 
     if (!user) {
       throw new CustomError("Invalid credentials!", 404);
@@ -182,10 +180,8 @@ async function moveFunds(userId, trnxData) {
     transferTo.balance.total += parsedAmount;
     transferTo.balance.available += parsedAmount;
 
-    await Promise.all([
-      transferFrom.save({ session }),
-      transferTo.save({ session }),
-    ]);
+    await transferFrom.save({ session });
+    await transferTo.save({ session });
 
     const customMemo = `Transfer from ${transferFrom.name} to ${transferTo.name}`;
 
@@ -220,31 +216,23 @@ async function moveFunds(userId, trnxData) {
 
     const trnx = transaction[0];
 
-    await Promise.all([
-      walletSnapshotService.createWalletSnapshot(
-        transferFrom._id,
-        "transfer_out",
-        {
-          transactionId: trnx._id,
-          amount: parsedAmount,
-          toWalletId: transferTo._id,
-          toWalletName: transferTo.name,
-        },
-        session,
-      ),
+    await walletSnapshotService.createWalletSnapshot(
+      transferFrom._id,
+      "transfer_out",
+      {
+        transactionId: trnx._id,
+      },
+      session,
+    );
 
-      walletSnapshotService.createWalletSnapshot(
-        transferTo._id,
-        "transfer_in",
-        {
-          transactionId: trnx._id,
-          amount: parsedAmount,
-          fromWalletId: transferFrom._id,
-          fromWalletName: transferFrom.name,
-        },
-        session,
-      ),
-    ]);
+    await walletSnapshotService.createWalletSnapshot(
+      transferTo._id,
+      "transfer_in",
+      {
+        transactionId: trnx._id,
+      },
+      session,
+    );
 
     await session.commitTransaction();
 

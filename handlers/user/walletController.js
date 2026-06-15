@@ -2,6 +2,7 @@ const {
   fetchUserWallets,
   getUserFinancialSummary,
   getWalletInvestData,
+  fetchPortfolioAccounts,
 } = require("../../services/user/walletService");
 
 const getUserWallets = async (req, res, next) => {
@@ -48,8 +49,24 @@ const getAccountsInvestmentData = async (req, res, next) => {
   }
 };
 
+const getPortfolioAccounts = async (req, res, next) => {
+  const userId = req.user.userId;
+  try {
+    const accounts = await fetchPortfolioAccounts(userId);
+
+    res.status(200).json({
+      message: "Portfolio accounts fetched succesfully",
+      data: accounts,
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getUserWallets,
   getWalletAnalytics,
   getAccountsInvestmentData,
+  getPortfolioAccounts,
 };

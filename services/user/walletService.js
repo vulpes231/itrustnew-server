@@ -16,6 +16,71 @@ async function fetchUserWallets(userId) {
   }
 }
 
+async function fetchPortfolioAccounts(userId) {
+  try {
+    const [wallets, user] = await Promise.all([
+      Wallet.find({ userId }).lean(),
+      User.findById(userId).lean(),
+    ]);
+
+    if (!user) {
+      throw new CustomError("User not found", 404);
+    }
+
+    const savingsAccounts = user.savingsAccounts || [];
+
+    const filteredWallets = wallets.filter((wallet) => wallet.slug !== "cash");
+
+    const filteredSavings = savingsAccounts.filter(
+      (acct) => acct.canTrade === true,
+    );
+
+    const allAccounts = [...filteredWallets, ...filteredSavings];
+
+    const result = allAccounts.reduce(
+      (acc, account) => {
+        acc.defaultWallets.push(account);
+
+        acc.totalBalance += account.balance?.total || 0;
+        acc.availableBalance += account.balance?.available || 0;
+
+        return acc;
+      },
+      {
+        defaultWallets: [],
+        totalBalance: 0,
+        availableBalance: 0,
+      },
+    );
+
+    const investing = {
+      balance: {
+        total: result.totalBalance,
+        available: result.availableBalance,
+      },
+      slug: "default",
+      name: "investing",
+      _id: "default",
+      dailyProfitPercent:
+        result.defaultWallets.reduce(
+          (sum, account) => sum + (account.dailyProfitPercent || 0),
+          0,
+        ) / (result.defaultWallets.length || 1),
+    };
+
+    const portfolioAccounts = [investing, ...allAccounts];
+
+    return portfolioAccounts;
+  } catch (error) {
+    if (error instanceof CustomError) throw error;
+
+    throw new CustomError(
+      error.message || "Failed to fetch portfolio accounts",
+      error.statusCode || 500,
+    );
+  }
+}
+
 async function getUserFinancialSummary(userId) {
   try {
     if (!userId) {
@@ -208,4 +273,5 @@ module.exports = {
   fetchUserWallets,
   getUserFinancialSummary,
   getWalletInvestData,
+  fetchPortfolioAccounts,
 };
