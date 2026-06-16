@@ -14,14 +14,13 @@ class WalletSnapshotService {
   ) {
     let wallet;
 
-    const user = await User.findById(userId).session(session).lean();
-
-    if (!user) {
-      throw new Error(`User not found: ${userId}`);
-    }
-    const savingsAccts = user.savingsAccounts || [];
-
     if (source === "cashout" || source === "contribution") {
+      const user = await User.findById(userId).session(session).lean();
+
+      if (!user) {
+        throw new Error(`User not found: ${userId}`);
+      }
+      const savingsAccts = user.savingsAccounts || [];
       wallet = savingsAccts.find(
         (wallet) => wallet._id.toString() === walletId.toString(),
       );
