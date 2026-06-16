@@ -4,6 +4,7 @@ const Transaction = require("../../models/Transaction");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
+const walletSnapshotService = require("./walletSnapshotService");
 
 async function fetchAvailableSavings() {
   try {
@@ -63,11 +64,14 @@ async function addSavingsAccount(userId, accountId) {
         min: acct.withdrawalLimits.min,
         max: acct.withdrawalLimits.max,
       },
+      balance: {
+        total: 0,
+        available: 0,
+      },
 
       analytics: {
         totalReturn: 0,
         dailyChange: 0,
-        balance: 0,
         contribution: 0,
         withdrawals: 0,
       },
@@ -177,14 +181,13 @@ async function fundSavings(userId, fundData) {
     wallet.balance.total -= parsedAmount;
     await wallet.save({ session });
 
-    user.savingsAccounts[accountIndex].analytics.balance.total += parsedAmount;
-    user.savingsAccounts[accountIndex].analytics.balance.available +=
-      parsedAmount;
+    user.savingsAccounts[accountIndex].balance.total += parsedAmount;
+    user.savingsAccounts[accountIndex].balance.available += parsedAmount;
     user.savingsAccounts[accountIndex].analytics.contributions += parsedAmount;
 
     await user.save({ session });
 
-    await Transaction.create(
+    const transact = await Transaction.create(
       [
         {
           method: {
@@ -202,6 +205,20 @@ async function fundSavings(userId, fundData) {
         },
       ],
       { session },
+    );
+
+    const userSavingAcctId = user.savingsAccounts[accountIndex]._id;
+
+    const trxn = transact[0]._id;
+
+    await walletSnapshotService.createWalletSnapshot(
+      userSavingAcctId,
+      "contribution",
+      {
+        transactionId: trxn._id,
+      },
+      session,
+      userId,
     );
 
     await session.commitTransaction();
@@ -277,7 +294,7 @@ async function withdrawSavings(userId, withdrawData) {
 
     await wallet.save({ session });
 
-    await Transaction.create(
+    const transact = await Transaction.create(
       [
         {
           method: {
@@ -294,6 +311,19 @@ async function withdrawSavings(userId, withdrawData) {
         },
       ],
       { session },
+    );
+
+    const trxn = transact[0]._id;
+    const userSavingAcctId = user.savingsAccounts[accountIndex]._id;
+
+    await walletSnapshotService.createWalletSnapshot(
+      userSavingAcctId,
+      "cashout",
+      {
+        transactionId: trxn._id,
+      },
+      session,
+      userId,
     );
 
     await session.commitTransaction();
@@ -325,11 +355,11 @@ async function fetchSavingsAnalytics(userId) {
     );
 
     const saveBal = savingsAccts.reduce((total, value) => {
-      return total + (value.analytics?.balance?.available || 0);
+      return total + (value.balance?.available || 0);
     }, 0);
 
     const retireBal = retirementAccts.reduce((total, value) => {
-      return total + (value.analytics?.balance?.available || 0);
+      return total + (value.balance?.available || 0);
     }, 0);
 
     const analytics = {

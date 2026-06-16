@@ -226,15 +226,16 @@ const userSchema = new Schema(
         jointMax: { type: Number },
         canTrade: { type: Boolean },
         accountId: { type: Schema.Types.ObjectId, ref: "Savingsaccount" },
+        balance: {
+          total: { type: Number, default: 0 },
+          available: { type: Number, default: 0 },
+        },
         analytics: {
           totalReturn: { type: Number, default: 0 },
           dailyChange: { type: Number, default: 0 },
           dailyChangePercent: { type: Number, default: 0 },
           totalReturnPercent: { type: Number, default: 0 },
-          balance: {
-            total: { type: Number, default: 0 },
-            available: { type: Number, default: 0 },
-          },
+
           contributions: { type: Number, default: 0 },
           withdrawals: { type: Number, default: 0 },
         },

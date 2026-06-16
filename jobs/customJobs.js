@@ -800,7 +800,7 @@ const updateTradePerformance = async () => {
 
 const updatePositionsPerformance = async () => {
   try {
-    console.log("Starting position performance update...");
+    // console.log("Starting position performance update...");
     const startTime = Date.now();
 
     const openPositions = await Position.find({
@@ -817,7 +817,7 @@ const updatePositionsPerformance = async () => {
       ...new Set(openPositions.map((p) => p.asset.symbol.toUpperCase())),
     ];
 
-    console.log(`Fetching prices for ${assetSymbols.length} assets...`);
+    // console.log(`Fetching prices for ${assetSymbols.length} assets...`);
 
     let currentAssets;
     try {

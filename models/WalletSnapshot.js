@@ -62,6 +62,8 @@ const walletSnapshotSchema = new mongoose.Schema(
         "account_creation",
         "deposit",
         "withdrawal",
+        "contribution",
+        "cashout",
         "trade_buy",
         "trade_sell",
         "profit_loss",

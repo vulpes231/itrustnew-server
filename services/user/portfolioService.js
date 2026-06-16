@@ -1,10 +1,18 @@
 const PortfolioSnapshot = require("../../models/Portfolio");
 const Position = require("../../models/Position");
+const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { getPositionValue } = require("../../utils/utils");
 
 class PortfolioService {
   async createPortfolioSnapshot(userId, reason, metadata = {}, session = null) {
+    const user = await User.findById(userId).session(session).lean();
+
+    if (!user) {
+      throw new Error(`User not found: ${userId}`);
+    }
+    const savingsAccts = user.savingsAccounts || [];
+
     const wallets = await Wallet.find({ userId }).session(session).lean();
     const positions = await Position.find({
       userId,
@@ -18,27 +26,20 @@ class PortfolioService {
       0,
     );
 
-    const totalPositionValue = positions.reduce(
+    const openTrades = positions.filter((trade) => trade.status === "open");
+
+    const totalPositionValue = openTrades.reduce(
       (sum, position) => sum + getPositionValue(position),
       0,
     );
 
-    const currentNetWorth = totalCashValue + totalPositionValue;
+    const savingsAccountValue = savingsAccts.reduce(
+      (sum, acct) => sum + (acct.balance.total || 0),
+      0,
+    );
 
-    const lastSnapshot = await PortfolioSnapshot.findOne({
-      userId,
-    })
-      .session(session)
-      .sort({ timestamp: -1 })
-      .select("currentNetWorth")
-      .lean();
-
-    if (
-      lastSnapshot &&
-      Math.abs(lastSnapshot.currentNetWorth - currentNetWorth) < 0.0001
-    ) {
-      return lastSnapshot;
-    }
+    const currentNetWorth =
+      totalCashValue + totalPositionValue + savingsAccountValue;
 
     const snapshotTimestamp = metadata.timestamp || new Date();
 

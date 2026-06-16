@@ -1,4 +1,5 @@
 const Position = require("../../models/Position");
+const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const WalletSnapshot = require("../../models/WalletSnapshot");
 const { getPositionValue } = require("../../utils/utils");
@@ -9,8 +10,24 @@ class WalletSnapshotService {
     source = "manual_adjustment",
     metadata = {},
     session = null,
+    userId,
   ) {
-    const wallet = await Wallet.findById(walletId).session(session).lean();
+    let wallet;
+
+    const user = await User.findById(userId).session(session).lean();
+
+    if (!user) {
+      throw new Error(`User not found: ${userId}`);
+    }
+    const savingsAccts = user.savingsAccounts || [];
+
+    if (source === "cashout" || source === "contribution") {
+      wallet = savingsAccts.find(
+        (wallet) => wallet._id.toString() === walletId.toString(),
+      );
+    } else {
+      wallet = await Wallet.findById(walletId).session(session).lean();
+    }
 
     if (!wallet) {
       throw new Error(`Wallet not found: ${walletId}`);
@@ -25,7 +42,9 @@ class WalletSnapshotService {
 
     const cashValue = wallet.balance?.total || 0;
 
-    const positionValue = positions.reduce(
+    const openTrades = positions.filter((trade) => trade.status === "open");
+
+    const positionValue = openTrades.reduce(
       (sum, position) => sum + getPositionValue(position),
       0,
     );
@@ -42,25 +61,10 @@ class WalletSnapshotService {
 
     const totalValue = cashValue + positionValue;
 
-    const lastSnapshot = await WalletSnapshot.findOne({
-      walletId: wallet._id,
-    })
-      .sort({ snapshotAt: -1 })
-      .select("totalValue cashValue positionValue");
-
-    if (
-      lastSnapshot &&
-      lastSnapshot.totalValue === totalValue &&
-      lastSnapshot.cashValue === cashValue &&
-      lastSnapshot.positionValue === positionValue
-    ) {
-      return lastSnapshot;
-    }
-
     const snapshot = await WalletSnapshot.create(
       [
         {
-          userId: wallet.userId,
+          userId: wallet.userId || userId,
           walletId: wallet._id,
           walletName: wallet.name,
           cashValue,
