@@ -34,6 +34,7 @@ const portfolioSchema = new mongoose.Schema(
         "trade_sell",
         "profit_loss",
         "extra_bonus",
+        "cron_update",
         "manual_adjustment",
       ],
       required: true,

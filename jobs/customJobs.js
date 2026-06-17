@@ -915,7 +915,6 @@ const updatePositionsPerformance = async () => {
             timestamp: snapshotTime,
           },
           null,
-          position.userId,
         ),
       ),
     );
