@@ -953,7 +953,7 @@ const updatePositionsPerformance = async () => {
 
     const duration = Date.now() - startTime;
     console.log(
-      `Position performance update completed in ${duration}ms. Updated ${positionUpdates.length} positions, created ${userPnLMap.size} portfolio snapshots.`,
+      `Position performance update completed in ${duration}ms. Updated ${positionUpdates.length} positions`,
     );
   } catch (error) {
     console.error("Error in updatePositionsPerformance:", error);
