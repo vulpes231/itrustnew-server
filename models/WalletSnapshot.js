@@ -24,21 +24,18 @@ const walletSnapshotSchema = new mongoose.Schema(
       type: Number,
       required: true,
       default: 0,
-      min: 0,
     },
 
     positionValue: {
       type: Number,
       required: true,
       default: 0,
-      min: 0,
     },
 
     totalValue: {
       type: Number,
       required: true,
       default: 0,
-      min: 0,
     },
 
     totalInvested: {

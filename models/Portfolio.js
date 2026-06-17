@@ -17,12 +17,11 @@ const portfolioSchema = new mongoose.Schema(
     currentNetWorth: {
       type: Number,
       required: true,
-      min: 0,
+      default: 0,
     },
     wallet: {
       name: { type: String },
       id: { type: mongoose.Schema.Types.ObjectId, ref: "Wallet" },
-      // index: true,
     },
     reason: {
       type: String,
