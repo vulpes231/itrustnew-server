@@ -906,6 +906,9 @@ const updatePositionsPerformance = async () => {
 
     const snapshotTime = new Date();
 
+    console.log(affectedUserIds.size, "userIds");
+    console.log(affectedWalletIds.size, "walletIds");
+
     const walletResults = await Promise.allSettled(
       [...affectedWalletIds].map((walletId) =>
         walletSnapshotService.createWalletSnapshot(
