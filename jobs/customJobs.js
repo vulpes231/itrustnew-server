@@ -800,7 +800,6 @@ const updateTradePerformance = async () => {
 
 const updatePositionsPerformance = async () => {
   try {
-    // console.log("Starting position performance update...");
     const startTime = Date.now();
 
     const openPositions = await Position.find({
@@ -816,8 +815,6 @@ const updatePositionsPerformance = async () => {
     const assetSymbols = [
       ...new Set(openPositions.map((p) => p.asset.symbol.toUpperCase())),
     ];
-
-    // console.log(`Fetching prices for ${assetSymbols.length} assets...`);
 
     let currentAssets;
     try {
@@ -909,21 +906,50 @@ const updatePositionsPerformance = async () => {
 
     const snapshotTime = new Date();
 
-    await Promise.allSettled(
+    const walletResults = await Promise.allSettled(
       [...affectedWalletIds].map((walletId) =>
-        walletSnapshotService.createWalletSnapshot(walletId, "cron_update", {
-          timestamp: snapshotTime,
-        }),
+        walletSnapshotService.createWalletSnapshot(
+          walletId,
+          "cron_update",
+          {
+            timestamp: snapshotTime,
+          },
+          null,
+          position.userId,
+        ),
       ),
     );
 
-    await Promise.allSettled(
+    walletResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error(
+          `Failed to create wallet snapshot for ${[...affectedWalletIds][index]}:`,
+          result.reason,
+        );
+      }
+    });
+
+    const portfolioResults = await Promise.allSettled(
       [...affectedUserIds].map((userId) =>
-        portfolioService.createPortfolioSnapshot(userId, "cron_update", {
-          timestamp: snapshotTime,
-        }),
+        portfolioService.createPortfolioSnapshot(
+          userId,
+          "cron_update",
+          {
+            timestamp: snapshotTime,
+          },
+          null,
+        ),
       ),
     );
+
+    portfolioResults.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error(
+          `Failed to create portfolio snapshot for ${[...affectedUserIds][index]}:`,
+          result.reason,
+        );
+      }
+    });
 
     const duration = Date.now() - startTime;
     console.log(

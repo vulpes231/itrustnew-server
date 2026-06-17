@@ -24,8 +24,9 @@ function initCronJobs() {
   const schedules = {
     assetUpdate: process.env.CRON_ASSET_UPDATE || "0 9,13,17 * * *",
     walletPerformance: process.env.CRON_WALLET_PERFORMANCE || "0 1 * * *",
-    tradePerformance: process.env.CRON_TRADE_PERFORMANCE || "0 * * * *",
-    positionPerformance: process.env.CRON_POSITION_PERFORMANCE || "0 * * * *",
+    tradePerformance: process.env.CRON_TRADE_PERFORMANCE || "*/30 * * * *",
+    positionPerformance:
+      process.env.CRON_POSITION_PERFORMANCE || "*/30 * * * *",
   };
 
   const assetUpdateJob = cron.schedule(

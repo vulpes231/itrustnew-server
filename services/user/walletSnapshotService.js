@@ -10,7 +10,7 @@ class WalletSnapshotService {
     source = "manual_adjustment",
     metadata = {},
     session = null,
-    userId,
+    userId = null,
   ) {
     let wallet;
 
@@ -60,10 +60,15 @@ class WalletSnapshotService {
 
     const totalValue = cashValue + positionValue;
 
+    const finalUserId = wallet.userId || userId;
+    if (!finalUserId) {
+      throw new Error(`Could not determine userId for wallet ${walletId}`);
+    }
+
     const snapshot = await WalletSnapshot.create(
       [
         {
-          userId: wallet.userId || userId,
+          userId: finalUserId,
           walletId: wallet._id,
           walletName: wallet.name,
           cashValue,
