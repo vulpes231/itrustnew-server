@@ -26,9 +26,7 @@ class PortfolioService {
       0,
     );
 
-    const openTrades = positions.filter((trade) => trade.status === "open");
-
-    const totalPositionValue = openTrades.reduce(
+    const totalPositionValue = positions.reduce(
       (sum, position) => sum + getPositionValue(position),
       0,
     );

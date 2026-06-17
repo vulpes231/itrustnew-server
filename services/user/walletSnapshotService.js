@@ -41,9 +41,7 @@ class WalletSnapshotService {
 
     const cashValue = wallet.balance?.total || 0;
 
-    const openTrades = positions.filter((trade) => trade.status === "open");
-
-    const positionValue = openTrades.reduce(
+    const positionValue = positions.reduce(
       (sum, position) => sum + getPositionValue(position),
       0,
     );
@@ -58,8 +56,7 @@ class WalletSnapshotService {
       0,
     );
 
-    const totalValue = cashValue + positionValue;
-
+    const totalValue = cashValue;
     const finalUserId = wallet.userId || userId;
     if (!finalUserId) {
       throw new Error(`Could not determine userId for wallet ${walletId}`);
