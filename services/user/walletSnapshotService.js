@@ -41,10 +41,13 @@ class WalletSnapshotService {
 
     const cashValue = wallet.balance?.total || 0;
 
+    console.log(wallet, "WalletSnapshot");
+
     const positionValue = positions.reduce(
       (sum, position) => sum + getPositionValue(position),
       0,
     );
+    console.log(positionValue, "WalletSnapshot");
 
     const totalInvested = positions.reduce(
       (sum, position) => sum + (position.amountInvested || 0),
@@ -56,7 +59,7 @@ class WalletSnapshotService {
       0,
     );
 
-    const totalValue = cashValue;
+    const totalValue = cashValue + positionValue;
     const finalUserId = wallet.userId || userId;
     if (!finalUserId) {
       throw new Error(`Could not determine userId for wallet ${walletId}`);
