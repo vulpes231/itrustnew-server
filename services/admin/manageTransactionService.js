@@ -91,7 +91,7 @@ async function editTransaction(transactionId, action) {
 
     if (action === "approve") {
       if (
-        transaction.type === "withdrawal" &&
+        transaction.type === "withdraw" &&
         transactionWallet.balance.available < transaction.amount
       ) {
         throw new CustomError(
@@ -103,7 +103,7 @@ async function editTransaction(transactionId, action) {
       if (transaction.type === "deposit") {
         transactionWallet.balance.available += transaction.amount;
         transactionWallet.balance.total += transaction.amount;
-      } else if (transaction.type === "withdrawal") {
+      } else if (transaction.type === "withdraw") {
         transactionWallet.balance.available -= transaction.amount;
         transactionWallet.balance.total -= transaction.amount;
       }
@@ -131,7 +131,7 @@ async function editTransaction(transactionId, action) {
             },
             session,
           );
-        } else if (type === "withdrawal") {
+        } else if (type === "withdraw") {
           await portfolioService.createPortfolioSnapshot(
             transaction.userId,
             "withdrawal",
