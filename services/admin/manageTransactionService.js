@@ -114,7 +114,7 @@ async function editTransaction(transactionId, action) {
       await transaction.save({ session });
 
       try {
-        if (type === "deposit") {
+        if (transaction.type === "deposit") {
           await portfolioService.createPortfolioSnapshot(
             transaction.userId,
             "deposit",
@@ -131,7 +131,7 @@ async function editTransaction(transactionId, action) {
             },
             session,
           );
-        } else if (type === "withdraw") {
+        } else if (transaction.type === "withdraw") {
           await portfolioService.createPortfolioSnapshot(
             transaction.userId,
             "withdrawal",

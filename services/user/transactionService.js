@@ -109,7 +109,7 @@ async function withdrawFunds(userId, trnxData) {
         network: network,
       },
       amount: amount,
-      account: account,
+      account: withdrawFrom.name,
       memo: memo || customMemo,
       type: "withdraw",
       userId: userId,
