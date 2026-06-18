@@ -82,7 +82,7 @@ async function editTransaction(transactionId, action) {
 
     const transactionWallet = await Wallet.findOne({
       userId: transaction.userId,
-      name: transaction.account,
+      slug: "cash",
     }).session(session);
 
     if (!transactionWallet) {
