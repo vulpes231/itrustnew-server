@@ -3,6 +3,7 @@ const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const WalletSnapshot = require("../../models/WalletSnapshot");
 const { getPositionValue } = require("../../utils/utils");
+const { fetchPortfolioAccounts } = require("./walletService");
 
 class WalletSnapshotService {
   async createWalletSnapshot(
@@ -167,6 +168,98 @@ class WalletSnapshotService {
       y: snapshot.totalValue,
       reason: snapshot.source,
     }));
+  }
+
+  async getCombinedWalletSnapshots(userId, timeframe = "all") {
+    if (!userId) {
+      throw new Error("userId is required");
+    }
+
+    const AllAccounts = await fetchPortfolioAccounts(userId);
+
+    const tradingAccounts = AllAccounts.filter(
+      (acct) => acct._id !== "default",
+    );
+
+    const walletIdArray = tradingAccounts
+      .map((acct) => acct._id.toString())
+      .filter(Boolean);
+
+    if (walletIdArray.length === 0) {
+      return [];
+    }
+
+    const startDate = this.getStartDate(timeframe);
+
+    const query = {
+      userId,
+      walletId: { $in: walletIdArray },
+    };
+
+    if (startDate) {
+      query.snapshotAt = { $gte: startDate };
+    }
+
+    const allSnapshots = await WalletSnapshot.find(query)
+      .sort({ snapshotAt: 1 })
+      .lean();
+
+    if (allSnapshots.length === 0) return [];
+
+    console.log(allSnapshots.length);
+
+    const walletData = new Map();
+
+    for (const snap of allSnapshots) {
+      const wid = snap.walletId.toString();
+      if (!walletData.has(wid)) walletData.set(wid, []);
+
+      walletData.get(wid).push({
+        x: new Date(snap.snapshotAt),
+        y: Number(snap.totalValue || 0),
+      });
+    }
+
+    // const grouped = {};
+
+    // for (const s of allSnapshots) {
+    //   const wid = s.walletId.toString();
+    //   grouped[wid] = (grouped[wid] || 0) + 1;
+    // }
+
+    // console.log(grouped);
+
+    const allTimestamps = [
+      ...new Set(allSnapshots.map((s) => s.snapshotAt.getTime())),
+    ].sort((a, b) => a - b);
+
+    const combined = [];
+    const lastValues = new Map();
+
+    for (const ts of allTimestamps) {
+      const currentTime = new Date(ts);
+
+      const snapsAtThisTime = allSnapshots.filter(
+        (s) => s.snapshotAt.getTime() === ts,
+      );
+
+      for (const snap of snapsAtThisTime) {
+        lastValues.set(snap.walletId.toString(), Number(snap.totalValue || 0));
+      }
+
+      let totalY = 0;
+      for (const walletId of walletIdArray) {
+        totalY += lastValues.get(walletId) || 0;
+      }
+
+      combined.push({
+        x: currentTime,
+        y: Number(totalY.toFixed(4)),
+        reason: "combined",
+      });
+    }
+
+    return combined;
   }
 }
 

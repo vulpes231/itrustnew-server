@@ -80,11 +80,9 @@ const getPortfolioChartData = async (req, res, next) => {
 const getAllPortfolioChartData = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-
-    const { timeframe } = req.query;
+    let { timeframe = "all" } = req.query;
 
     const validTimeframes = ["1h", "1d", "1w", "1m", "1y", "all"];
-
     if (!validTimeframes.includes(timeframe.toLowerCase())) {
       return res.status(400).json({
         success: false,
@@ -92,7 +90,7 @@ const getAllPortfolioChartData = async (req, res, next) => {
       });
     }
 
-    const chartData = await walletSnapshotService.getAllSnapshot(
+    const chartData = await walletSnapshotService.getCombinedWalletSnapshots(
       userId,
       timeframe.toLowerCase(),
     );
