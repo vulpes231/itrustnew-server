@@ -71,25 +71,34 @@ async function getWatchlist(userId) {
 async function addToWatchlist(userId, assetId) {
   try {
     const asset = await Asset.findById(assetId);
+
     if (!asset) {
       throw new Error("Asset not found");
     }
 
     const user = await User.findById(userId);
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
     const alreadyExists = user.watchList.some(
       (item) => item.assetId.toString() === assetId,
     );
 
     if (alreadyExists) {
-      throw new Error("Asset already in watchlist");
+      user.watchList = user.watchList.filter(
+        (item) => item.assetId.toString() !== assetId,
+      );
+    } else {
+      user.watchList.push({ assetId });
     }
 
-    user.watchList.push({ assetId });
     await user.save();
 
     return await getWatchlist(userId);
   } catch (error) {
-    console.error("Error adding to watchlist:", error);
+    console.error("Error updating watchlist:", error);
     throw error;
   }
 }
