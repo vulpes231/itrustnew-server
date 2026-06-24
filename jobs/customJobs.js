@@ -630,22 +630,33 @@ const updateTradePerformance = async () => {
     const startTime = Date.now();
 
     const openTrades = await Trade.find(
-      { status: "open", "asset.symbol": { $exists: true, $ne: null } },
       {
+        status: "open",
+        "asset.symbol": { $exists: true, $ne: null },
+      },
+      {
+        assetType: 1,
         "asset.symbol": 1,
+
         "execution.price": 1,
         "execution.quantity": 1,
         "execution.amount": 1,
         "execution.leverage": 1,
         "execution.type": 1,
+
         "performance.totalReturn": 1,
         "performance.todayReturn": 1,
         "performance.currentValue": 1,
+        "performance.currentPrice": 1,
+        "performance.previousClose": 1,
+
         "targets.takeProfit": 1,
         "targets.stopLoss": 1,
+
         orderType: 1,
         extra: 1,
         "wallet.id": 1,
+
         createdAt: 1,
         userId: 1,
       },
@@ -672,6 +683,7 @@ const updateTradePerformance = async () => {
     for (const trade of openTrades) {
       if (trade.asset?.symbol) {
         const symbol = trade.asset.symbol.toUpperCase();
+
         if (!symbolSet.has(symbol)) {
           symbolSet.add(symbol);
           assetSymbols.push(symbol);
@@ -687,6 +699,7 @@ const updateTradePerformance = async () => {
     console.log(`Fetching current prices for ${assetSymbols.length} assets...`);
 
     let currentAssets;
+
     try {
       currentAssets = await fetchAssetsWithRetry(assetSymbols);
     } catch (error) {
@@ -694,10 +707,21 @@ const updateTradePerformance = async () => {
       return;
     }
 
+    /**
+     * Store:
+     * {
+     *   current,
+     *   previousClose
+     * }
+     */
     const assetPriceMap = new Map();
+
     for (const asset of currentAssets) {
-      if (asset?.symbol && asset?.priceData?.current) {
-        assetPriceMap.set(asset.symbol.toUpperCase(), asset.priceData.current);
+      if (asset?.symbol) {
+        assetPriceMap.set(asset.symbol.toUpperCase(), {
+          current: asset?.priceData?.current || 0,
+          previousClose: asset?.priceData?.previousClose || 0,
+        });
       }
     }
 
@@ -707,27 +731,50 @@ const updateTradePerformance = async () => {
 
     for (const trade of openTrades) {
       const symbol = trade.asset?.symbol?.toUpperCase();
+
       if (!symbol) continue;
 
-      const currentPrice = assetPriceMap.get(symbol);
-      if (!currentPrice) continue;
+      const assetData = assetPriceMap.get(symbol);
 
+      if (!assetData) continue;
+
+      const currentPrice = assetData.current;
+      const previousClose = assetData.previousClose;
+
+      if (!currentPrice || currentPrice <= 0) continue;
+
+      const quantity = trade.execution?.quantity || 0;
+
+      /**
+       * Existing calculation helper
+       */
       const result = calculateTradeValue(trade, currentPrice);
+
       const totalCurrentValue = result.currentValue;
       const totalReturn = result.totalReturn;
       const totalReturnPercent = result.totalReturnPercent;
 
-      const previousCurrentValue =
-        trade.performance?.currentValue || totalCurrentValue;
-      const todayReturn = totalCurrentValue - previousCurrentValue;
-      const todayReturnPercent =
-        previousCurrentValue > 0
-          ? (todayReturn / previousCurrentValue) * 100
-          : 0;
+      /**
+       * TODAY RETURN
+       * Based on previous market close
+       */
+      let todayReturn = 0;
+      let todayReturnPercent = 0;
 
+      if (previousClose > 0) {
+        todayReturn = (currentPrice - previousClose) * quantity;
+
+        todayReturnPercent =
+          ((currentPrice - previousClose) / previousClose) * 100;
+      }
+
+      /**
+       * TP / SL
+       */
       const shouldCloseByTP =
         trade.targets?.takeProfit &&
         totalReturnPercent >= trade.targets.takeProfit;
+
       const shouldCloseBySL =
         trade.targets?.stopLoss && totalReturnPercent <= trade.targets.stopLoss;
 
@@ -744,20 +791,38 @@ const updateTradePerformance = async () => {
       tradeUpdates.push({
         updateOne: {
           filter: { _id: trade._id },
+
           update: {
             $set: {
+              /**
+               * TOTAL PERFORMANCE
+               */
               "performance.totalReturn": parseFloat(totalReturn.toFixed(4)),
+
               "performance.totalReturnPercent": parseFloat(
                 totalReturnPercent.toFixed(4),
               ),
+
+              /**
+               * DAILY PERFORMANCE
+               */
               "performance.todayReturn": parseFloat(todayReturn.toFixed(4)),
+
               "performance.todayReturnPercent": parseFloat(
                 todayReturnPercent.toFixed(4),
               ),
+
+              /**
+               * PRICE DATA
+               */
               "performance.currentValue": parseFloat(
                 totalCurrentValue.toFixed(4),
               ),
-              "performance.currentPrice": parseFloat(currentPrice),
+
+              "performance.currentPrice": parseFloat(currentPrice.toFixed(4)),
+
+              "performance.previousClose": parseFloat(previousClose.toFixed(4)),
+
               updatedAt: now,
             },
           },
@@ -765,12 +830,20 @@ const updateTradePerformance = async () => {
       });
     }
 
+    /**
+     * BULK UPDATE
+     */
     if (tradeUpdates.length > 0) {
       const BATCH_SIZE = 500;
+
       for (let i = 0; i < tradeUpdates.length; i += BATCH_SIZE) {
         const batch = tradeUpdates.slice(i, i + BATCH_SIZE);
+
         try {
-          await Trade.bulkWrite(batch, { ordered: false });
+          await Trade.bulkWrite(batch, {
+            ordered: false,
+          });
+
           console.log(
             `Updated ${batch.length} trades in batch ${
               Math.floor(i / BATCH_SIZE) + 1
@@ -785,15 +858,21 @@ const updateTradePerformance = async () => {
       }
     }
 
+    /**
+     * CLOSE TP/SL TRADES
+     */
     if (tradesToClose.length > 0) {
       console.log(`Closing ${tradesToClose.length} trades (TP/SL reached)`);
+
       await closeTradesInBatch(tradesToClose, now);
     }
 
     const duration = Date.now() - startTime;
+
     console.log(`Trade performance update completed in ${duration}ms.`);
   } catch (error) {
     console.error("Error in updateTradePerformance:", error);
+
     throw error;
   }
 };
@@ -802,32 +881,70 @@ const updatePositionsPerformance = async () => {
   try {
     const startTime = Date.now();
 
-    const openPositions = await Position.find({
-      status: "open",
-      "asset.symbol": { $exists: true, $ne: null },
-    }).lean();
+    const openPositions = await Position.find(
+      {
+        status: "open",
+        "asset.symbol": { $exists: true, $ne: null },
+      },
+      {
+        userId: 1,
+
+        "wallet.id": 1,
+
+        "asset.symbol": 1,
+
+        quantity: 1,
+        amountInvested: 1,
+
+        "performance.currentValue": 1,
+        "performance.currentPrice": 1,
+        "performance.previousClose": 1,
+
+        updatedAt: 1,
+      },
+    ).lean();
 
     if (openPositions.length === 0) {
       console.log("No open positions found.");
       return;
     }
 
+    /**
+     * UNIQUE SYMBOLS
+     */
     const assetSymbols = [
       ...new Set(openPositions.map((p) => p.asset.symbol.toUpperCase())),
     ];
 
+    /**
+     * FETCH MARKET DATA
+     */
     let currentAssets;
+
     try {
       currentAssets = await fetchAssetsWithRetry(assetSymbols);
     } catch (error) {
       console.error("Error fetching assets:", error.message);
+
       return;
     }
 
+    /**
+     * MAP:
+     * SYMBOL => {
+     *   current,
+     *   previousClose
+     * }
+     */
     const assetPriceMap = new Map();
+
     for (const asset of currentAssets) {
-      if (asset?.symbol && asset?.priceData?.current) {
-        assetPriceMap.set(asset.symbol.toUpperCase(), asset.priceData.current);
+      if (asset?.symbol) {
+        assetPriceMap.set(asset.symbol.toUpperCase(), {
+          current: asset?.priceData?.current || 0,
+
+          previousClose: asset?.priceData?.previousClose || 0,
+        });
       }
     }
 
@@ -836,6 +953,9 @@ const updatePositionsPerformance = async () => {
 
     const positionUpdates = [];
 
+    /**
+     * UPDATE POSITIONS
+     */
     for (const position of openPositions) {
       affectedUserIds.add(position.userId.toString());
 
@@ -843,17 +963,34 @@ const updatePositionsPerformance = async () => {
         affectedWalletIds.add(position.wallet.id.toString());
       }
 
-      const currentPrice = assetPriceMap.get(
-        position.asset.symbol.toUpperCase(),
-      );
+      const symbol = position.asset?.symbol?.toUpperCase();
 
-      if (!currentPrice) {
-        console.warn(`No price found for ${position.asset.symbol}`);
+      if (!symbol) continue;
+
+      const assetData = assetPriceMap.get(symbol);
+
+      if (!assetData) {
+        console.warn(`No price found for ${symbol}`);
+
         continue;
       }
 
+      const currentPrice = assetData.current;
+
+      const previousClose = assetData.previousClose;
+
+      if (!currentPrice || currentPrice <= 0) {
+        continue;
+      }
+
+      /**
+       * CURRENT VALUE
+       */
       const currentValue = position.quantity * currentPrice;
 
+      /**
+       * TOTAL RETURN
+       */
       const totalReturn = currentValue - position.amountInvested;
 
       const totalReturnPercent =
@@ -861,31 +998,56 @@ const updatePositionsPerformance = async () => {
           ? (totalReturn / position.amountInvested) * 100
           : 0;
 
-      const previousCurrentValue =
-        position.performance?.currentValue || currentValue;
+      /**
+       * TODAY RETURN
+       * BASED ON PREVIOUS MARKET CLOSE
+       */
+      let todayReturn = 0;
+      let todayReturnPercent = 0;
 
-      const todayReturn = currentValue - previousCurrentValue;
+      if (previousClose > 0) {
+        todayReturn = (currentPrice - previousClose) * position.quantity;
 
-      const todayReturnPercent =
-        previousCurrentValue > 0
-          ? (todayReturn / previousCurrentValue) * 100
-          : 0;
+        todayReturnPercent =
+          ((currentPrice - previousClose) / previousClose) * 100;
+      }
 
       positionUpdates.push({
         updateOne: {
           filter: { _id: position._id },
+
           update: {
             $set: {
+              /**
+               * VALUE
+               */
               "performance.currentValue": Number(currentValue.toFixed(4)),
+
+              /**
+               * TOTAL PERFORMANCE
+               */
               "performance.totalReturn": Number(totalReturn.toFixed(4)),
+
               "performance.totalReturnPercent": Number(
                 totalReturnPercent.toFixed(4),
               ),
+
+              /**
+               * DAILY PERFORMANCE
+               */
               "performance.todayReturn": Number(todayReturn.toFixed(4)),
+
               "performance.todayReturnPercent": Number(
                 todayReturnPercent.toFixed(4),
               ),
-              "performance.currentPrice": currentPrice,
+
+              /**
+               * MARKET DATA
+               */
+              "performance.currentPrice": Number(currentPrice.toFixed(4)),
+
+              "performance.previousClose": Number(previousClose.toFixed(4)),
+
               updatedAt: new Date(),
             },
           },
@@ -893,22 +1055,39 @@ const updatePositionsPerformance = async () => {
       });
     }
 
+    /**
+     * BULK UPDATE
+     */
     if (positionUpdates.length > 0) {
       const BATCH_SIZE = 500;
+
       for (let i = 0; i < positionUpdates.length; i += BATCH_SIZE) {
         const batch = positionUpdates.slice(i, i + BATCH_SIZE);
-        await Position.bulkWrite(batch, { ordered: false });
+
+        await Position.bulkWrite(batch, {
+          ordered: false,
+        });
+
         console.log(
-          `Updated ${batch.length} positions in batch ${Math.floor(i / BATCH_SIZE) + 1}`,
+          `Updated ${batch.length} positions in batch ${
+            Math.floor(i / BATCH_SIZE) + 1
+          }`,
         );
       }
     }
 
+    /**
+     * SNAPSHOTS
+     */
     const snapshotTime = new Date();
 
     console.log(affectedUserIds.size, "userIds");
+
     console.log(affectedWalletIds.size, "walletIds");
 
+    /**
+     * WALLET SNAPSHOTS
+     */
     const walletResults = await Promise.allSettled(
       [...affectedWalletIds].map((walletId) =>
         walletSnapshotService.createWalletSnapshot(
@@ -925,12 +1104,17 @@ const updatePositionsPerformance = async () => {
     walletResults.forEach((result, index) => {
       if (result.status === "rejected") {
         console.error(
-          `Failed to create wallet snapshot for ${[...affectedWalletIds][index]}:`,
+          `Failed to create wallet snapshot for ${
+            [...affectedWalletIds][index]
+          }:`,
           result.reason,
         );
       }
     });
 
+    /**
+     * PORTFOLIO SNAPSHOTS
+     */
     const portfolioResults = await Promise.allSettled(
       [...affectedUserIds].map((userId) =>
         portfolioService.createPortfolioSnapshot(
@@ -947,18 +1131,22 @@ const updatePositionsPerformance = async () => {
     portfolioResults.forEach((result, index) => {
       if (result.status === "rejected") {
         console.error(
-          `Failed to create portfolio snapshot for ${[...affectedUserIds][index]}:`,
+          `Failed to create portfolio snapshot for ${
+            [...affectedUserIds][index]
+          }:`,
           result.reason,
         );
       }
     });
 
     const duration = Date.now() - startTime;
+
     console.log(
       `Position performance update completed in ${duration}ms. Updated ${positionUpdates.length} positions`,
     );
   } catch (error) {
     console.error("Error in updatePositionsPerformance:", error);
+
     throw error;
   }
 };
