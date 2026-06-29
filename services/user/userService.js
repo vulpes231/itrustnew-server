@@ -72,6 +72,7 @@ async function updateUserProfile(userId, userData) {
       dob,
       email,
       phone,
+      phoneCode,
       street,
       city,
       stateId,
@@ -106,6 +107,7 @@ async function updateUserProfile(userId, userData) {
     setIfDefined(user.contactInfo, "email", email);
     setIfDefined(user.personalInfo, "username", username);
     setIfDefined(user.contactInfo, "phone", phone);
+    setIfDefined(user.contactInfo, "areaCode", phoneCode);
 
     if (dob !== undefined) {
       const formattedDob = new Date(dob);

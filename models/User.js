@@ -45,6 +45,9 @@ const userSchema = new Schema(
       phone: {
         type: String,
       },
+      areaCode: {
+        type: String,
+      },
       email: {
         type: String,
         required: true,

@@ -141,6 +141,7 @@ async function registerService(userData) {
 async function completeRegister(userData, userId) {
   const {
     phone,
+    phoneCode,
     street,
     city,
     zipCode,
@@ -155,6 +156,7 @@ async function completeRegister(userData, userId) {
 
   if (
     !phone ||
+    !phoneCode ||
     !dob ||
     !countryId ||
     !stateId ||
@@ -195,6 +197,7 @@ async function completeRegister(userData, userId) {
     const updateData = {
       $set: {
         "contactInfo.phone": phone,
+        "contactInfo.areaCode": phoneCode,
         "contactInfo.street": street,
         "contactInfo.city": city,
         "contactInfo.zipCode": zipCode,
