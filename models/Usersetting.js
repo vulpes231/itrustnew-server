@@ -57,22 +57,22 @@ const userSettingSchema = new Schema(
     limits: {
       deposit: {
         bank: {
-          min: { type: Number, default: 100 },
-          max: { type: Number, default: 1000 },
+          min: { type: Number, default: 25000 },
+          max: { type: Number, default: 500000 },
         },
         crypto: {
-          min: { type: Number, default: 100 },
-          max: { type: Number, default: 1000 },
+          min: { type: Number, default: 10 },
+          max: { type: Number, default: 1000000 },
         },
       },
       withdrawal: {
         bank: {
-          min: { type: Number, default: 100 },
-          max: { type: Number, default: 1000 },
+          min: { type: Number, default: 1000 },
+          max: { type: Number, default: 1000000 },
         },
         crypto: {
-          min: { type: Number, default: 100 },
-          max: { type: Number, default: 1000 },
+          min: { type: Number, default: 200 },
+          max: { type: Number, default: 1000000 },
         },
       },
     },
@@ -99,7 +99,7 @@ const userSettingSchema = new Schema(
       walletName: { type: String },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("UserSetting", userSettingSchema);

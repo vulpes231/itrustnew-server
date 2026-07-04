@@ -44,7 +44,7 @@ const walletSettingSchema = new Schema(
       },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const WalletSetting = mongoose.model("WalletSetting", walletSettingSchema);

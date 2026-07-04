@@ -4,6 +4,8 @@ const {
   buildEmailMsg,
   buildTwoFaMsg,
   buildWelcomeMsg,
+  buildTransactionEmail,
+  buildTradeMessage,
 } = require("../utils/messages");
 const { generateOtp, CustomError } = require("../utils/utils");
 const bcrypt = require("bcryptjs");
@@ -54,14 +56,16 @@ async function sendLoginCode(email) {
   }
 }
 
-async function sendMailVerificationCode(subject, email) {
+async function sendMailVerificationCode(
+  subject = "Your Verification Code",
+  email,
+) {
   if (!email) {
     throw new CustomError("Email required!", 400);
   }
 
   const otp = generateOtp();
 
-  // const subject = "Verify Your Email Address - Itrust Investment";
   const msg = buildEmailMsg(otp);
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
@@ -131,61 +135,18 @@ async function sendDepositAlert(email, transaction, currency) {
 
   const subject = `Deposit Successful - ${symbol}${amount} ${currencyName} Received`;
 
-  const message = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .logo { max-height: 50px; }
-            .highlight-box { 
-                background-color: #f8f9fa; 
-                border-left: 4px solid #28a745;
-                padding: 15px;
-                margin: 20px 0;
-            }
-            .method-icon { font-size: 24px; margin-right: 10px; vertical-align: middle; }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <img src="https://www.itrustinvestments.com/logo.png" alt="iTrust Investments" class="logo">
-        </div>
-        
-        <h2 style="color: #2c3e50;">Deposit Received</h2>
-        
-        <p>Hello,</p>
-        
-        <div class="highlight-box">
-            <p style="font-size: 18px; margin: 0;">
-              
-                <strong>${symbol}${amount} ${currencyName}</strong> via ${
-                  method
-                }
-            </p>
-        </div>
-        
-        <p>Your deposit has been successfully credited to your iTrust Investments account and is now available for trading.</p>
-        
-        <p><strong>Transaction Details:</strong></p>
-        <ul>
-            <li>Amount: ${symbol}${amount} ${currencyName}</li>
-            <li>Payment Method: ${method}</li>
-            <li>Status: Completed</li>
-            <li>Date: ${new Date().toLocaleString()}</li>
-        </ul>
-        
-        <p>You can now <a href="https://app.itrustinvestments.com/dashboard">log in to your account</a> to start investing.</p>
-        
-        <div style="margin-top: 40px; font-size: 12px; color: #7f8c8d;">
-            <p>If you didn't initiate this deposit, please contact our <a href="https://www.itrustinvestments.com/support">security team</a> immediately.</p>
-            <p>© ${new Date().getFullYear()} iTrust Investments. All rights reserved.</p>
-        </div>
-    </body>
-    </html>
-    `;
+  const message = buildTransactionEmail({
+    type: "Deposit Successful",
+    amount,
+    symbol,
+    currencyName,
+    method,
+    status: "Completed",
+    buttonText: "Go to Dashboard",
+    buttonLink: "https://itrustinvestment.netlify.app/dashboard",
+    message:
+      "Your deposit has been received successfully and credited to your iTrust Investments account.",
+  });
 
   try {
     await sendMail(email, subject, message);
@@ -193,6 +154,7 @@ async function sendDepositAlert(email, transaction, currency) {
     if (error instanceof CustomError) {
       throw error;
     }
+
     throw new CustomError(error.message, 500);
   }
 }
@@ -203,61 +165,20 @@ async function sendWithdrawalAlert(email, transaction, currency) {
   const currencyName = currency?.symbol?.toUpperCase();
   const amount = transaction?.amount;
 
-  const subject = `Withdrawal Successful - ${symbol}${amount} ${currencyName} Received`;
+  const subject = `Withdrawal Successful - ${symbol}${amount} ${currencyName}`;
 
-  const message = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .logo { max-height: 50px; }
-            .highlight-box { 
-                background-color: #f8f9fa; 
-                border-left: 4px solid #28a745;
-                padding: 15px;
-                margin: 20px 0;
-            }
-            .method-icon { font-size: 24px; margin-right: 10px; vertical-align: middle; }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <img src="https://www.itrustinvestments.com/logo.png" alt="iTrust Investments" class="logo">
-        </div>
-        
-        <h2 style="color: #2c3e50;">Withdrawal Processed</h2>
-        
-        <p>Hello,</p>
-        
-        <div class="highlight-box">
-            <p style="font-size: 18px; margin: 0;">
-              
-                <strong>${symbol}${amount} ${currencyName}</strong> via ${
-                  method
-                }
-            </p>
-        </div>
-        
-        <p>Your withdrawal request has been successfully processed.</p>
-        
-        <p><strong>Transaction Details:</strong></p>
-        <ul>
-            <li>Amount: ${symbol}${amount} ${currencyName}</li>
-            <li>Payment Method: ${method}</li>
-            <li>Status: Processed</li>
-            <li>Date: ${new Date().toLocaleString()}</li>
-        </ul>
-        
-        <div style="margin-top: 40px; font-size: 12px; color: #7f8c8d;">
-            <p>If you didn't initiate this deposit, please contact our <a href="https://www.itrustinvestments.com/support">security team</a> immediately.</p>
-            <p>© ${new Date().getFullYear()} iTrust Investments. All rights reserved.</p>
-        </div>
-    </body>
-    </html>
-    `;
+  const message = buildTransactionEmail({
+    type: "Withdrawal Processed",
+    amount,
+    symbol,
+    currencyName,
+    method,
+    status: "Processed",
+    buttonText: "View Dashboard",
+    buttonLink: "https://itrustinvestment.netlify.app/dashboard",
+    message:
+      "Your withdrawal request has been processed successfully. The funds are on their way to your selected payment destination.",
+  });
 
   try {
     await sendMail(email, subject, message);
@@ -265,6 +186,7 @@ async function sendWithdrawalAlert(email, transaction, currency) {
     if (error instanceof CustomError) {
       throw error;
     }
+
     throw new CustomError(error.message, 500);
   }
 }
@@ -298,92 +220,27 @@ async function sendTradeAlert(
 
     subject = `${closeType} Trade: ${trade.asset.symbol.toUpperCase()} - ${profitLossFormatted}`;
 
-    message = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-          <meta charset="UTF-8">
-          <style>
-              body { font-family: 'Arial', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { text-align: center; margin-bottom: 20px; }
-              .logo { max-height: 50px; }
-              .trade-box { 
-                  background-color: #f8f9fa; 
-                  border-left: 4px solid ${profitLoss >= 0 ? "#28a745" : "#dc3545"};
-                  padding: 15px;
-                  margin: 20px 0;
-                  border-radius: 4px;
-              }
-              .profit { color: #28a745; font-weight: bold; }
-              .loss { color: #dc3545; font-weight: bold; }
-              .info-box {
-                  background-color: #e9ecef;
-                  padding: 10px;
-                  margin: 10px 0;
-                  border-radius: 4px;
-              }
-          </style>
-      </head>
-      <body>
-          <div class="header">
-              <img src="https://itrustinvestment.netlify.app/logo.png" alt="iTrust Investments" class="logo">
-          </div>
-          
-          <h2 style="color: #2c3e50;">${closeType} Trade Confirmation</h2>
-          
-          <p>Hello,</p>
-          
-          <div class="trade-box">
-              <p style="font-size: 18px; margin: 0;">
-                  <span class="asset-icon">${trade.asset.img || "📊"}</span>
-                  Your ${trade.orderType.toUpperCase()} position in 
-                  <strong>${trade.asset.symbol} (${trade.asset.name})</strong> has been ${closedPortion?.percentClosed === 100 ? "closed" : "partially closed"}
-              </p>
-          </div>
-          
-          ${
-            isPartialClose
-              ? `
-          <div class="info-box">
-              <p><strong>Partial Close Details:</strong></p>
-              <ul>
-                  <li>Closed Percentage: ${closedPortion?.percentClosed}%</li>
-                  <li>Principal Closed: $${closedPortion?.principalClosed?.toFixed(2)}</li>
-                  <li>Remaining Principal: $${closedPortion?.remainingPrincipal?.toFixed(2)}</li>
-                  <li>Remaining Quantity: ${(trade.execution.quantity || 0).toFixed(4)}</li>
-              </ul>
-          </div>
-          `
-              : ""
-          }
-          
-          <p><strong>Trade Performance:</strong></p>
-          <ul>
-              <li>Action: ${trade.orderType.toUpperCase()}</li>
-              <li>Asset: ${trade.asset.name}</li>
-              <li>Exit Price: $${(closedPortion?.exitPrice || trade.targets?.exitPoint || "N/A").toFixed(2)}</li>
-              <li>Profit/Loss: <span class="${profitLossClass}">${profitLossFormatted}</span></li>
-              <li>Closed Date: ${new Date().toLocaleString()}</li>
-          </ul>
-          
-          ${
-            closedPortion?.percentClosed !== 100
-              ? `
-          <p>Your remaining position is still active. You can close more later from your portfolio.</p>
-          `
-              : ""
-          }
-          
-          <p>View your updated portfolio <a href="https://itrustinvestment.netlify.app">here</a>.</p>
-          
-          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #7f8c6d;">
-              <p>This is an automated notification. Please <a href="mailto:support@itrustinvestments.com">contact support</a> 
-              if you didn't initiate this trade.</p>
-              <p>© ${new Date().getFullYear()} iTrust Investments. All rights reserved.</p>
-          </div>
-      </body>
-      </html>
-    `;
+    message = buildTradeMessage({
+      title: `${closeType} Trade Confirmation`,
+      message: `
+            Your ${trade.orderType.toUpperCase()} position in
+            <strong>${trade.asset.symbol} (${trade.asset.name})</strong>
+            has been ${
+              closedPortion?.percentClosed === 100
+                ? "closed"
+                : "partially closed"
+            }
+        `,
+      trade,
+      actionColor: profitLoss >= 0 ? "#28a745" : "#dc3545",
+      actionLabel: closeType,
+      isClosing: true,
+      profitLoss,
+      profitLossFormatted,
+      profitLossClass,
+      closeType,
+      closedPortion,
+    });
   } else {
     const actionVerb =
       {
@@ -396,68 +253,19 @@ async function sendTradeAlert(
 
     subject = `Trade Confirmation: You ${actionVerb} ${parsedQty} ${trade.asset.symbol.toUpperCase()}`;
 
-    message = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body { font-family: 'Arial', sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { text-align: center; margin-bottom: 20px; }
-            .logo { max-height: 50px; }
-            .trade-box { 
-                background-color: #f8f9fa; 
-                border-left: 4px solid ${
-                  action === "buy" ? "#28a745" : "#dc3545"
-                };
-                padding: 15px;
-                margin: 20px 0;
-                border-radius: 4px;
-            }
-            .asset-icon { font-size: 24px; margin-right: 10px; vertical-align: middle; }
-            .action-${action} { color: ${
-              action === "buy" ? "#28a745" : "#dc3545"
-            }; font-weight: bold; }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-            <img src="https://itrustinvestment.netlify.app/logo.png" alt="iTrust Investments" class="logo">
-        </div>
-        
-        <h2 style="color: #2c3e50;">Trade Confirmation</h2>
-        
-        <p>Hello,</p>
-        
-        <div class="trade-box">
-            <p style="font-size: 18px; margin: 0;">
-                <img class="asset-icon src=${trade.asset.img} width="30px" height="30px"/>
-                You <span class="action-${action}">${actionVerb}</span> 
-                <strong>${parsedQty} ${trade.asset.symbol}</strong> (${
-                  trade.asset.name
-                })
-            </p>
-        </div>
-        
-        <p><strong>Trade Details:</strong></p>
-        <ul>
-            <li>Action: <span class="action-${action}">${action.toUpperCase()}</span></li>
-            <li>Asset: ${trade.asset.name} </li>
-            <li>Quantity: ${parsedQty}</li>
-            <li>Ticker: ${trade.asset.symbol}</li>
-            <li>Date: ${new Date().toLocaleString()}</li>
-        </ul>
-        
-        <p>You can view this trade in your <a href="https://itrustinvestment.netlify.app">portfolio</a>.</p>
-        
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #7f8c8d;">
-            <p>This is an automated notification. Please <a href="mailto:support@itrustinvestments.com">contact support</a> 
-            if you didn't initiate this trade.</p>
-            <p>© ${new Date().getFullYear()} iTrust Investments. All rights reserved.</p>
-        </div>
-    </body>
-    </html>
-    `;
+    message = buildTradeMessage({
+      title: "Trade Confirmation",
+      message: `
+            You 
+            <strong style="color:${action === "buy" ? "#28a745" : "#dc3545"};">
+                ${actionVerb.toUpperCase()}
+            </strong>
+            ${parsedQty} ${trade.asset.symbol} (${trade.asset.name})
+        `,
+      trade,
+      actionColor: action === "buy" ? "#28a745" : "#dc3545",
+      actionLabel: action.toUpperCase(),
+    });
   }
 
   try {
