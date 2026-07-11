@@ -5,6 +5,7 @@ const {
   getTransactionData,
   adminCreateTransaction,
   setTransactionStatus,
+  updateTransactionInfo,
 } = require("../../handlers/admin/manageTransactionController");
 
 const router = Router();
@@ -14,6 +15,7 @@ router
   .route("/:transactionId")
   .get(getTransactionData)
   .put(updateTransaction)
-  .patch(setTransactionStatus);
+  .patch(setTransactionStatus)
+  .post(updateTransactionInfo);
 
 module.exports = router;

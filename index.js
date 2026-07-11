@@ -99,6 +99,7 @@ const manageVerifyRoute = require("./routes/admin/manageverify.js");
 const manageSavingsAccountRoute = require("./routes/admin/managesavingsaccount.js");
 const manageConfigRoute = require("./routes/admin/manageconfig.js");
 const manageSysInfoRoute = require("./routes/admin/systemanalytics.js");
+const manageAssetRoute = require("./routes/admin/manageAsset.js");
 
 // routes
 
@@ -188,6 +189,11 @@ app.use(
   "/manageconfig",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
   manageConfigRoute,
+);
+app.use(
+  "/manageasset",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageAssetRoute,
 );
 
 let server;

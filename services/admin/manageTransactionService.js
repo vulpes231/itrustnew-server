@@ -210,14 +210,28 @@ async function updateTransactionStatus({ formData }) {
 }
 
 async function createTransaction(transactionData) {
-  const { method, amount, accountId, memo, network, userId, type } =
-    transactionData;
+  const {
+    method,
+    amount,
+    accountId,
+    memo,
+    network,
+    userId,
+    type,
+    customDate,
+    toAccountId,
+    address,
+    bankName,
+    accountNumber,
+    routing,
+    accountName,
+  } = transactionData;
 
   if (!amount || !method || !accountId || !userId || !type) {
     throw new CustomError("Missing required fields!", 400);
   }
 
-  if (!["deposit", "withdrawal"].includes(type)) {
+  if (!["deposit", "withdraw", "transfer"].includes(type)) {
     throw new CustomError("Invalid transaction type!", 400);
   }
 
@@ -236,6 +250,8 @@ async function createTransaction(transactionData) {
       throw new CustomError("No wallets found for this user!", 404);
     }
 
+    let transferToAccount;
+
     const receiver = wallets.find(
       (wallet) => wallet._id.toString() === accountId,
     );
@@ -243,53 +259,121 @@ async function createTransaction(transactionData) {
       throw new CustomError("Invalid wallet!", 400);
     }
 
+    if (type === "transfer") {
+      if (!toAccountId) {
+        throw new CustomError("Destination wallet is required.", 400);
+      }
+
+      transferToAccount = wallets.find(
+        (wallet) => wallet._id.toString() === toAccountId,
+      );
+
+      if (!transferToAccount) {
+        throw new CustomError("Destination wallet not found.", 404);
+      }
+
+      if (receiver._id.equals(transferToAccount._id)) {
+        throw new CustomError("Cannot transfer to the same wallet.", 400);
+      }
+    }
+
+    const value = Number(amount);
+
+    if (!Number.isFinite(value) || value <= 0) {
+      throw new CustomError("Invalid amount.", 400);
+    }
+
     if (
-      type === "withdrawal" &&
-      receiver.balance.available < parseFloat(amount)
+      ["withdraw", "transfer"].includes(type) &&
+      receiver.balance.available < value
     ) {
       throw new CustomError("Insufficient funds!", 400);
     }
 
     const customMemo = `${method} ${type} to ${receiver.name}`;
 
-    const trnx = await Transaction.create(
-      [
-        {
-          method: {
-            mode: method,
-            network: network || null,
-          },
-          amount: parseFloat(amount),
-          account: receiver.name,
-          memo: memo || customMemo,
-          type: type,
-          userId: userId,
-          email: user.contactInfo.email,
-          fullname: user.fullName,
-          status: "processed",
+    const transactionPayload = {
+      method: {
+        mode: method,
+        network: network || null,
+      },
+      amount: value,
+      account: receiver.name,
+      memo: memo || customMemo,
+      type,
+      userId,
+      email: user.contactInfo.email,
+      fullname: user.fullName,
+      status: "processed",
+      ...(type === "transfer" && {
+        meta: {
+          type: "transfer",
+          fromWalletId: receiver._id,
+          toWalletId: transferToAccount._id,
+          from: receiver.slug,
+          to: transferToAccount.slug,
+          method: "internal",
+          network: "internal",
         },
-      ],
-      { session },
-    );
+      }),
+    };
 
-    const transaction = trnx[0];
+    let bankInfo;
+
+    if (type === "withdraw") {
+      bankInfo = `${`${bankName}-acc:${accountNumber}-rou:${routing}-owner:${accountName}`}`;
+    }
+
+    transactionPayload.meta = {
+      type: "withdraw",
+      to: transferToAccount.name,
+      method: method,
+      network: network,
+      info: method === "bank" ? bankInfo : address,
+    };
+
+    if (customDate) {
+      const date = new Date(customDate);
+
+      if (Number.isNaN(date.getTime())) {
+        throw new CustomError("Invalid custom date.", 400);
+      }
+
+      transactionPayload.createdAt = date;
+      transactionPayload.updatedAt = date;
+    }
+
+    const [transaction] = await Transaction.create([transactionPayload], {
+      session,
+      ...(customDate && { timestamps: false }),
+    });
 
     if (type === "deposit") {
-      receiver.balance.total += parseFloat(amount);
-      receiver.balance.available += parseFloat(amount);
+      receiver.balance.total += value;
+      receiver.balance.available += value;
+    } else if (type === "transfer") {
+      receiver.balance.total -= value;
+      receiver.balance.available -= value;
+      transferToAccount.balance.total += value;
+      transferToAccount.balance.available += value;
     } else {
-      receiver.balance.total -= parseFloat(amount);
-      receiver.balance.available -= parseFloat(amount);
+      receiver.balance.total -= value;
+      receiver.balance.available -= value;
     }
 
     await receiver.save({ session });
 
+    if (transferToAccount) {
+      await transferToAccount.save({ session });
+    }
+
     if (type === "deposit") {
       await portfolioService.createPortfolioSnapshot(
         transaction.userId,
         "deposit",
         {
           transactionId: transaction._id,
+          timestamp: transaction.createdAt,
         },
         session,
       );
@@ -298,23 +382,46 @@ async function createTransaction(transactionData) {
         "deposit",
         {
           transactionId: transaction._id,
+          timestamp: transaction.createdAt,
         },
         session,
       );
-    } else if (type === "withdrawal") {
+    } else if (type === "withdraw") {
       await portfolioService.createPortfolioSnapshot(
         transaction.userId,
-        "withdrawal",
+        "withdraw",
         {
           transactionId: transaction._id,
+          timestamp: transaction.createdAt,
         },
         session,
       );
       await walletSnapshotService.createWalletSnapshot(
         receiver._id,
-        "withdrawal",
+        "withdraw",
         {
           transactionId: transaction._id,
+          timestamp: transaction.createdAt,
+        },
+        session,
+      );
+    } else {
+      await walletSnapshotService.createWalletSnapshot(
+        receiver._id,
+        "transfer_out",
+        {
+          transactionId: transaction._id,
+          timestamp: transaction.createdAt,
+        },
+        session,
+      );
+
+      await walletSnapshotService.createWalletSnapshot(
+        transferToAccount._id,
+        "transfer_in",
+        {
+          transactionId: transaction._id,
+          timestamp: transaction.createdAt,
         },
         session,
       );
@@ -322,7 +429,7 @@ async function createTransaction(transactionData) {
 
     await session.commitTransaction();
 
-    return transaction;
+    return { transaction, success: true, email: user.contactInfo.email };
   } catch (error) {
     await session.abortTransaction();
 
@@ -335,10 +442,32 @@ async function createTransaction(transactionData) {
   }
 }
 
+async function editTransactionInfo(transactionData) {
+  const { customDate, transactionId } = transactionData;
+  try {
+    const transaction = await Transaction.findById(transactionId);
+    if (customDate) {
+      const date = new Date(customDate);
+
+      if (Number.isNaN(date.getTime())) {
+        throw new CustomError("Invalid custom date.", 400);
+      }
+
+      transaction.createdAt = date;
+      transaction.updatedAt = date;
+    }
+    await transaction.save();
+    return transaction;
+  } catch (error) {
+    throw new CustomError(error.message, 404);
+  }
+}
+
 module.exports = {
   getTransactionInfo,
   editTransaction,
   fetchAllTransactions,
   createTransaction,
   updateTransactionStatus,
+  editTransactionInfo,
 };

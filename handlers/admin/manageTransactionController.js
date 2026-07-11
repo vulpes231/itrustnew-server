@@ -4,6 +4,7 @@ const {
   editTransaction,
   createTransaction,
   updateTransactionStatus,
+  editTransactionInfo,
 } = require("../../services/admin/manageTransactionService");
 const queueService = require("../../services/queueService");
 
@@ -118,11 +119,40 @@ const updateTransaction = async (req, res, next) => {
 const adminCreateTransaction = async (req, res, next) => {
   try {
     const trnxData = req.body;
-    await createTransaction(trnxData);
+
+    const result = await createTransaction(trnxData);
+
+    if (result.success && trnxData.notifyUser && trnxData.type !== "transfer") {
+      await queueService.sendToQueue("email_queue", {
+        type: trnxData.type === "deposit" ? "DEPOSIT_EMAIL" : "WITHDRAW_EMAIL",
+        to: result.email,
+        templateData: {
+          transaction: result.transaction,
+          currency: result.transaction.method.mode,
+        },
+      });
+    }
     res.status(200).json({
-      message: `${req.body.type} initiated`,
+      message: `${req.body.type} created`,
       success: true,
       data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateTransactionInfo = async (req, res, next) => {
+  const { transactionId } = req.params;
+  const { customDate } = req.body;
+
+  try {
+    await editTransactionInfo({ transactionId, customDate });
+
+    res.status(200).json({
+      data: null,
+      success: true,
+      message: "transaction updated successfully",
     });
   } catch (error) {
     next(error);
@@ -135,4 +165,5 @@ module.exports = {
   getTransactionData,
   adminCreateTransaction,
   setTransactionStatus,
+  updateTransactionInfo,
 };
