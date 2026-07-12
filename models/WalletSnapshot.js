@@ -58,7 +58,7 @@ const walletSnapshotSchema = new mongoose.Schema(
       enum: [
         "account_creation",
         "deposit",
-        "withdrawal",
+        "withdraw",
         "contribution",
         "cashout",
         "trade_buy",

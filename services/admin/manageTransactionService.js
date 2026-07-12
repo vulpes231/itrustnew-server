@@ -12,7 +12,7 @@ async function fetchAllTransactions(queryData) {
     sortBy = "createdAt",
     sortOrder = "desc",
     page = 1,
-    limit = 15,
+    limit = 1000,
     filterBy,
   } = queryData;
   try {
@@ -25,16 +25,19 @@ async function fetchAllTransactions(queryData) {
     const sort = {};
     if (sortBy) sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
-    const transactions = await Transaction.find(filter)
-      .sort(sort)
-      .skip((page - 1) * limit)
-      .limit(limit);
+    // const transactions = await Transaction.find({}).sort({ createdAt: -1 });
+    const [transactions, total] = await Promise.all([
+      Transaction.find(filter).sort(sort),
 
-    const totalTrnxs = await Transaction.countDocuments(filter);
-    const totalPages =
-      Math.ceil(totalTrnxs / limit) === 0 ? 1 : Math.ceil(totalTrnxs / limit);
+      Transaction.countDocuments(filter),
+    ]);
 
-    return { transactions, totalTrnxs, totalPages, currentPage: page };
+    return {
+      transactions,
+      totalTrnxs: total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: Number(page),
+    };
   } catch (error) {
     console.log(error);
     throw new CustomError(error.message, 500);
@@ -134,7 +137,7 @@ async function editTransaction(transactionId, action) {
         } else if (transaction.type === "withdraw") {
           await portfolioService.createPortfolioSnapshot(
             transaction.userId,
-            "withdrawal",
+            "withdraw",
             {
               transactionId: transaction._id,
             },
@@ -142,7 +145,7 @@ async function editTransaction(transactionId, action) {
           );
           await walletSnapshotService.createWalletSnapshot(
             transactionWallet._id,
-            "withdrawal",
+            "withdraw",
             {
               transactionId: transaction._id,
             },
@@ -326,7 +329,7 @@ async function createTransaction(transactionData) {
 
     transactionPayload.meta = {
       type: "withdraw",
-      to: transferToAccount.name,
+      to: receiver.name,
       method: method,
       network: network,
       info: method === "bank" ? bankInfo : address,

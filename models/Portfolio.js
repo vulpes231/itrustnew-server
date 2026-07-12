@@ -28,7 +28,7 @@ const portfolioSchema = new mongoose.Schema(
       enum: [
         "account_creation",
         "deposit",
-        "withdrawal",
+        "withdraw",
         "trade_buy",
         "trade_sell",
         "profit_loss",
