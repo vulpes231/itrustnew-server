@@ -1,75 +1,109 @@
+const { default: axios } = require("axios");
 const Asset = require("../../models/Asset");
-const { CustomError } = require("../../utils/utils");
+const {
+  CustomError,
+  transformStock,
+  transformToETFAsset,
+  transformCrypto,
+  fetchQuote,
+  fetchProfile,
+  fetchKeyMetrics,
+
+  fetchETFInfo,
+} = require("../../utils/utils");
 
 class ManageAssetService {
   async addNewAsset(formData) {
-    const { symbol, name, type, exchange, price, imageUrl } = formData;
+    const { ticker, type } = formData;
 
-    if (!symbol || !name || !type || price == null) {
-      throw new CustomError("Symbol, name, type and price are required.", 400);
+    if (!ticker || !type) {
+      throw new CustomError("Ticker and asset type are required.", 400);
     }
 
-    const existingAsset = await Asset.findOne({
-      symbol: symbol.toUpperCase(),
-    });
+    const symbol = ticker.trim().toUpperCase();
+
+    if (!["stock", "etf", "crypto"].includes(type)) {
+      throw new CustomError("Invalid asset type.", 400);
+    }
+
+    const existingAsset = await Asset.findOne({ symbol });
 
     if (existingAsset) {
       throw new CustomError("Asset already exists.", 409);
     }
 
+    let asset;
+
     try {
-      const asset = await Asset.create({
-        symbol: symbol.toUpperCase(),
-        name,
-        type,
-        exchange,
-        priceData: {
-          current: Number(price),
-        },
-        imageUrl: imageUrl || null,
-        isActive: true,
-        isTradable: true,
-        lastUpdated: new Date(),
-        apiId: symbol.toUpperCase(),
-      });
+      switch (type) {
+        case "stock":
+          asset = await this.fetchStock(symbol);
+          break;
 
-      // {
-      //   symbol: symbol,
-      //   name: profileData?.companyName || quoteData.name || symbol,
-      //   type: "etf",
-      //   exchange: mapExchange(quoteData.exchange || profileData?.exchange),
-      //   priceData: {
-      //     current: quoteData.price || 0,
-      //     open: quoteData.open || null,
-      //     previousClose: quoteData.previousClose || null,
-      //     dayLow: quoteData.dayLow || null,
-      //     dayHigh: quoteData.dayHigh || null,
-      //     change: quoteData.change || null,
-      //     changePercent: quoteData.changesPercentage || null,
-      //     volume: quoteData.volume || null,
-      //     avgVolume: quoteData.avgVolume || null,
-      //   },
-      //   historical: {
-      //     yearLow: quoteData.yearLow || null,
-      //     yearHigh: quoteData.yearHigh || null,
-      //   },
-      //   fundamentals: {
-      //     marketCap: quoteData.marketCap || profileData?.mktCap || null,
-      //     eps: null,
-      //     pe: null,
-      //     dividendYield: profileData?.lastDividendValue || null,
-      //   },
-      //   imageUrl: profileData?.image || null,
-      //   isActive: true,
-      //   isTradable: true,
-      //   lastUpdated: new Date(),
-      //   apiId: symbol,
-      // }
+        case "etf":
+          asset = await this.fetchETF(symbol);
+          break;
 
-      return asset;
+        case "crypto":
+          asset = await this.fetchCrypto(symbol);
+          break;
+      }
+
+      if (!asset) {
+        throw new CustomError(`${symbol} was not found as a ${type}.`, 404);
+      }
+
+      return await Asset.create(asset);
     } catch (error) {
+      if (error instanceof CustomError) throw error;
+
       throw new CustomError(error.message, 500);
     }
+  }
+
+  async fetchETF(symbol) {
+    const [quote, profile, etfInfo] = await Promise.all([
+      fetchQuote(symbol),
+      fetchProfile(symbol),
+      fetchETFInfo(symbol),
+    ]);
+
+    if (!quote) {
+      return null;
+    }
+
+    return transformToETFAsset(symbol, quote, profile, etfInfo);
+  }
+
+  async fetchStock(symbol) {
+    const [quote, profile, metrics] = await Promise.all([
+      fetchQuote(symbol),
+      fetchProfile(symbol),
+      fetchKeyMetrics(symbol),
+    ]);
+
+    if (!quote) {
+      return null;
+    }
+
+    return transformStock(symbol, quote, profile, metrics);
+  }
+
+  async fetchCrypto(symbol) {
+    const quote = await fetchQuote(symbol);
+
+    if (!quote) {
+      return null;
+    }
+
+    if (
+      quote.type?.toLowerCase() !== "crypto" &&
+      quote.assetType?.toLowerCase() !== "crypto"
+    ) {
+      return null;
+    }
+
+    return transformCrypto(symbol, quote);
   }
 
   async removeAsset(assetId) {

@@ -446,9 +446,52 @@ async function createTransaction(transactionData) {
 }
 
 async function editTransactionInfo(transactionData) {
-  const { customDate, transactionId } = transactionData;
+  const { amount, customDate, transactionId } = transactionData;
+
+  const session = await mongoose.startSession();
+
   try {
-    const transaction = await Transaction.findById(transactionId);
+    session.startTransaction();
+
+    const transaction =
+      await Transaction.findById(transactionId).session(session);
+
+    if (!transaction) {
+      throw new CustomError("Transaction not found.", 404);
+    }
+
+    const wallet = await Wallet.findOne({
+      userId: transaction.userId,
+      slug: transaction.account,
+    }).session(session);
+
+    if (!wallet) {
+      throw new CustomError("Wallet not found.", 404);
+    }
+
+    const parsedAmount = Number(amount);
+
+    if (Number.isNaN(parsedAmount) || parsedAmount <= 0) {
+      throw new CustomError("Invalid amount.", 400);
+    }
+
+    const oldAmount = transaction.amount;
+    const difference = parsedAmount - oldAmount;
+
+    if (transaction.type === "deposit") {
+      wallet.balance.total += difference;
+      wallet.balance.available += difference;
+    } else {
+      if (wallet.balance.available < difference) {
+        throw new CustomError("Insufficient wallet balance.", 400);
+      }
+
+      wallet.balance.total -= difference;
+      wallet.balance.available -= difference;
+    }
+
+    transaction.amount = parsedAmount;
+
     if (customDate) {
       const date = new Date(customDate);
 
@@ -457,12 +500,22 @@ async function editTransactionInfo(transactionData) {
       }
 
       transaction.createdAt = date;
-      transaction.updatedAt = date;
+      // transaction.updatedAt = date;
     }
-    await transaction.save();
+
+    await wallet.save({ session });
+    await transaction.save({ session });
+
+    await session.commitTransaction();
+
     return transaction;
   } catch (error) {
-    throw new CustomError(error.message, 404);
+    await session.abortTransaction();
+    throw error instanceof CustomError
+      ? error
+      : new CustomError(error.message, 500);
+  } finally {
+    session.endSession();
   }
 }
 

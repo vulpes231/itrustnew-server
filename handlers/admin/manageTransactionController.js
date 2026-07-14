@@ -144,10 +144,9 @@ const adminCreateTransaction = async (req, res, next) => {
 
 const updateTransactionInfo = async (req, res, next) => {
   const { transactionId } = req.params;
-  const { customDate } = req.body;
 
   try {
-    await editTransactionInfo({ transactionId, customDate });
+    await editTransactionInfo({ ...req.body, transactionId });
 
     res.status(200).json({
       data: null,

@@ -3,6 +3,9 @@ const crypto = require("crypto");
 const path = require("path");
 const multer = require("multer");
 const { default: mongoose } = require("mongoose");
+const { default: axios } = require("axios");
+const FMP_API_KEY = process.env.FMP_API_KEY;
+const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
 
 const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
 const upload = multer({
@@ -103,8 +106,188 @@ function getPositionValue(position) {
   );
 }
 
+function transformStock(symbol, quoteData, profileData, metricsData) {
+  if (!quoteData) return null;
+
+  const asset = {
+    symbol: symbol,
+    name: profileData?.companyName || quoteData.name || symbol,
+    type: "stock",
+    exchange: mapExchange(quoteData.exchange || profileData?.exchange),
+    priceData: {
+      current: quoteData.price || 0,
+      open: quoteData.open || null,
+      previousClose: quoteData.previousClose || null,
+      dayLow: quoteData.dayLow || null,
+      dayHigh: quoteData.dayHigh || null,
+      change: quoteData.change || null,
+      changePercent: quoteData.changesPercentage || null,
+      volume: quoteData.volume || null,
+      avgVolume: quoteData.avgVolume || null,
+    },
+    historical: {
+      yearLow: quoteData.yearLow || null,
+      yearHigh: quoteData.yearHigh || null,
+    },
+    fundamentals: {
+      marketCap: quoteData.marketCap || profileData?.mktCap || null,
+      eps: metricsData?.eps || profileData?.eps || null,
+      pe: quoteData.pe || metricsData?.peRatio || null,
+      dividendYield: profileData?.lastDividendValue || null,
+    },
+    imageUrl: profileData?.image || null,
+    isActive: true,
+    isTradable: true,
+    lastUpdated: new Date(),
+    apiId: symbol,
+  };
+
+  return asset;
+}
+
+function transformToETFAsset(symbol, quoteData, profileData, etfInfo) {
+  if (!quoteData) return null;
+
+  const asset = {
+    symbol: symbol,
+    name: profileData?.companyName || quoteData.name || symbol,
+    type: "etf",
+    exchange: mapExchange(quoteData.exchange || profileData?.exchange),
+    priceData: {
+      current: quoteData.price || 0,
+      open: quoteData.open || null,
+      previousClose: quoteData.previousClose || null,
+      dayLow: quoteData.dayLow || null,
+      dayHigh: quoteData.dayHigh || null,
+      change: quoteData.change || null,
+      changePercent: quoteData.changesPercentage || null,
+      volume: quoteData.volume || null,
+      avgVolume: quoteData.avgVolume || null,
+    },
+    historical: {
+      yearLow: quoteData.yearLow || null,
+      yearHigh: quoteData.yearHigh || null,
+    },
+    fundamentals: {
+      marketCap: quoteData.marketCap || profileData?.mktCap || null,
+      eps: null,
+      pe: null,
+      dividendYield: profileData?.lastDividendValue || null,
+    },
+    imageUrl: profileData?.image || null,
+    isActive: true,
+    isTradable: true,
+    lastUpdated: new Date(),
+    apiId: symbol,
+  };
+
+  return asset;
+}
+
+function transformCrypto(symbol, quoteData) {
+  return {
+    symbol,
+    name: quoteData.name,
+    type: "crypto",
+    exchange: mapExchange(quoteData.exchange),
+
+    priceData: {
+      current: quoteData.price,
+      open: quoteData.open,
+      previousClose: quoteData.previousClose,
+      dayLow: quoteData.dayLow,
+      dayHigh: quoteData.dayHigh,
+      change: quoteData.change,
+      changePercent: quoteData.changesPercentage,
+      volume: quoteData.volume,
+      avgVolume: quoteData.avgVolume,
+    },
+
+    historical: {
+      yearLow: quoteData.yearLow,
+      yearHigh: quoteData.yearHigh,
+    },
+
+    fundamentals: {
+      marketCap: quoteData.marketCap,
+      eps: null,
+      pe: null,
+      dividendYield: null,
+    },
+
+    imageUrl: quoteData.image || null,
+    isActive: true,
+    isTradable: true,
+    lastUpdated: new Date(),
+    apiId: symbol,
+  };
+}
+
+async function fetchQuote(symbol) {
+  try {
+    const response = await axios.get(`${FMP_BASE_URL}/quote/${symbol}`, {
+      params: {
+        apikey: FMP_API_KEY,
+      },
+    });
+
+    if (response.data && response.data.length > 0) {
+      return response.data[0];
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error fetching quote for ${symbol}:`, error.message);
+    return null;
+  }
+}
+
+async function fetchProfile(symbol) {
+  try {
+    const response = await axios.get(`${FMP_BASE_URL}/profile/${symbol}`, {
+      params: {
+        apikey: FMP_API_KEY,
+      },
+    });
+
+    if (response.data && response.data.length > 0) {
+      return response.data[0];
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error fetching profile for ${symbol}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Fetch key metrics (PE, EPS, etc.)
+ */
+async function fetchKeyMetrics(symbol) {
+  try {
+    const response = await axios.get(
+      `${FMP_BASE_URL}/key-metrics-ttm/${symbol}`,
+      {
+        params: {
+          apikey: FMP_API_KEY,
+        },
+      },
+    );
+
+    if (response.data && response.data.length > 0) {
+      return response.data[0];
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error fetching metrics for ${symbol}:`, error.message);
+    return null;
+  }
+}
+
 module.exports = {
   getPositionValue,
+  fetchProfile,
+  fetchKeyMetrics,
+  fetchQuote,
   getClientIp,
   generateOtp,
   CustomError,
@@ -114,4 +297,7 @@ module.exports = {
   upload,
   allowedMimeTypes,
   waitForDatabaseConnection,
+  transformStock,
+  transformToETFAsset,
+  transformCrypto,
 };
