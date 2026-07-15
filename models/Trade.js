@@ -33,6 +33,11 @@ const tradeSchema = new Schema(
     wallet: {
       id: { type: Schema.Types.ObjectId, ref: "Wallet" },
       name: { type: String },
+      slug: { type: String },
+    },
+    plan: {
+      id: { type: Schema.Types.ObjectId, ref: "Autoplan" },
+      name: { type: String },
     },
     execution: {
       price: { type: Number, required: true },

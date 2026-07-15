@@ -79,8 +79,10 @@ class TradeService {
         throw new CustomError("Insufficient funds!", 400);
       }
 
+      let plan;
+
       if (wallet.slug === "auto" && planId) {
-        const plan = user.activePlans.find(
+        plan = user.activePlans.find(
           (plan) => plan.planId.toString() === planId,
         );
 
@@ -109,6 +111,11 @@ class TradeService {
         wallet: {
           id: wallet._id,
           name: wallet.name,
+          slug: wallet.slug,
+        },
+        plan: {
+          id: plan._id || null,
+          name: plan.name,
         },
         execution: {
           price: currentPrice,

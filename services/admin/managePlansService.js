@@ -1,9 +1,13 @@
+const { default: mongoose } = require("mongoose");
 const Autoplan = require("../../models/Autoplan");
+const Position = require("../../models/Position");
 const Trade = require("../../models/Trade");
 const User = require("../../models/User");
+const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 const fs = require("fs").promises;
 const path = require("path");
+// mongoose
 
 async function addNewPlan(planData) {
   const {
@@ -217,39 +221,95 @@ async function fetchSinglePlan(planId) {
 async function editUserPlan(form) {
   const { planId, userId, start, end } = form;
 
+  const session = await mongoose.startSession();
+
   try {
-    const user = await User.findById(userId);
-    if (!user) {
-      throw new CustomError("User not found!", 404);
-    }
+    await session.withTransaction(async () => {
+      const user = await User.findById(userId).session(session);
 
-    const userPlan = user.activePlans.id(planId);
+      if (!user) {
+        throw new CustomError("User not found!", 404);
+      }
 
-    if (!userPlan) {
-      throw new CustomError("Plan not found!", 404);
-    }
+      const userPlan = user.activePlans.id(planId);
 
-    if (start) {
-      userPlan.start = new Date(start);
-    }
+      if (!userPlan) {
+        throw new CustomError("Plan not found!", 404);
+      }
 
-    if (end) {
-      userPlan.end = new Date(end);
-    }
+      if (start) {
+        userPlan.start = new Date(start);
+      }
 
-    const now = new Date();
-    if (userPlan.end && userPlan.end <= now) {
-      userPlan.status = "closed";
-    }
+      if (end) {
+        userPlan.end = new Date(end);
+      }
 
-    await user.save();
+      const now = new Date();
 
-    return userPlan;
+      if (userPlan.status !== "closed" && userPlan.end && userPlan.end <= now) {
+        const autoAccount = await Wallet.findOne({
+          userId: user._id,
+          slug: "auto",
+        }).session(session);
+
+        if (!autoAccount) {
+          throw new CustomError("Auto wallet not found!", 404);
+        }
+
+        const trades = await Trade.find({
+          userId: user._id,
+          planId: userPlan.planId,
+          status: "open",
+        }).session(session);
+
+        const totalReturn = trades.reduce(
+          (sum, trade) => sum + (trade.performance?.totalReturn || 0),
+          0,
+        );
+
+        userPlan.balance.available += totalReturn;
+        userPlan.balance.total += totalReturn;
+
+        // Close all trades
+        await Trade.updateMany(
+          {
+            userId: user._id,
+            planId: userPlan.planId,
+            status: "open",
+          },
+          {
+            $set: {
+              status: "closed",
+            },
+          },
+          { session },
+        );
+
+        // Return the plan balance to the auto wallet
+        autoAccount.balance.available += userPlan.balance.total;
+        autoAccount.balance.total += userPlan.balance.total;
+
+        // Reset the plan
+        userPlan.balance.available = 0;
+        userPlan.balance.total = 0;
+        userPlan.status = "closed";
+
+        await autoAccount.save({ session });
+      }
+
+      await user.save({ session });
+    });
+
+    return true;
   } catch (error) {
     if (error instanceof CustomError) {
       throw error;
     }
+
     throw new CustomError(error.message, 500);
+  } finally {
+    session.endSession();
   }
 }
 

@@ -24,6 +24,10 @@ const positionSchema = new Schema(
       ref: "Autoplan",
       default: null,
     },
+    plan: {
+      id: { type: Schema.Types.ObjectId, ref: "Autoplan" },
+      name: { type: String },
+    },
     orderType: {
       type: String,
       enum: ["buy", "sell"],
