@@ -68,6 +68,7 @@ async function newSavingsAccount(accountData) {
       information,
       canTrade,
       tag,
+      designTag,
       contributionLimits: {
         min: minDeposit ?? 1,
         max: maxDeposit ?? 1000,
