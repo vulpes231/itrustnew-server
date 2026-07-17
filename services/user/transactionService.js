@@ -193,6 +193,7 @@ async function moveFunds(userId, trnxData) {
           email: user.contactInfo.email,
           fullname: user.fullName,
           status: "processed",
+          tag: transferTo?.designTag || null,
           meta: {
             type: "transfer",
             fromWalletId: transferFrom._id,
