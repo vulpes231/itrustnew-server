@@ -32,10 +32,19 @@ const savingsAccountSchema = new Schema(
     },
     tag: {
       type: String,
-      enum: ["retirement", "savings", "investment"],
+      enum: ["retirement", "savings"],
     },
     designTag: {
       type: String,
+      enum: [
+        "retirement1",
+        "retirement2",
+        "retirement3",
+        "savings1",
+        "savings2",
+        "savings3",
+        "margin",
+      ],
     },
     details: {
       type: [String],

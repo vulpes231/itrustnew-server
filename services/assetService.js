@@ -41,8 +41,6 @@ async function fetchAssets(queryData) {
     }
 
     const assets = await Asset.find(filter).sort(sort);
-    // .skip((page - 1) * limit)
-    // .limit(limit);
 
     const totalAssetCount = await Asset.countDocuments(filter);
     const totalPages = Math.ceil(totalAssetCount / limit);

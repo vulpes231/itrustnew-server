@@ -24,11 +24,11 @@ async function addFunds(userId, trnxData) {
     if (!receiver) {
       throw new CustomError("Invalid receiving account!", 400);
     }
-    const customMemo = `${method} deposit to ${receiver.name}`;
+    const customMemo = `${method} deposit to ${receiver.slug}`;
 
     const meta = {
       type: "cash deposit",
-      to: receiver.slug,
+      to: receiver.name,
       method: method,
       network: network,
     };
@@ -60,7 +60,6 @@ async function withdrawFunds(userId, trnxData) {
   const {
     method,
     amount,
-    account,
     memo,
     network,
     address,
@@ -68,7 +67,7 @@ async function withdrawFunds(userId, trnxData) {
     accountNumber,
     routing,
   } = trnxData;
-  if (!amount || !method || !account || !network)
+  if (!amount || !method || !network)
     throw new CustomError("Bad request!", 400);
   try {
     const user = await User.findById(userId);
@@ -77,21 +76,15 @@ async function withdrawFunds(userId, trnxData) {
     if (user.identityVerification.kycStatus !== "approved")
       throw new CustomError("Account not verified!", 400);
 
-    const wallets = await Wallet.find({ userId });
-    if (wallets.length < 1) {
-      throw new CustomError("Contact support for more info!", {
-        statusCode: 404,
-      });
-    }
+    const withdrawFrom = await Wallet.findOne({ userId, slug: "cash" });
 
-    const withdrawFrom = wallets.find((wallet) => wallet.slug === "cash");
     if (!withdrawFrom)
       throw new CustomError("Invalid withdrawal account!", 400);
 
     if (withdrawFrom.balance.available < parseFloat(amount))
       throw new CustomError("Insufficient funds!", 400);
 
-    const customMemo = `${method} withdrawal from ${withdrawFrom.name}`;
+    const customMemo = `${method} withdrawal from ${withdrawFrom.slug}`;
 
     const bankInfo = `${`${bankName}-acc:${accountNumber}-rou:${routing}`}`;
 
@@ -183,7 +176,7 @@ async function moveFunds(userId, trnxData) {
     await transferFrom.save({ session });
     await transferTo.save({ session });
 
-    const customMemo = `Transfer from ${transferFrom.name} to ${transferTo.name}`;
+    const customMemo = `Transfer from ${transferFrom.slug} to ${transferTo.slug}`;
 
     const transaction = await Transaction.create(
       [

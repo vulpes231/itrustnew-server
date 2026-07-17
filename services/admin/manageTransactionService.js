@@ -293,7 +293,7 @@ async function createTransaction(transactionData) {
       throw new CustomError("Insufficient funds!", 400);
     }
 
-    const customMemo = `${method} ${type} to ${receiver.name}`;
+    const customMemo = `${method} ${type} to ${receiver.slug}`;
 
     const transactionPayload = {
       method: {
@@ -301,7 +301,7 @@ async function createTransaction(transactionData) {
         network: network || null,
       },
       amount: value,
-      account: receiver.name,
+      account: receiver.slug,
       memo: memo || customMemo,
       type,
       userId,

@@ -110,6 +110,7 @@ async function buyAsset(userId, assetData) {
       wallet: {
         id: userWallet._id,
         name: userWallet.name,
+        slug: userWallet.slug,
       },
       execution: {
         price: currentPrice,
