@@ -2,8 +2,6 @@ const crypto = require("crypto");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs").promises;
-
-const { allowedMimeTypes } = require("../../utils/utils");
 const articleService = require("../../services/articleService");
 
 const IMG_STORAGE_PATH = path.join(__dirname, "../../storage/articles");
@@ -21,21 +19,14 @@ const AddNewArticle = async (req, res, next) => {
   try {
     const { title, topic, content, isAsk } = req.body;
 
-    if (!req.files || req.files.length === 0) {
+    if (!req.file) {
       return res.status(400).json({
         success: false,
         message: "Article image is required.",
       });
     }
 
-    const articleImage = req.files[0];
-
-    if (!allowedMimeTypes.includes(articleImage.mimetype)) {
-      return res.status(400).json({
-        success: false,
-        message: "Article image must be a valid image.",
-      });
-    }
+    const articleImage = req.file;
 
     await fs.mkdir(IMG_STORAGE_PATH, { recursive: true });
 
@@ -79,15 +70,8 @@ const updateArticle = async (req, res, next) => {
   let imagePath;
 
   try {
-    if (req.files && req.files.length > 0) {
-      const articleImage = req.files[0];
-
-      if (!allowedMimeTypes.includes(articleImage.mimetype)) {
-        return res.status(400).json({
-          success: false,
-          message: "Article image must be a valid image.",
-        });
-      }
+    if (req.file) {
+      const articleImage = req.file;
 
       await fs.mkdir(IMG_STORAGE_PATH, { recursive: true });
 

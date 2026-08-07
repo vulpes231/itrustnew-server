@@ -83,6 +83,7 @@ const settingsRoute = require("./routes/user/settings.js");
 const profileSettingsRoute = require("./routes/user/profileSettings.js");
 const chartRoute = require("./routes/user/portfolio.js");
 const positionRoute = require("./routes/user/position.js");
+const articleRoute = require("./routes/article.js");
 
 // admin routers
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
@@ -108,6 +109,7 @@ app.use("/location", locationRoute);
 app.use("/currency", currencyRoute);
 app.use("/signup", userRegisterRoute);
 app.use("/signin", userLoginRoute);
+app.use("/article", articleRoute);
 app.use("/code", otpVerificationRoute);
 app.use("/mail", mailRoute);
 app.use("/asset", assetRoute);

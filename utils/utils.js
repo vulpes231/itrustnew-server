@@ -8,16 +8,17 @@ const FMP_API_KEY = process.env.FMP_API_KEY;
 const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
 
 const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
+    if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only image files are allowed!"), false);
+      cb(new Error("Only JPG, PNG and WEBP images are allowed."), false);
     }
   },
 });

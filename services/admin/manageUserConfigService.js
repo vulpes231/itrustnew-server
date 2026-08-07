@@ -23,32 +23,75 @@ async function configureUserLimits(formData) {
     minCryptoWithdrawal,
     userId,
   } = formData;
-  try {
-    if (!userId) throw new CustomError("Bad request", 400);
 
-    const settings = await Usersetting.findOne({ userId });
-    if (!settings) throw new CustomError("Settings not found", 404);
-
-    if (bankMessage) settings.locks.bankDeposit.message = bankMessage;
-    if (cashMessage) settings.locks.cash.message = cashMessage;
-    if (minBankDeposit) settings.limits.deposit.bank.min = minBankDeposit;
-    if (maxBankDeposit) settings.limits.deposit.bank.max = maxBankDeposit;
-    if (minCryptoDeposit) settings.limits.deposit.crypto.min = minCryptoDeposit;
-    if (maxCryptoDeposit) settings.limits.deposit.crypto.max = maxCryptoDeposit;
-    if (minBankWithdrawal)
-      settings.limits.withdrawal.bank.min = minBankWithdrawal;
-    if (maxBankWithdrawal)
-      settings.limits.withdrawal.bank.max = maxBankWithdrawal;
-    if (minCryptoWithdrawal)
-      settings.limits.withdrawal.crypto.min = minCryptoWithdrawal;
-    if (maxCryptoWithdrawal)
-      settings.limits.withdrawal.crypto.max = maxCryptoWithdrawal;
-
-    await settings.save();
-    return settings;
-  } catch (error) {
-    throw new CustomError(error.message, 500);
+  if (!userId) {
+    throw new CustomError("Bad request", 400);
   }
+
+  const settings = await Usersetting.findOne({ userId });
+
+  if (!settings) {
+    throw new CustomError("Settings not found", 404);
+  }
+
+  const parseLimit = (value) => {
+    if (value === undefined) return undefined;
+    if (value === "unlimited") return null;
+
+    return Number(value);
+  };
+
+  if (bankMessage !== undefined) {
+    settings.locks.bankDeposit.message = bankMessage;
+  }
+
+  if (cashMessage !== undefined) {
+    settings.locks.cash.message = cashMessage;
+  }
+
+  const bankDepositMin = parseLimit(minBankDeposit);
+  if (bankDepositMin !== undefined) {
+    settings.limits.deposit.bank.min = bankDepositMin;
+  }
+
+  const bankDepositMax = parseLimit(maxBankDeposit);
+  if (bankDepositMax !== undefined) {
+    settings.limits.deposit.bank.max = bankDepositMax;
+  }
+
+  const cryptoDepositMin = parseLimit(minCryptoDeposit);
+  if (cryptoDepositMin !== undefined) {
+    settings.limits.deposit.crypto.min = cryptoDepositMin;
+  }
+
+  const cryptoDepositMax = parseLimit(maxCryptoDeposit);
+  if (cryptoDepositMax !== undefined) {
+    settings.limits.deposit.crypto.max = cryptoDepositMax;
+  }
+
+  const bankWithdrawalMin = parseLimit(minBankWithdrawal);
+  if (bankWithdrawalMin !== undefined) {
+    settings.limits.withdrawal.bank.min = bankWithdrawalMin;
+  }
+
+  const bankWithdrawalMax = parseLimit(maxBankWithdrawal);
+  if (bankWithdrawalMax !== undefined) {
+    settings.limits.withdrawal.bank.max = bankWithdrawalMax;
+  }
+
+  const cryptoWithdrawalMin = parseLimit(minCryptoWithdrawal);
+  if (cryptoWithdrawalMin !== undefined) {
+    settings.limits.withdrawal.crypto.min = cryptoWithdrawalMin;
+  }
+
+  const cryptoWithdrawalMax = parseLimit(maxCryptoWithdrawal);
+  if (cryptoWithdrawalMax !== undefined) {
+    settings.limits.withdrawal.crypto.max = cryptoWithdrawalMax;
+  }
+
+  await settings.save();
+
+  return settings;
 }
 
 async function configureBankDeposit(formData) {
@@ -189,7 +232,7 @@ async function configureUserInfo(formData) {
     const updatedUser = await User.findByIdAndUpdate(
       userId,
       { $set: setObject },
-      { new: true }
+      { new: true },
     );
 
     return updatedUser;

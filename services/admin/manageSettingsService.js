@@ -88,27 +88,62 @@ async function editLimit(data) {
     maxBankWithdrawal,
   } = data;
 
-  try {
-    const settings = await WalletSetting.findOne({ name: "global" });
+  const parseLimit = (value) => {
+    if (value === undefined) return undefined;
+    if (value === "unlimited") return null;
 
-    if (minCryptoDeposit) settings.depositLimits.crypto.min = minCryptoDeposit;
-    if (maxCryptoDeposit) settings.depositLimits.crypto.max = maxCryptoDeposit;
-    if (minBankDeposit) settings.depositLimits.bank.min = minBankDeposit;
-    if (maxBankDeposit) settings.depositLimits.bank.max = maxBankDeposit;
-    if (minCryptoWithdrawal)
-      settings.withdrawalLimits.crypto.min = minCryptoWithdrawal;
-    if (maxCryptoWithdrawal)
-      settings.withdrawalLimits.crypto.max = maxCryptoWithdrawal;
-    if (minBankWithdrawal)
-      settings.withdrawalLimits.bank.min = minBankWithdrawal;
-    if (maxBankWithdrawal)
-      settings.withdrawalLimits.bank.max = maxBankWithdrawal;
+    return Number(value);
+  };
 
-    await settings.save();
-    return settings;
-  } catch (error) {
-    throw new CustomError(error.message, error.statusCode);
+  const settings = await WalletSetting.findOne({ name: "global" });
+
+  if (!settings) {
+    throw new CustomError("Wallet settings not found.", 404);
   }
+
+  const cryptoDepositMin = parseLimit(minCryptoDeposit);
+  if (cryptoDepositMin !== undefined) {
+    settings.depositLimits.crypto.min = cryptoDepositMin;
+  }
+
+  const cryptoDepositMax = parseLimit(maxCryptoDeposit);
+  if (cryptoDepositMax !== undefined) {
+    settings.depositLimits.crypto.max = cryptoDepositMax;
+  }
+
+  const bankDepositMin = parseLimit(minBankDeposit);
+  if (bankDepositMin !== undefined) {
+    settings.depositLimits.bank.min = bankDepositMin;
+  }
+
+  const bankDepositMax = parseLimit(maxBankDeposit);
+  if (bankDepositMax !== undefined) {
+    settings.depositLimits.bank.max = bankDepositMax;
+  }
+
+  const cryptoWithdrawalMin = parseLimit(minCryptoWithdrawal);
+  if (cryptoWithdrawalMin !== undefined) {
+    settings.withdrawalLimits.crypto.min = cryptoWithdrawalMin;
+  }
+
+  const cryptoWithdrawalMax = parseLimit(maxCryptoWithdrawal);
+  if (cryptoWithdrawalMax !== undefined) {
+    settings.withdrawalLimits.crypto.max = cryptoWithdrawalMax;
+  }
+
+  const bankWithdrawalMin = parseLimit(minBankWithdrawal);
+  if (bankWithdrawalMin !== undefined) {
+    settings.withdrawalLimits.bank.min = bankWithdrawalMin;
+  }
+
+  const bankWithdrawalMax = parseLimit(maxBankWithdrawal);
+  if (bankWithdrawalMax !== undefined) {
+    settings.withdrawalLimits.bank.max = bankWithdrawalMax;
+  }
+
+  await settings.save();
+
+  return settings;
 }
 
 async function fetchGlobalSettings() {

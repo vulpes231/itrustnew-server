@@ -7,10 +7,13 @@ const {
   updateArticle,
   removeArticle,
 } = require("../../handlers/admin/manageArticleHandler");
+const { upload } = require("../../utils/utils");
 
 const router = Router();
 
-router.post("/", sanitizeArticle, AddNewArticle);
+router
+  .route("/")
+  .post(upload.single("articleImg"), sanitizeArticle, AddNewArticle);
 
 router.patch("/:articleId", sanitizeArticle, updateArticle);
 
