@@ -194,7 +194,7 @@ const userSchema = new Schema(
     mailing: {
       emailNotification: {
         type: Boolean,
-        default: false,
+        default: true,
       },
       priceAlert: {
         type: Boolean,
@@ -202,7 +202,7 @@ const userSchema = new Schema(
       },
       orderNotification: {
         type: Boolean,
-        default: false,
+        default: true,
       },
       loginAlert: {
         type: Boolean,

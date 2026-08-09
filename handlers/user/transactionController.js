@@ -10,6 +10,7 @@ const { allowedMimeTypes } = require("../../utils/utils");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
+const queueService = require("../../services/queueService");
 
 const deposit = async (req, res, next) => {
   const userId = req.user.userId;
@@ -60,6 +61,17 @@ const deposit = async (req, res, next) => {
 
     const result = await addFunds(userId, { ...trnxData, proof });
 
+    if (result.success) {
+      await queueService.sendToQueue("email_queue", {
+        type: "DEPOSIT_REQUEST_EMAIL",
+        to: result.userInfo.email,
+        templateData: {
+          transaction: result.trnx,
+          currency: result.userInfo.currency,
+        },
+      });
+    }
+
     res.status(200).json({
       message: "Deposit initiated.",
       success: true,
@@ -74,7 +86,18 @@ const withdraw = async (req, res, next) => {
   const userId = req.user.userId;
   try {
     const trnxData = req.body;
-    await withdrawFunds(userId, trnxData);
+    const result = await withdrawFunds(userId, trnxData);
+
+    if (result.success) {
+      await queueService.sendToQueue("email_queue", {
+        type: "WITHDRAWAL_REQUEST_EMAIL",
+        to: result.userInfo.email,
+        templateData: {
+          transaction: result.trnx,
+          currency: result.userInfo.currency,
+        },
+      });
+    }
     res
       .status(200)
       .json({ message: "Withdrawal initiated.", success: true, data: null });

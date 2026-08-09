@@ -49,7 +49,11 @@ async function addFunds(userId, trnxData) {
       meta: meta,
     });
 
-    return { transaction: trnx, success: true };
+    return {
+      trnx,
+      success: true,
+      userInfo: { email: user.contactInfo.email, currency: user.currency },
+    };
   } catch (error) {
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
@@ -110,7 +114,11 @@ async function withdrawFunds(userId, trnxData) {
       fullname: user.fullName,
       meta: meta,
     });
-    return trnx;
+    return {
+      trnx,
+      success: true,
+      userInfo: { email: user.contactInfo.email, currency: user.currency },
+    };
   } catch (error) {
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
@@ -230,7 +238,11 @@ async function moveFunds(userId, trnxData) {
 
     await session.commitTransaction();
 
-    return trnx;
+    return {
+      trnx,
+      success: true,
+      userInfo: { email: user.contactInfo.email, currency: user.currency },
+    };
   } catch (error) {
     await session.abortTransaction();
 

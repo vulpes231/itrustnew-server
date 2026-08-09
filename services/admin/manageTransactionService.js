@@ -432,7 +432,15 @@ async function createTransaction(transactionData) {
 
     await session.commitTransaction();
 
-    return { transaction, success: true, email: user.contactInfo.email };
+    return {
+      transaction,
+      success: true,
+      userInfo: {
+        sendAlert: user.mailing.emailNotification,
+        email: user.contactInfo.email,
+        currency: user.currency,
+      },
+    };
   } catch (error) {
     await session.abortTransaction();
 

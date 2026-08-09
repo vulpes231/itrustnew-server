@@ -56,12 +56,9 @@ async function sendLoginCode(email) {
   }
 }
 
-async function sendMailVerificationCode(
-  subject = "Your Verification Code",
-  email,
-) {
-  if (!email) {
-    throw new CustomError("Email required!", 400);
+async function sendMailVerificationCode(subject, email) {
+  if (!subject || !email) {
+    throw new CustomError("Email and subject required!", 400);
   }
 
   const otp = generateOtp();
@@ -102,11 +99,6 @@ async function sendMailVerificationCode(
       otpSent: true,
     };
   } catch (error) {
-    console.error("Failed to send verification email:", {
-      email,
-      error: error.message,
-      stack: error.stack,
-    });
     throw new CustomError(
       `Failed to send email verification code: ${error.message}`,
       500,
@@ -133,7 +125,7 @@ async function sendDepositAlert(email, transaction, currency) {
   const currencyName = currency?.symbol?.toUpperCase();
   const amount = transaction?.amount;
 
-  const subject = `Deposit Successful - ${symbol}${amount} ${currencyName} Received`;
+  const subject = `Deposit Successful`;
 
   const message = buildTransactionEmail({
     type: "Deposit Successful",
@@ -141,9 +133,9 @@ async function sendDepositAlert(email, transaction, currency) {
     symbol,
     currencyName,
     method,
-    status: "Completed",
-    buttonText: "Go to Dashboard",
-    buttonLink: "https://itrustinvestment.netlify.app/dashboard",
+    status: transaction.status || "Completed",
+    buttonText: "Login to Dashboard",
+    buttonLink: "https://itrustinvestment.netlify.app/login",
     message:
       "Your deposit has been received successfully and credited to your iTrust Investments account.",
   });
@@ -178,6 +170,70 @@ async function sendWithdrawalAlert(email, transaction, currency) {
     buttonLink: "https://itrustinvestment.netlify.app/dashboard",
     message:
       "Your withdrawal request has been processed successfully. The funds are on their way to your selected payment destination.",
+  });
+
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function sendDepositRequestAlert(email, transaction, currency) {
+  const method = transaction?.method?.mode;
+  const symbol = currency?.sign;
+  const currencyName = currency?.symbol?.toUpperCase();
+  const amount = transaction?.amount;
+
+  const subject = `Deposit Request Received`;
+
+  const message = buildTransactionEmail({
+    type: "Deposit Request",
+    amount,
+    symbol,
+    currencyName,
+    method,
+    status: transaction.status,
+    buttonText: "Login to Dashboard",
+    buttonLink: "https://itrustinvestment.netlify.app/login",
+    message:
+      "Deposit request received. The funds will be credited to your account once processed.",
+  });
+
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function sendWithdrawalRequestAlert(email, transaction, currency) {
+  const method = transaction?.method?.mode;
+  const symbol = currency?.sign;
+  const currencyName = currency?.symbol?.toUpperCase();
+  const amount = transaction?.amount;
+
+  const subject = `Withdrawal Request Received`;
+
+  const message = buildTransactionEmail({
+    type: "Withdrawal Request",
+    amount,
+    symbol,
+    currencyName,
+    method,
+    status: transaction.status,
+    buttonText: "Check Status",
+    buttonLink: "https://itrustinvestment.netlify.app/login",
+    message:
+      "Withdrawal request received. The funds will be proceesed and you will receive a email update.",
   });
 
   try {
@@ -285,4 +341,6 @@ module.exports = {
   sendMailVerificationCode,
   sendWelcomeMessage,
   sendLoginCode,
+  sendDepositRequestAlert,
+  sendWithdrawalRequestAlert,
 };

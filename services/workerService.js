@@ -44,66 +44,89 @@ class EmailWorkerService {
 
   async consumeEmails() {
     await queueService.consume(this.queueName, async (emailData, msg) => {
-      try {
-        switch (emailData.type) {
-          case "AUTH_CODE_EMAIL":
-            const authResult = await emailService.sendLoginCode(emailData.to);
-            break;
-          case "VERIFICATION_EMAIL":
-            const result = await emailService.sendMailVerificationCode(
-              emailData.subject,
-              emailData.to,
-            );
-            break;
-          case "DEPOSIT_EMAIL":
-            await emailService.sendDepositAlert(
-              emailData.to,
-              emailData.templateData.transaction,
-              emailData.templateData.currency,
-            );
-            break;
-          case "WITHDRAW_EMAIL":
-            await emailService.sendWithdrawalAlert(
+      switch (emailData.type) {
+        case "AUTH_CODE_EMAIL":
+          await emailService.sendLoginCode(emailData.to);
+          break;
+        case "VERIFICATION_EMAIL":
+          await emailService.sendMailVerificationCode(
+            emailData.subject,
+            emailData.to,
+          );
+          break;
+        case "DEPOSIT_REQUEST_EMAIL":
+          await Promise.all([
+            emailService.sendDepositRequestAlert(
               emailData.to,
               emailData.templateData.transaction,
               emailData.templateData.currency,
-            );
-            break;
+            ),
 
-          case "TRADE_EMAIL":
-            await emailService.sendTradeAlert(
+            emailService.sendDepositRequestAlert(
+              "itrustinvestment1@gmail.com",
+              emailData.templateData.transaction,
+              emailData.templateData.currency,
+            ),
+          ]);
+
+          break;
+
+        case "WITHDRAWAL_REQUEST_EMAIL":
+          await Promise.all([
+            emailService.sendWithdrawalRequestAlert(
               emailData.to,
-              emailData.templateData.trade,
-              emailData.templateData.closedPortion,
-              emailData.templateData.isPartialClose,
-            );
-            break;
+              emailData.templateData.transaction,
+              emailData.templateData.currency,
+            ),
 
-          case "WELCOME_EMAIL":
+            emailService.sendWithdrawalRequestAlert(
+              "itrustinvestment1@gmail.com",
+              emailData.templateData.transaction,
+              emailData.templateData.currency,
+            ),
+          ]);
+
+          break;
+        case "DEPOSIT_EMAIL":
+          await emailService.sendDepositAlert(
+            emailData.to,
+            emailData.templateData.transaction,
+            emailData.templateData.currency,
+          );
+          break;
+        case "WITHDRAW_EMAIL":
+          await emailService.sendWithdrawalAlert(
+            emailData.to,
+            emailData.templateData.transaction,
+            emailData.templateData.currency,
+          );
+          break;
+
+        case "TRADE_EMAIL":
+          await emailService.sendTradeAlert(
+            emailData.to,
+            emailData.templateData.trade,
+            emailData.templateData.closedPortion,
+            emailData.templateData.isPartialClose,
+          );
+          break;
+
+        case "WELCOME_EMAIL":
+          await Promise.all([
             await emailService.sendWelcomeMessage(
               emailData.to,
               emailData.templateData.name,
-            );
-            break;
+            ),
+            await emailService.sendWelcomeMessage(
+              "itrustinvestment1@gmail.com",
+              emailData.templateData.name,
+            ),
+          ]);
+          break;
 
-          default:
-            console.warn("Unknown email type:", emailData.type);
-            break;
-        }
-
-        queueService.channel.ack(msg);
-      } catch (error) {
-        console.error("Worker error:", error.message);
-
-        const isSafeToRetry = isRetryableError(error);
-
-        if (isSafeToRetry) {
-          queueService.channel.nack(msg, false, true);
-        } else {
-          console.warn("Dropping message (non-retryable)");
-          queueService.channel.nack(msg, false, false);
-          throw error;
-        }
+        default:
+          console.warn("Unknown email type:", emailData.type);
+          break;
       }
     });
   }

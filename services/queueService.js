@@ -106,35 +106,45 @@ class QueueService {
         const retries = msg.properties.headers?.["x-retries"] || 0;
 
         let content;
+
         try {
           content = JSON.parse(msg.content.toString());
         } catch (err) {
           console.error("Invalid message format:", err.message);
-          return this.channel.nack(msg, false, false);
+
+          this.channel.nack(msg, false, false);
+          return;
         }
 
         try {
           await callback(content, msg);
+
+          // Only ACK after successful processing
+          this.channel.ack(msg);
         } catch (err) {
           console.error(`Processing error for ${queueName}:`, err.message);
 
           if (retries >= 3) {
             console.error("Max retries reached. Dropping message.");
+
             this.channel.nack(msg, false, false);
-          } else {
-            console.log(`Retrying... (${retries + 1})`);
-
-            this.channel.sendToQueue(
-              queueName,
-              Buffer.from(JSON.stringify(content)),
-              {
-                persistent: true,
-                headers: { "x-retries": retries + 1 },
-              },
-            );
-
-            this.channel.ack(msg);
+            return;
           }
+
+          console.log(`Retrying... (${retries + 1})`);
+
+          this.channel.sendToQueue(
+            queueName,
+            Buffer.from(JSON.stringify(content)),
+            {
+              persistent: true,
+              headers: {
+                "x-retries": retries + 1,
+              },
+            },
+          );
+
+          this.channel.ack(msg);
         }
       },
       {

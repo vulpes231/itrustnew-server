@@ -1,4 +1,4 @@
-const BRAND_COLOR = "#5126be";
+const BRAND_COLOR = "#333";
 const WHITE = "#ffffff";
 const BLACK = "#000000";
 
@@ -37,7 +37,7 @@ function baseTemplate({ title, content }) {
             ">
                 <img 
                     src="https://www.itrustinvestments.com/logo.png" 
-                    alt="iTrust Investments"
+                    alt="Itrust Investment"
                     style="max-height: 55px;"
                 />
             </div>
@@ -62,7 +62,7 @@ function baseTemplate({ title, content }) {
                 text-align: center;
             ">
                 <p style="margin: 0 0 10px;">
-                    © ${new Date().getFullYear()} iTrust Investments. All rights reserved.
+                    © ${new Date().getFullYear()} Itrust Investment. All rights reserved.
                 </p>
 
                 <p style="margin: 0 0 10px;">
@@ -93,7 +93,7 @@ function buildEmailMsg(otp) {
         <p>Hello,</p>
 
         <p>
-            Thank you for registering with iTrust Investments.
+            Thank you for registering with Itrust Investment.
             Use the verification code below to complete your registration.
         </p>
 
@@ -136,7 +136,7 @@ function buildTwoFaMsg(otp) {
         <p>Hello,</p>
 
         <p>
-            We received a login request for your iTrust Investments account.
+            We received a login request for your Itrust Investment account.
             Use the verification code below to continue.
         </p>
 
@@ -176,7 +176,7 @@ function buildWelcomeMsg(username) {
         </h2>
 
         <p>
-            Thank you for verifying your email and joining iTrust Investments.
+            Thank you for verifying your email and joining Itrust Investment.
         </p>
 
         <p>
@@ -209,7 +209,7 @@ function buildWelcomeMsg(username) {
     `;
 
   return baseTemplate({
-    title: "Welcome to iTrust Investments",
+    title: "Welcome to Itrust Investment",
     content,
   });
 }
@@ -397,7 +397,7 @@ function buildTradeMessage({
   const content = `
         <h2 style="
             margin-top: 0;
-            color: #5126be;
+          
         ">
             ${title}
         </h2>
@@ -674,7 +674,7 @@ function buildTradeMessage({
                 href="https://app.itrustinvestments.com/dashboard"
                 style="
                     display: inline-block;
-                    background: #5126be;
+                    background: #505050;
                     color: #ffffff;
                     text-decoration: none;
                     padding: 14px 28px;

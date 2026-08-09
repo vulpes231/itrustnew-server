@@ -125,10 +125,10 @@ const adminCreateTransaction = async (req, res, next) => {
     if (result.success && trnxData.notifyUser && trnxData.type !== "transfer") {
       await queueService.sendToQueue("email_queue", {
         type: trnxData.type === "deposit" ? "DEPOSIT_EMAIL" : "WITHDRAW_EMAIL",
-        to: result.email,
+        to: result.userInfo.email,
         templateData: {
           transaction: result.transaction,
-          currency: result.transaction.method.mode,
+          currency: result.userInfo.currency,
         },
       });
     }
