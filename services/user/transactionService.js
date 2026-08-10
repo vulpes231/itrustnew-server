@@ -73,24 +73,39 @@ async function withdrawFunds(userId, trnxData) {
   } = trnxData;
   if (!amount || !method || !network)
     throw new CustomError("Bad request!", 400);
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).session(session);
     if (!user) throw new CustomError("Invalid credentials!", 404);
 
     if (user.identityVerification.kycStatus !== "approved")
       throw new CustomError("Account not verified!", 400);
 
-    const withdrawFrom = await Wallet.findOne({ userId, slug: "cash" });
+    const withdrawFrom = await Wallet.findOne({ userId, slug: "cash" }).session(
+      session,
+    );
 
     if (!withdrawFrom)
       throw new CustomError("Invalid withdrawal account!", 400);
 
-    if (withdrawFrom.balance.available < parseFloat(amount))
+    const parsedAmt = Number(amount);
+
+    if (!Number.isFinite(parsedAmt) || parsedAmt <= 0) {
+      throw new CustomError("Invalid withdrawal amount!", 400);
+    }
+
+    if (withdrawFrom.balance.available < parsedAmt)
       throw new CustomError("Insufficient funds!", 400);
+
+    withdrawFrom.balance.total -= parsedAmt;
+    withdrawFrom.balance.available -= parsedAmt;
+
+    await withdrawFrom.save({ session });
 
     const customMemo = `${method} withdrawal from ${withdrawFrom.slug}`;
 
-    const bankInfo = `${`${bankName}-acc:${accountNumber}-rou:${routing}`}`;
+    const bankInfo = `${bankName}-acc:${accountNumber}-rou:${routing}`;
 
     const meta = {
       type: "withdraw",
@@ -100,28 +115,38 @@ async function withdrawFunds(userId, trnxData) {
       info: method === "bank" ? bankInfo : address,
     };
 
-    const trnx = await Transaction.create({
-      method: {
-        mode: method,
-        network: network,
-      },
-      amount: amount,
-      account: withdrawFrom.slug,
-      memo: memo || customMemo,
-      type: "withdraw",
-      userId: userId,
-      email: user.contactInfo.email,
-      fullname: user.fullName,
-      meta: meta,
-    });
+    const [trnx] = await Transaction.create(
+      [
+        {
+          method: {
+            mode: method,
+            network,
+          },
+          amount: parsedAmt,
+          account: withdrawFrom.slug,
+          memo: memo || customMemo,
+          type: "withdraw",
+          userId,
+          email: user.contactInfo.email,
+          fullname: user.fullName,
+          meta,
+        },
+      ],
+      { session },
+    );
+
+    await session.commitTransaction();
     return {
       trnx,
       success: true,
       userInfo: { email: user.contactInfo.email, currency: user.currency },
     };
   } catch (error) {
+    await session.abortTransaction();
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
+  } finally {
+    await session.endSession();
   }
 }
 

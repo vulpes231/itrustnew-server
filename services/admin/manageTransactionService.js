@@ -93,22 +93,9 @@ async function editTransaction(transactionId, action) {
     }
 
     if (action === "approve") {
-      if (
-        transaction.type === "withdraw" &&
-        transactionWallet.balance.available < transaction.amount
-      ) {
-        throw new CustomError(
-          "Insufficient funds in wallet to approve withdrawal!",
-          400,
-        );
-      }
-
       if (transaction.type === "deposit") {
         transactionWallet.balance.available += transaction.amount;
         transactionWallet.balance.total += transaction.amount;
-      } else if (transaction.type === "withdraw") {
-        transactionWallet.balance.available -= transaction.amount;
-        transactionWallet.balance.total -= transaction.amount;
       }
 
       await transactionWallet.save({ session });
@@ -156,6 +143,10 @@ async function editTransaction(transactionId, action) {
         console.error("Portfolio service error:", trackerError.message);
       }
     } else if (action === "reject") {
+      if (transaction.type === "withdraw") {
+        transactionWallet.balance.available += transaction.amount;
+        transactionWallet.balance.total += transaction.amount;
+      }
       transaction.status = "failed";
       await transaction.save({ session });
     }
@@ -182,7 +173,7 @@ async function editTransaction(transactionId, action) {
       500,
     );
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 }
 

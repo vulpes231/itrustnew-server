@@ -86,6 +86,9 @@ class TradeService {
           (plan) => plan.planId.toString() === planId,
         );
 
+        console.log(plan.balance.available, "plan balance");
+        console.log(marginAmount, "amount");
+
         if (plan.balance.available < marginAmount) {
           throw new CustomError("Plan balance not sufficient!", 400);
         }
@@ -172,8 +175,6 @@ class TradeService {
         session,
       );
 
-      await session.commitTransaction();
-
       await portfolioService.createPortfolioSnapshot(
         trade.userId,
         "trade_buy",
@@ -194,7 +195,7 @@ class TradeService {
         session,
       );
 
-      session.endSession();
+      await session.commitTransaction();
 
       return {
         success: true,
@@ -204,8 +205,10 @@ class TradeService {
       };
     } catch (error) {
       await session.abortTransaction();
-      session.endSession();
-      throw new CustomError(error.message, 500);
+
+      throw new CustomError(error.message, error.statusCode);
+    } finally {
+      await session.endSession();
     }
   }
 

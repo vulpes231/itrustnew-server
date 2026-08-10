@@ -82,52 +82,46 @@ async function completeVerification(userId, verifyData) {
   const session = await mongoose.startSession();
 
   try {
-    session.startTransaction();
+    await session.withTransaction(async () => {
+      const user = await User.findById(userId).session(session);
 
-    const [user, submittedData] = await Promise.all([
-      User.findById(userId).session(session),
-      Verification.findById(verifyId).session(session),
-    ]);
+      if (!user) {
+        throw new CustomError("User not found!", 404);
+      }
 
-    if (!user) {
-      throw new CustomError("User not found!", 404);
-    }
+      const submittedData =
+        await Verification.findById(verifyId).session(session);
 
-    if (!submittedData) {
-      throw new CustomError("Invalid verification info!", 404);
-    }
+      if (!submittedData) {
+        throw new CustomError("Invalid verification info!", 404);
+      }
 
-    if (submittedData.status && submittedData.status !== "pending") {
-      throw new CustomError("Verification request already processed!", 400);
-    }
+      if (submittedData.status && submittedData.status !== "pending") {
+        throw new CustomError("Verification request already processed!", 400);
+      }
 
-    user.identityVerification = {
-      kycStatus: "approved",
-      idType: submittedData.idType,
-      idFront: submittedData.frontId,
-      idBack: submittedData?.backId || null,
-      verifiedAt: new Date(),
-    };
+      user.identityVerification = {
+        kycStatus: "approved",
+        idType: submittedData.idType,
+        idFront: submittedData.frontId,
+        idBack: submittedData.backId || null,
+        verifiedAt: new Date(),
+      };
 
-    submittedData.status = "approved";
-    await Promise.all([
-      user.save({ session }),
-      submittedData.save({ session }),
-    ]);
+      submittedData.status = "approved";
 
-    await session.commitTransaction();
+      await user.save({ session });
+      await submittedData.save({ session });
+    });
 
     return true;
   } catch (error) {
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
-
     if (error instanceof CustomError) {
       throw error;
     }
 
     console.error("Verification completion error:", error);
+
     throw new CustomError(
       error.message || "Failed to complete verification",
       500,

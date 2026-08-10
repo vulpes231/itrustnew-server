@@ -263,7 +263,7 @@ async function getWalletInvestData(userId) {
       (acc, pos) => {
         const walletId = pos.wallet.id.toString();
 
-        const totalReturn = pos.performance?.totalReturn || 0;
+        const totalReturn = pos.performance?.return || 0;
         const extra = pos.performance?.extra || 0;
         const currentValue = pos.performance?.currentValue || 0;
 
