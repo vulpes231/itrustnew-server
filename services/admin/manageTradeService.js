@@ -8,6 +8,7 @@ const Asset = require("../../models/Asset");
 const Position = require("../../models/Position");
 const positionService = require("../user/positionService");
 const walletSnapshotService = require("../user/walletSnapshotService");
+const portfolioService = require("../user/portfolioService");
 
 class TradeService {
   constructor() {
