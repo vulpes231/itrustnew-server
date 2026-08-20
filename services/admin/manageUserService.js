@@ -76,12 +76,14 @@ async function completeVerification(userId, verifyData) {
   const { verifyId } = verifyData;
 
   if (!verifyId) {
-    throw new CustomError("Bad request!", 400);
+    throw new CustomError("Verification ID is required!", 400);
   }
 
   const session = await mongoose.startSession();
 
   try {
+    let updatedUser;
+
     await session.withTransaction(async () => {
       const user = await User.findById(userId).session(session);
 
@@ -110,11 +112,18 @@ async function completeVerification(userId, verifyData) {
 
       submittedData.status = "approved";
 
-      await user.save({ session });
-      await submittedData.save({ session });
+      await Promise.all([
+        user.save({ session }),
+        submittedData.save({ session }),
+      ]);
+
+      updatedUser = user;
     });
 
-    return true;
+    return {
+      success: true,
+      user: updatedUser,
+    };
   } catch (error) {
     if (error instanceof CustomError) {
       throw error;

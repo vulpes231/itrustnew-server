@@ -4,6 +4,7 @@ const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const { CustomError } = require("../../utils/utils");
 const walletSnapshotService = require("./walletSnapshotService");
+const Usersetting = require("../../models/Usersetting");
 
 async function addFunds(userId, trnxData) {
   const { method, amount, memo, network, proof } = trnxData;
@@ -49,10 +50,13 @@ async function addFunds(userId, trnxData) {
       meta: meta,
     });
 
+    const settings = await Usersetting.findOne({ userId: user._id });
+
     return {
       trnx,
+      user,
+      settings,
       success: true,
-      userInfo: { email: user.contactInfo.email, currency: user.currency },
     };
   } catch (error) {
     if (error instanceof CustomError) throw error;
@@ -138,8 +142,8 @@ async function withdrawFunds(userId, trnxData) {
     await session.commitTransaction();
     return {
       trnx,
+      user,
       success: true,
-      userInfo: { email: user.contactInfo.email, currency: user.currency },
     };
   } catch (error) {
     await session.abortTransaction();
@@ -265,8 +269,8 @@ async function moveFunds(userId, trnxData) {
 
     return {
       trnx,
+      user,
       success: true,
-      userInfo: { email: user.contactInfo.email, currency: user.currency },
     };
   } catch (error) {
     await session.abortTransaction();
@@ -294,19 +298,59 @@ async function getUserLedger(userId) {
 }
 
 async function cancelTransaction(transactionId) {
+  if (!transactionId) {
+    throw new CustomError("Transaction ID required!", 400);
+  }
+
+  const session = await mongoose.startSession();
+
   try {
-    const transaction = await Transaction.findOne({ _id: transactionId });
+    session.startTransaction();
+
+    const transaction =
+      await Transaction.findById(transactionId).session(session);
+
+    if (!transaction) {
+      throw new CustomError("Transaction not found!", 404);
+    }
 
     if (transaction.status !== "pending") {
       throw new CustomError("Cannot cancel transaction!", 400);
     }
 
+    if (transaction.type === "withdraw") {
+      const transactionAccount = await Wallet.findOne({
+        userId: transaction.userId,
+        slug: transaction.account,
+      }).session(session);
+
+      if (!transactionAccount) {
+        throw new CustomError("Invalid account!", 404);
+      }
+
+      transactionAccount.balance.total += transaction.amount;
+      transactionAccount.balance.available += transaction.amount;
+
+      await transactionAccount.save({ session });
+    }
+
     transaction.status = "cancelled";
-    await transaction.save();
+
+    await transaction.save({ session });
+
+    await session.commitTransaction();
+
     return transaction;
   } catch (error) {
-    if (error instanceof CustomError) throw error;
-    throw new CustomError(error.message, error.statusCode);
+    await session.abortTransaction();
+
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, error.statusCode || 500);
+  } finally {
+    await session.endSession();
   }
 }
 

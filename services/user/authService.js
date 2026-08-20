@@ -101,7 +101,10 @@ async function registerService(userData) {
     );
 
     try {
-      await portfolioService.createAccountSnapshot(result.userId);
+      await portfolioService.createPortfolioSnapshot(
+        result.userId,
+        "account_creation",
+      );
     } catch (trackerError) {
       console.warn(
         `Portfolio tracker initialization failed for user ${result.userId}:`,
@@ -113,6 +116,7 @@ async function registerService(userData) {
       .sendToQueue("email_queue", {
         type: "VERIFICATION_EMAIL",
         to: email,
+        subject: "Confirm Your Email",
       })
       .catch((error) => {
         console.error("Failed to queue verification email:", error);

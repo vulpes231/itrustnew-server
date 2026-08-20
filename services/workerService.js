@@ -57,57 +57,103 @@ class EmailWorkerService {
         case "DEPOSIT_REQUEST_EMAIL":
           await Promise.all([
             emailService.sendDepositRequestAlert(
-              emailData.to,
+              emailData.templateData.user,
               emailData.templateData.transaction,
-              emailData.templateData.currency,
+              emailData.templateData.settings,
             ),
 
-            emailService.sendDepositRequestAlert(
-              "itrustinvestment1@gmail.com",
-              emailData.templateData.transaction,
-              emailData.templateData.currency,
-            ),
+            // emailService.sendDepositRequestAlert(
+            //   "itrustinvestment1@gmail.com",
+            //   emailData.templateData.transaction,
+            //   emailData.templateData.currency,
+            // ),
           ]);
 
+          break;
+        case "DEPOSIT_APPROVED_EMAIL":
+          await emailService.sendDepositApprovedAlert(
+            emailData.templateData.user,
+            emailData.templateData.transaction,
+          );
+          break;
+        case "DEPOSIT_DECLINED_EMAIL":
+          await emailService.sendDepositDeclineAlert(
+            emailData.templateData.user,
+            emailData.templateData.transaction,
+          );
           break;
 
         case "WITHDRAWAL_REQUEST_EMAIL":
           await Promise.all([
             emailService.sendWithdrawalRequestAlert(
-              emailData.to,
+              emailData.templateData.user,
               emailData.templateData.transaction,
-              emailData.templateData.currency,
             ),
 
-            emailService.sendWithdrawalRequestAlert(
-              "itrustinvestment1@gmail.com",
-              emailData.templateData.transaction,
-              emailData.templateData.currency,
-            ),
+            // emailService.sendWithdrawalRequestAlert(
+            //   "itrustinvestment1@gmail.com",
+            //   emailData.templateData.transaction,
+            //   emailData.templateData.currency,
+            // ),
           ]);
 
           break;
-        case "DEPOSIT_EMAIL":
-          await emailService.sendDepositAlert(
-            emailData.to,
+
+        case "WITHDRAW_APPROVED_EMAIL":
+          await emailService.sendWithdrawalApprovedAlert(
+            emailData.templateData.user,
             emailData.templateData.transaction,
-            emailData.templateData.currency,
-          );
-          break;
-        case "WITHDRAW_EMAIL":
-          await emailService.sendWithdrawalAlert(
-            emailData.to,
-            emailData.templateData.transaction,
-            emailData.templateData.currency,
           );
           break;
 
-        case "TRADE_EMAIL":
-          await emailService.sendTradeAlert(
-            emailData.to,
+        case "WITHDRAW_DECLINED_EMAIL":
+          await emailService.sendWithdrawalDeclinedAlert(
+            emailData.templateData.user,
+            emailData.templateData.transaction,
+          );
+          break;
+
+        case "BUY_ORDER_EMAIL":
+          await emailService.sendBuyAlert(
+            emailData.templateData.user,
             emailData.templateData.trade,
-            emailData.templateData.closedPortion,
-            emailData.templateData.isPartialClose,
+          );
+          break;
+        case "SELL_ORDER_EMAIL":
+          await emailService.sendSellAlert(
+            emailData.templateData.user,
+            emailData.templateData.trade,
+          );
+          break;
+        case "TRANSFER_EMAIL":
+          await emailService.sendTranferAlert(
+            emailData.templateData.user,
+            emailData.templateData.transaction,
+          );
+          break;
+
+        case "IDENTITY_VERIFIED_EMAIL":
+          await emailService.sendIdVerifiedAlert(emailData.templateData.user);
+          break;
+
+        case "SAVINGS_CREATED_EMAIL":
+          await emailService.sendSavingsCreatedAlert(
+            emailData.templateData.user,
+            emailData.templateData.account,
+          );
+          break;
+
+        case "CONTRIBUTION_EMAIL":
+          await emailService.sendContributionAlert(
+            emailData.templateData.user,
+            emailData.templateData.transaction,
+          );
+          break;
+
+        case "CASHOUT_REQUEST_EMAIL":
+          await emailService.sendCashoutRequestAlert(
+            emailData.templateData.user,
+            emailData.templateData.transaction,
           );
           break;
 
@@ -117,10 +163,10 @@ class EmailWorkerService {
               emailData.to,
               emailData.templateData.name,
             ),
-            await emailService.sendWelcomeMessage(
-              "itrustinvestment1@gmail.com",
-              emailData.templateData.name,
-            ),
+            // await emailService.sendWelcomeMessage(
+            //   "itrustinvestment1@gmail.com",
+            //   emailData.templateData.name,
+            // ),
           ]);
           break;
 

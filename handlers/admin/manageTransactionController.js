@@ -76,15 +76,16 @@ const updateTransaction = async (req, res, next) => {
     if (
       result.success &&
       result.userInfo.sendAlert &&
-      result.transaction.type === "deposit"
+      result.transaction.type === "deposit" &&
+      result.transaction.status === "processed"
     ) {
       queueService
         .sendToQueue("email_queue", {
-          type: "DEPOSIT_EMAIL",
-          to: result.userInfo.email,
+          type: "DEPOSIT_APPROVED_EMAIL",
+          to: result.user.contactInfo.email,
           templateData: {
             transaction: result.transaction,
-            currency: result.userInfo.currency,
+            user: result.user,
           },
         })
         .catch((err) => console.error("Failed to send deposit email:", err));
@@ -93,15 +94,52 @@ const updateTransaction = async (req, res, next) => {
     if (
       result.success &&
       result.userInfo.sendAlert &&
-      result.transaction.type === "withdraw"
+      result.transaction.type === "deposit" &&
+      result.transaction.status === "failed"
     ) {
       queueService
         .sendToQueue("email_queue", {
-          type: "WITHDRAW_EMAIL",
-          to: result.userInfo.email,
+          type: "DEPOSIT_DECLINED_EMAIL",
+          to: result.user.contactInfo.email,
           templateData: {
             transaction: result.transaction,
-            currency: result.userInfo.currency,
+            user: result.user,
+          },
+        })
+        .catch((err) => console.error("Failed to send deposit email:", err));
+    }
+
+    if (
+      result.success &&
+      result.userInfo.sendAlert &&
+      result.transaction.type === "withdraw" &&
+      result.transaction.status === "processed"
+    ) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "WITHDRAW_APPROVED_EMAIL",
+          to: result.user.contactInfo.email,
+          templateData: {
+            transaction: result.transaction,
+            user: result.user,
+          },
+        })
+        .catch((err) => console.error("Failed to send withdrawal email:", err));
+    }
+
+    if (
+      result.success &&
+      result.userInfo.sendAlert &&
+      result.transaction.type === "withdraw" &&
+      result.transaction.status === "failed"
+    ) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "WITHDRAW_DECLINED_EMAIL",
+          to: result.user.contactInfo.email,
+          templateData: {
+            transaction: result.transaction,
+            user: result.user,
           },
         })
         .catch((err) => console.error("Failed to send withdrawal email:", err));

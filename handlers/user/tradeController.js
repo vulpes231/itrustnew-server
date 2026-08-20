@@ -12,13 +12,14 @@ const openPosition = async (req, res, next) => {
     const assetData = req.body;
     const result = await buyAsset(userId, assetData);
 
-    if (result.success && result.user.sendTradeAlert) {
+    if (result.success && result.user.mailing.orderNotification) {
       queueService
         .sendToQueue("email_queue", {
-          type: "TRADE_EMAIL",
-          to: result.user.email,
+          type: "BUY_ORDER_EMAIL",
+          to: result.user.contactInfo.email,
           templateData: {
             trade: result.trade,
+            user: result.user,
           },
         })
         .catch((err) => console.error("Failed to send trade email:", err));
@@ -43,13 +44,14 @@ const closePosition = async (req, res, next) => {
       amount,
     });
 
-    if (result.success && result.user.sendTradeAlert) {
+    if (result.success && result.user.mailing.orderNotification) {
       queueService
         .sendToQueue("email_queue", {
-          type: "TRADE_EMAIL",
-          to: result.user.email,
+          type: "SELL_ORDER_EMAIL",
+          to: result.user.contactInfo.email,
           templateData: {
             trade: result.sellTrade,
+            user: result.user,
           },
         })
         .catch((err) => console.error("Failed to send trade email:", err));

@@ -194,7 +194,7 @@ async function buyAsset(userId, assetData) {
     return {
       success: true,
       trade: trade[0],
-      user: userInfo,
+      user,
     };
   } catch (error) {
     console.log(error);
@@ -452,15 +452,10 @@ async function sellAsset(formData) {
 
     session.endSession();
 
-    const userInfo = {
-      sendTradeAlert: user.mailing.orderNotification,
-      email: user.contactInfo.email,
-    };
-
     return {
       success: true,
       sellTrade: sellTrade[0],
-      user: userInfo,
+      user: user,
     };
   } catch (error) {
     console.log(error);

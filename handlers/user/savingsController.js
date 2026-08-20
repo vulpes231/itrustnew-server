@@ -1,3 +1,4 @@
+const queueService = require("../../services/queueService");
 const {
   fetchAvailableSavings,
   addSavingsAccount,
@@ -25,9 +26,20 @@ const createSavingsAccounts = async (req, res, next) => {
   const userId = req.user.userId;
   const { accountId } = req.body;
   try {
-    const acctName = await addSavingsAccount(userId, accountId);
+    const result = await addSavingsAccount(userId, accountId);
+
+    if (result.success && result.user.mailing.emailNotification) {
+      await queueService.sendToQueue("email_queue", {
+        type: "SAVINGS_CREATED_EMAIL",
+        to: result.user.contactInfo.email,
+        templateData: {
+          account: result.account,
+          user: result.user,
+        },
+      });
+    }
     res.status(201).json({
-      message: `${acctName} account opened successfully`,
+      message: `${result.account.name} account opened successfully`,
       data: null,
       success: true,
     });
@@ -67,7 +79,17 @@ const contributeSavings = async (req, res, next) => {
   const userId = req.user.userId;
   const fundData = req.body;
   try {
-    await fundSavings(userId, fundData);
+    const result = await fundSavings(userId, fundData);
+    if (result.success && result.user.mailing.emailNotification) {
+      await queueService.sendToQueue("email_queue", {
+        type: "CONTRIBUTION_EMAIL",
+        to: result.user.contactInfo.email,
+        templateData: {
+          transaction: result.transaction,
+          user: result.user,
+        },
+      });
+    }
     res.status(200).json({
       message: `Contribution successful`,
       data: null,
@@ -82,7 +104,17 @@ const cashoutSavings = async (req, res, next) => {
   const userId = req.user.userId;
   const withdrawData = req.body;
   try {
-    const acctName = await withdrawSavings(userId, withdrawData);
+    const result = await withdrawSavings(userId, withdrawData);
+    if (result.success && result.user.mailing.emailNotification) {
+      await queueService.sendToQueue("email_queue", {
+        type: "CASHOUT_REQUEST_EMAIL",
+        to: result.user.contactInfo.email,
+        templateData: {
+          transaction: result.transaction,
+          user: result.user,
+        },
+      });
+    }
     res.status(200).json({
       message: `Cashout successful`,
       data: null,

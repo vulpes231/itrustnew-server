@@ -55,7 +55,17 @@ const reviewVerification = async (req, res, next) => {
   const { action, verifyId } = req.body;
   const { userId } = req.params;
   try {
-    await completeVerification(userId, { action, verifyId });
+    const result = await completeVerification(userId, { action, verifyId });
+
+    if (result.success && result.user.mailing.emailNotification) {
+      await queueService.sendToQueue("email_queue", {
+        type: "IDENTITY_VERIFIED_EMAIL",
+        to: result.user.contactInfo.email,
+        templateData: {
+          user: result.user,
+        },
+      });
+    }
 
     res.status(200).json({
       data: null,

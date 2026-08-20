@@ -80,7 +80,11 @@ async function addSavingsAccount(userId, accountId) {
     user.savingsAccounts.push(newAccountData);
     await user.save();
 
-    return newAccountData.name;
+    const createdAcct = user.savingsAccounts.find(
+      (acct) => acct.accountId.toString() === accountId.toString(),
+    );
+
+    return { success: true, account: createdAcct, user };
   } catch (error) {
     console.log(error);
     if (error instanceof CustomError) {
@@ -226,8 +230,8 @@ async function fundSavings(userId, fundData) {
 
     return {
       success: true,
-      message: "Savings account funded successfully",
-      data: null,
+      user,
+      transaction: trxn,
     };
   } catch (error) {
     if (session.inTransaction()) {
@@ -329,6 +333,7 @@ async function withdrawSavings(userId, withdrawData) {
     );
 
     await session.commitTransaction();
+    return { success: true, user, transaction: trxn };
   } catch (error) {
     await session.abortTransaction();
 

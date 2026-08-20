@@ -1,15 +1,35 @@
 const User = require("../models/User");
 const { sendMail } = require("../utils/mailer");
 const {
-  buildEmailMsg,
-  buildTwoFaMsg,
-  buildWelcomeMsg,
-  buildTransactionEmail,
-  buildTradeMessage,
-} = require("../utils/messages");
+  buildDepositEmail,
+  buildDepositApprovedEmail,
+  buildDepositDeclinedEmail,
+} = require("../utils/messages/deposit/depositMessages");
+const {
+  buildIdentityVerifiedMsg,
+} = require("../utils/messages/kyc/verificationMsg");
+const { buildEmailMsg } = require("../utils/messages/otp/emailMessage");
+const {
+  buildSavingsCreatedEmail,
+  buildContributionEmail,
+  buildCashoutReqEmail,
+} = require("../utils/messages/savings/savingsMessage");
+const {
+  buildBuyOrderEmail,
+  buildSellOrderEmail,
+} = require("../utils/messages/trade/tradeMessages");
+const {
+  buildTransferEmail,
+} = require("../utils/messages/transfer/transferMessages");
+const {
+  buildWithdrawalEmail,
+  buildWithdrawalApprovedEmail,
+  buildWithdrawalDeclinedEmail,
+} = require("../utils/messages/withdraw/withdrawMessages");
 const { generateOtp, CustomError } = require("../utils/utils");
 const bcrypt = require("bcryptjs");
 
+// USER OTP EMAILS
 async function sendLoginCode(email) {
   if (!email) throw new CustomError("Email required!", 400);
 
@@ -106,6 +126,145 @@ async function sendMailVerificationCode(subject, email) {
   }
 }
 
+//USER DEPOSIT EMAILS
+async function sendDepositRequestAlert(user, transaction, settings) {
+  const subject = `Deposit Request Confirmation`;
+
+  const message = buildDepositEmail({ user, transaction, settings });
+
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function sendDepositApprovedAlert(user, transaction) {
+  const email = user.contactInfo.email;
+  const subject = `Deposit Processed`;
+
+  const message = buildDepositApprovedEmail({ user, transaction });
+
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function sendDepositDeclineAlert(user, transaction) {
+  const email = user.contactInfo.email;
+  const subject = `Deposit Declined`;
+
+  const message = buildDepositDeclinedEmail({ user, transaction });
+
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
+// USER WITHDRAWAL EMAILS
+async function sendWithdrawalRequestAlert(user, transaction) {
+  const email = user.contactInfo.email;
+  const subject = `Withdrawal Request Confirmation`;
+
+  const message = buildWithdrawalEmail({ user, transaction });
+
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function sendWithdrawalApprovedAlert(user, transaction) {
+  const email = user.contactInfo.email;
+
+  const subject = `Withdrawal Processed`;
+
+  const message = buildWithdrawalApprovedEmail({ user, transaction });
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function sendWithdrawalDeclinedAlert(user, transaction) {
+  const subject = `Withdrawal Declined`;
+
+  const message = buildWithdrawalDeclinedEmail({
+    user,
+    transaction,
+  });
+
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
+// USER TRADE ALERTS
+async function sendBuyAlert(user, trade) {
+  const email = user.contactInfo.email;
+
+  const subject = "Purchase Order Confirmed";
+
+  const message = buildBuyOrderEmail({ user, trade });
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function sendSellAlert(user, trade) {
+  const email = user.contactInfo.email;
+
+  const subject = "Sale Order Confirmed";
+
+  const message = buildSellOrderEmail({ user, trade });
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
+  }
+}
+
+// USER WELCOME ALERT
 async function sendWelcomeMessage(email, username) {
   const subject = "Welcome to iTrust Investments - Get Started Today!";
   const msg = buildWelcomeMsg(username);
@@ -119,26 +278,30 @@ async function sendWelcomeMessage(email, username) {
   }
 }
 
-async function sendDepositAlert(email, transaction, currency) {
-  const method = transaction?.method?.mode;
-  const symbol = currency?.sign;
-  const currencyName = currency?.symbol?.toUpperCase();
-  const amount = transaction?.amount;
+//USER KYC ALERTS
+async function sendIdVerifiedAlert(user) {
+  const email = user.contactInfo.email;
+  const username = user.personalInfo.username;
 
-  const subject = `Deposit Successful`;
+  const subject = "ID Verified";
 
-  const message = buildTransactionEmail({
-    type: "Deposit Successful",
-    amount,
-    symbol,
-    currencyName,
-    method,
-    status: transaction.status || "Completed",
-    buttonText: "Login to Dashboard",
-    buttonLink: "https://itrustinvestment.netlify.app/login",
-    message:
-      "Your deposit has been received successfully and credited to your iTrust Investments account.",
-  });
+  const message = buildIdentityVerifiedMsg(username);
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
+  }
+}
+
+//USER TRANSFER EMAIL
+async function sendTranferAlert(user, transaction) {
+  const email = user.contactInfo.email;
+  const subject = `Transfer to ${transaction.meta.to}`;
+
+  const message = buildTransferEmail({ user, transaction });
 
   try {
     await sendMail(email, subject, message);
@@ -151,26 +314,12 @@ async function sendDepositAlert(email, transaction, currency) {
   }
 }
 
-async function sendWithdrawalAlert(email, transaction, currency) {
-  const method = transaction?.method?.mode;
-  const symbol = currency?.sign;
-  const currencyName = currency?.symbol?.toUpperCase();
-  const amount = transaction?.amount;
+//USER SAVINGS ACCOUNTS EMAIL
+async function sendSavingsCreatedAlert(user, account) {
+  const email = user.contactInfo.email;
+  const subject = `Your ${account.name} Account Has Been Successfuly Created`;
 
-  const subject = `Withdrawal Successful - ${symbol}${amount} ${currencyName}`;
-
-  const message = buildTransactionEmail({
-    type: "Withdrawal Processed",
-    amount,
-    symbol,
-    currencyName,
-    method,
-    status: "Processed",
-    buttonText: "View Dashboard",
-    buttonLink: "https://itrustinvestment.netlify.app/dashboard",
-    message:
-      "Your withdrawal request has been processed successfully. The funds are on their way to your selected payment destination.",
-  });
+  const message = buildSavingsCreatedEmail({ user, account });
 
   try {
     await sendMail(email, subject, message);
@@ -183,26 +332,11 @@ async function sendWithdrawalAlert(email, transaction, currency) {
   }
 }
 
-async function sendDepositRequestAlert(email, transaction, currency) {
-  const method = transaction?.method?.mode;
-  const symbol = currency?.sign;
-  const currencyName = currency?.symbol?.toUpperCase();
-  const amount = transaction?.amount;
+async function sendContributionAlert(user, transaction) {
+  const email = user.contactInfo.email;
+  const subject = `Contribution to ${transaction.account}`;
 
-  const subject = `Deposit Request Received`;
-
-  const message = buildTransactionEmail({
-    type: "Deposit Request",
-    amount,
-    symbol,
-    currencyName,
-    method,
-    status: transaction.status,
-    buttonText: "Login to Dashboard",
-    buttonLink: "https://itrustinvestment.netlify.app/login",
-    message:
-      "Deposit request received. The funds will be credited to your account once processed.",
-  });
+  const message = buildContributionEmail({ user, transaction });
 
   try {
     await sendMail(email, subject, message);
@@ -215,26 +349,11 @@ async function sendDepositRequestAlert(email, transaction, currency) {
   }
 }
 
-async function sendWithdrawalRequestAlert(email, transaction, currency) {
-  const method = transaction?.method?.mode;
-  const symbol = currency?.sign;
-  const currencyName = currency?.symbol?.toUpperCase();
-  const amount = transaction?.amount;
+async function sendCashoutRequestAlert(user, transaction) {
+  const email = user.contactInfo.email;
+  const subject = `Cashout Request from ${transaction.account}`;
 
-  const subject = `Withdrawal Request Received`;
-
-  const message = buildTransactionEmail({
-    type: "Withdrawal Request",
-    amount,
-    symbol,
-    currencyName,
-    method,
-    status: transaction.status,
-    buttonText: "Check Status",
-    buttonLink: "https://itrustinvestment.netlify.app/login",
-    message:
-      "Withdrawal request received. The funds will be proceesed and you will receive a email update.",
-  });
+  const message = buildCashoutReqEmail({ user, transaction });
 
   try {
     await sendMail(email, subject, message);
@@ -243,104 +362,25 @@ async function sendWithdrawalRequestAlert(email, transaction, currency) {
       throw error;
     }
 
-    throw new CustomError(error.message, 500);
-  }
-}
-
-async function sendTradeAlert(
-  email,
-  trade,
-  closedPortion = null,
-  isPartialClose = false,
-) {
-  if (!trade) throw new CustomError("Incomplete data!", 400);
-
-  const action = trade.orderType;
-  const isClosing = trade.status === "closed" || isPartialClose;
-
-  let subject, message;
-
-  if (isClosing) {
-    const profitLoss =
-      closedPortion?.profitLossClosed || trade.performance.totalReturn;
-    const profitLossFormatted =
-      profitLoss >= 0
-        ? `+$${profitLoss.toFixed(2)}`
-        : `-$${Math.abs(profitLoss).toFixed(2)}`;
-    const profitLossClass = profitLoss >= 0 ? "profit" : "loss";
-
-    const closeType =
-      closedPortion?.percentClosed === 100
-        ? "Closed"
-        : `Partially Closed (${closedPortion?.percentClosed}%)`;
-
-    subject = `${closeType} Trade: ${trade.asset.symbol.toUpperCase()} - ${profitLossFormatted}`;
-
-    message = buildTradeMessage({
-      title: `${closeType} Trade Confirmation`,
-      message: `
-            Your ${trade.orderType.toUpperCase()} position in
-            <strong>${trade.asset.symbol} (${trade.asset.name})</strong>
-            has been ${
-              closedPortion?.percentClosed === 100
-                ? "closed"
-                : "partially closed"
-            }
-        `,
-      trade,
-      actionColor: profitLoss >= 0 ? "#28a745" : "#dc3545",
-      actionLabel: closeType,
-      isClosing: true,
-      profitLoss,
-      profitLossFormatted,
-      profitLossClass,
-      closeType,
-      closedPortion,
-    });
-  } else {
-    const actionVerb =
-      {
-        buy: "purchased",
-        sell: "sold",
-      }[action] || action;
-
-    const qty = trade.execution.quantity;
-    const parsedQty = parseFloat(qty).toFixed(6);
-
-    subject = `Trade Confirmation: You ${actionVerb} ${parsedQty} ${trade.asset.symbol.toUpperCase()}`;
-
-    message = buildTradeMessage({
-      title: "Trade Confirmation",
-      message: `
-            You 
-            <strong style="color:${action === "buy" ? "#28a745" : "#dc3545"};">
-                ${actionVerb.toUpperCase()}
-            </strong>
-            ${parsedQty} ${trade.asset.symbol} (${trade.asset.name})
-        `,
-      trade,
-      actionColor: action === "buy" ? "#28a745" : "#dc3545",
-      actionLabel: action.toUpperCase(),
-    });
-  }
-
-  try {
-    await sendMail(email, subject, message);
-  } catch (error) {
-    if (error instanceof CustomError) {
-      throw error;
-    }
     throw new CustomError(error.message, 500);
   }
 }
 
 module.exports = {
-  sendDepositAlert,
-  sendWithdrawalAlert,
-  sendTradeAlert,
-  sendMailVerificationCode,
+  sendMailVerificationCode, //otp
   sendWelcomeMessage,
   sendLoginCode,
-  sendDepositRequestAlert,
-  sendWithdrawalRequestAlert,
+  sendBuyAlert, //trade
+  sendSellAlert,
+  sendDepositRequestAlert, //deposit
+  sendDepositApprovedAlert,
+  sendDepositDeclineAlert,
+  sendWithdrawalRequestAlert, //withdrawal
+  sendWithdrawalApprovedAlert,
+  sendWithdrawalDeclinedAlert,
+  sendIdVerifiedAlert, //kyc
+  sendTranferAlert, //transfer
+  sendSavingsCreatedAlert, //savings
+  sendContributionAlert,
+  sendCashoutRequestAlert,
 };

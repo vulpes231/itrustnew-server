@@ -61,13 +61,14 @@ const deposit = async (req, res, next) => {
 
     const result = await addFunds(userId, { ...trnxData, proof });
 
-    if (result.success) {
+    if (result.success && result.user.mailing.emailNotification) {
       await queueService.sendToQueue("email_queue", {
         type: "DEPOSIT_REQUEST_EMAIL",
-        to: result.userInfo.email,
+        to: result.user.contactInfo.email,
         templateData: {
           transaction: result.trnx,
-          currency: result.userInfo.currency,
+          user: result.user,
+          settings: result.settings,
         },
       });
     }
@@ -88,13 +89,13 @@ const withdraw = async (req, res, next) => {
     const trnxData = req.body;
     const result = await withdrawFunds(userId, trnxData);
 
-    if (result.success) {
+    if (result.success && result.user.mailing.emailNotification) {
       await queueService.sendToQueue("email_queue", {
         type: "WITHDRAWAL_REQUEST_EMAIL",
-        to: result.userInfo.email,
+        to: result.user.contactInfo.email,
         templateData: {
           transaction: result.trnx,
-          currency: result.userInfo.currency,
+          user: result.user,
         },
       });
     }
@@ -110,7 +111,17 @@ const transfer = async (req, res, next) => {
   const userId = req.user.userId;
   try {
     const trnxData = req.body;
-    await moveFunds(userId, trnxData);
+    const result = await moveFunds(userId, trnxData);
+    if (result.success && result.user.mailing.emailNotification) {
+      await queueService.sendToQueue("email_queue", {
+        type: "TRANSFER_EMAIL",
+        to: result.user.contactInfo.email,
+        templateData: {
+          transaction: result.trnx,
+          user: result.user,
+        },
+      });
+    }
     res
       .status(200)
       .json({ message: "Transfer completed.", success: true, data: null });

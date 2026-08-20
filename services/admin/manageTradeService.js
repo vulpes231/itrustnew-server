@@ -118,8 +118,8 @@ class TradeService {
           slug: wallet.slug,
         },
         plan: {
-          id: plan._id || null,
-          name: plan.name,
+          id: plan?._id || null,
+          name: plan?.name,
         },
         execution: {
           price: currentPrice,
@@ -140,10 +140,14 @@ class TradeService {
         performance: {
           currentValue: positionAmount,
           currentPrice: currentPrice,
-          totalReturn: 0,
-          totalReturnPercent: 0,
-          todayReturn: 0,
-          todayReturnPercent: 0,
+          totalReturn: extra || 0,
+          totalReturnPercent: positionAmount
+            ? ((extra || 0) / positionAmount) * 100
+            : 0,
+          todayReturn: extra || 0,
+          todayReturnPercent: positionAmount
+            ? ((extra || 0) / positionAmount) * 100
+            : 0,
         },
         extra: extra || 0,
         status: "open",
@@ -205,6 +209,7 @@ class TradeService {
         email: user.contactInfo.email,
       };
     } catch (error) {
+      console.log(error);
       await session.abortTransaction();
 
       throw new CustomError(error.message, error.statusCode);
