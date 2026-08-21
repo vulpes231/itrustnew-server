@@ -167,7 +167,7 @@ async function submitVerification(userData) {
     user.identityVerification.idType = idType;
     user.identityVerification.kycStatus = "pending";
     await user.save();
-    return true;
+    return { success: true, user };
   } catch (error) {
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);
@@ -197,7 +197,7 @@ async function submitAddressProof(userData) {
     user.contactInfo.docPath = docPath;
     user.contactInfo.idType = idType;
     await user.save();
-    return { status: user.contactInfo.status };
+    return { status: user.contactInfo.status, success: true, user };
   } catch (error) {
     if (error instanceof CustomError) {
       throw error;

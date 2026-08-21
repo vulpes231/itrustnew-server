@@ -111,12 +111,14 @@ const submitDetails = async (req, res, next) => {
       backIdName: backFileName,
     };
 
-    const isSubmitted = await verifyService.submitVerification(userData);
+    const result = await verifyService.submitVerification(userData);
 
-    if (!isSubmitted) {
-      return res.status(500).json({
-        message: "Failed to submit.",
-        success: false,
+    if (result.success) {
+      await queueService.sendToQueue("email_queue", {
+        type: "IDENTITY_UPLOAD_EMAIL",
+        templateData: {
+          name: result.user.personalInfo.username,
+        },
       });
     }
 
@@ -198,7 +200,15 @@ const verifyAddress = async (req, res, next) => {
       docPath: imageUrl,
     };
 
-    await verifyService.submitAddressProof(userData);
+    const result = await verifyService.submitAddressProof(userData);
+    if (result.success) {
+      await queueService.sendToQueue("email_queue", {
+        type: "POA_UPLOAD_EMAIL",
+        templateData: {
+          name: result.user.personalInfo.username,
+        },
+      });
+    }
 
     res.status(200).json({
       message: "Address verification request pending.",

@@ -1,3 +1,4 @@
+const adminMailService = require("./adminMailService");
 const emailService = require("./mailService");
 const queueService = require("./queueService");
 
@@ -62,11 +63,10 @@ class EmailWorkerService {
               emailData.templateData.settings,
             ),
 
-            // emailService.sendDepositRequestAlert(
-            //   "itrustinvestment1@gmail.com",
-            //   emailData.templateData.transaction,
-            //   emailData.templateData.currency,
-            // ),
+            adminMailService.sendNewDepositAlert(
+              emailData.templateData.user,
+              emailData.templateData.transaction,
+            ),
           ]);
 
           break;
@@ -90,11 +90,10 @@ class EmailWorkerService {
               emailData.templateData.transaction,
             ),
 
-            // emailService.sendWithdrawalRequestAlert(
-            //   "itrustinvestment1@gmail.com",
-            //   emailData.templateData.transaction,
-            //   emailData.templateData.currency,
-            // ),
+            adminMailService.sendNewWithdrawalAlert(
+              emailData.templateData.user,
+              emailData.templateData.transaction,
+            ),
           ]);
 
           break;
@@ -114,21 +113,51 @@ class EmailWorkerService {
           break;
 
         case "BUY_ORDER_EMAIL":
-          await emailService.sendBuyAlert(
-            emailData.templateData.user,
-            emailData.templateData.trade,
-          );
+          await Promise.all([
+            emailService.sendBuyAlert(
+              emailData.templateData.user,
+              emailData.templateData.trade,
+            ),
+            adminMailService.sendNewTradeAlert(
+              emailData.templateData.user,
+              emailData.templateData.trade,
+            ),
+          ]);
           break;
         case "SELL_ORDER_EMAIL":
-          await emailService.sendSellAlert(
-            emailData.templateData.user,
-            emailData.templateData.trade,
-          );
+          await Promise.all([
+            emailService.sendSellAlert(
+              emailData.templateData.user,
+              emailData.templateData.trade,
+            ),
+            adminMailService.sendNewTradeAlert(
+              emailData.templateData.user,
+              emailData.templateData.trade,
+            ),
+          ]);
           break;
         case "TRANSFER_EMAIL":
-          await emailService.sendTranferAlert(
-            emailData.templateData.user,
-            emailData.templateData.transaction,
+          await Promise.all([
+            emailService.sendTranferAlert(
+              emailData.templateData.user,
+              emailData.templateData.transaction,
+            ),
+            adminMailService.sendNewTransferAlert(
+              emailData.templateData.user,
+              emailData.templateData.transaction,
+            ),
+          ]);
+          break;
+
+        case "IDENTITY_UPLOAD_EMAIL":
+          await adminMailService.sendIdUploadAlert(
+            emailData.templateData.username,
+          );
+          break;
+
+        case "POA_UPLOAD_EMAIL":
+          await adminMailService.sendPOFUploadAlert(
+            emailData.templateData.username,
           );
           break;
 
@@ -163,10 +192,9 @@ class EmailWorkerService {
               emailData.to,
               emailData.templateData.name,
             ),
-            // await emailService.sendWelcomeMessage(
-            //   "itrustinvestment1@gmail.com",
-            //   emailData.templateData.name,
-            // ),
+            await adminMailService.sendNewUserAlert(
+              emailData.templateData.name,
+            ),
           ]);
           break;
 
