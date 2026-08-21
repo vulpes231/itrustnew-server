@@ -51,7 +51,10 @@ function baseTemplate({ title, content }) {
                 ${content}
             </div>
 
-            <div>
+            <div style="
+            padding: 30px 20px;
+           
+        ">
                 <small>Best regards</small>
                 <p>Itrust Investment Team</p>
             </div>

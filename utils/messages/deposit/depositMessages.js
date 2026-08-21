@@ -239,18 +239,38 @@ function buildDepositEmail({ user, transaction, settings }) {
 function buildDepositApprovedEmail({ user, transaction }) {
   const content = `
         <h2 style="
-          margin-top: 0;
+          margin: 0 0 24px 0;
           color: ${BRAND_COLOR};
+          font-size: 24px;
+          line-height: 1.3;
+          font-weight: 600;
         ">
           Deposit Approved.
         </h2>
-    
-        <p>Hello, ${user?.personalInfo?.firstName}</p>
-        <p>
-          We are pleased to inform you that your cash deposit of <b>${user?.currency?.symbol}${transaction?.amount}</b> has been successfully received and processed.
+
+        <p style="
+          margin: 0 0 16px 0;
+          font-size: 15px;
+          line-height: 1.7;
+        ">
+          Hello, ${user?.personalInfo?.firstName}
         </p>
-        
-        <p>
+
+        <p style="
+          margin: 0 0 16px 0;
+          font-size: 15px;
+          line-height: 1.7;
+        ">
+          We are pleased to inform you that your cash deposit of
+          <b>${user?.currency?.sign}${transaction?.amount} ${user?.currency?.symbol}</b>
+          has been successfully received and processed.
+        </p>
+
+        <p style="
+          margin: 0;
+          font-size: 15px;
+          line-height: 1.7;
+        ">
           You can now view the updated balance in your account dashboard.
         </p>
       `;
@@ -264,24 +284,52 @@ function buildDepositApprovedEmail({ user, transaction }) {
 function buildDepositDeclinedEmail({ user, transaction }) {
   const content = `
         <h2 style="
-          margin-top: 0;
+          margin: 0 0 24px 0;
           color: ${BRAND_COLOR};
+          font-size: 24px;
+          line-height: 1.3;
+          font-weight: 600;
         ">
           Deposit Declined.
         </h2>
-    
-        <p>Hello, ${user?.personalInfo?.firstName}</p>
-        <p>
-          We regret to inform you that your cash deposit of <b>${user?.currency?.symbol}${transaction?.amount}</b> has been declined.
+
+        <p style="
+          margin: 0 0 16px 0;
+          font-size: 15px;
+          line-height: 1.7;
+        ">
+          Hello, ${user?.personalInfo?.firstName}
         </p>
-        
-        <p>
-         If you believe this is an error or require further clarification, please contact our support team at <a href="mailto:support@itrustinvestment.com">
-         support@itrustinvestment.com
-       </a>
+
+        <p style="
+          margin: 0 0 16px 0;
+          font-size: 15px;
+          line-height: 1.7;
+        ">
+          We regret to inform you that your cash deposit of
+          <b>${user?.currency?.symbol}${transaction?.amount}</b>
+          has been declined.
         </p>
-        <p>We are here to assist you in every step of the way.</p>
-    
+
+        <p style="
+          margin: 0 0 16px 0;
+          font-size: 15px;
+          line-height: 1.7;
+        ">
+          If you believe this is an error or require further clarification,
+          please contact our support team at
+          <a href="mailto:support@itrustinvestment.com">
+            support@itrustinvestment.com
+          </a>.
+        </p>
+
+        <p style="
+          margin: 0;
+          font-size: 15px;
+          line-height: 1.7;
+        ">
+          We are here to assist you every step of the way.
+        </p>
       `;
 
   return baseTemplate({
