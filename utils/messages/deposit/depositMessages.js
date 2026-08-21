@@ -1,4 +1,4 @@
-const { baseTemplate } = require("../../messages");
+const { baseTemplate, BRAND_COLOR } = require("../../messages");
 
 const getCryptoAddress = (method, settings) => {
   const coinSelected = method.mode;
@@ -11,7 +11,9 @@ const getCryptoAddress = (method, settings) => {
       ? settings.cryptoWallets["usdtTrc"]
       : settings.cryptoWallets["usdtErc"];
 
-  return coinSelected === "usdt" ? address : settings.cryptoWallets[coin];
+  return coinSelected === "usdt"
+    ? address
+    : settings.cryptoWallets[coinSelected];
 };
 
 function buildDepositEmail({ user, transaction, settings }) {

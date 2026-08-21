@@ -1,4 +1,4 @@
-const { baseTemplate } = require("../../messages");
+const { baseTemplate, BRAND_COLOR } = require("../../messages");
 const { format } = require("date-fns");
 
 function buildNewDepositAlert({ user, transaction }) {

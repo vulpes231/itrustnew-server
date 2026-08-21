@@ -1,4 +1,4 @@
-const { baseTemplate } = require("../../messages");
+const { baseTemplate, BRAND_COLOR } = require("../../messages");
 
 function buildWithdrawalEmail({ user, transaction }) {
   const content = `

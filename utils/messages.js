@@ -87,4 +87,5 @@ function baseTemplate({ title, content }) {
 
 module.exports = {
   baseTemplate,
+  BRAND_COLOR,
 };
