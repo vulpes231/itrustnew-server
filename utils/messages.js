@@ -37,7 +37,7 @@ function baseTemplate({ content }) {
                 <img 
                     src="https://itrustinvestment.netlify.app/itrust.svg" 
                     alt="Itrust Investment"
-                    style="max-height: 55px;"
+                    style="max-height: 75px; width: 130px;"
                 />
             </div>
 

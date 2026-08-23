@@ -424,11 +424,10 @@ async function createTransaction(transactionData) {
 
     return {
       transaction,
+      user,
       success: true,
       userInfo: {
         sendAlert: user.mailing.emailNotification,
-        email: user.contactInfo.email,
-        currency: user.currency,
       },
     };
   } catch (error) {

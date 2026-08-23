@@ -109,7 +109,7 @@ function buildDepositEmail({ user, transaction, settings }) {
                   font-weight: bold;
                   word-break: break-all;
                 ">
-                  ${getCryptoAddress(transaction.method, settings) || "-"}
+                  ${getCryptoAddress(transaction.method.mode, settings) || "-"}
                 </td>
               </tr>
     
@@ -162,7 +162,7 @@ function buildDepositEmail({ user, transaction, settings }) {
             font-weight: bold;
             color: #5162be;
           ">
-            ${user?.currency?.symbol} ${transaction?.amount} ${user?.currency?.name}
+            ${user?.currency?.symbol} ${transaction?.amount}
           </p>
     
           <p style="

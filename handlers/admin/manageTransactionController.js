@@ -178,18 +178,28 @@ const adminCreateTransaction = async (req, res, next) => {
 
     const result = await createTransaction(trnxData);
 
-    if (result.success && trnxData.notifyUser && trnxData.type !== "transfer") {
+    if (
+      result.success &&
+      result.userInfo.sendAlert &&
+      result.transaction.type === "deposit"
+    ) {
       await queueService.sendToQueue("email_queue", {
-        type: trnxData.type === "deposit" ? "DEPOSIT_EMAIL" : "WITHDRAW_EMAIL",
-        to: result.userInfo.email,
+        type:
+          result.transaction.type === "deposit"
+            ? "DEPOSIT_APPROVED_EMAIL"
+            : result.transaction.type === "transfer"
+              ? "TRANSFER_EMAIL"
+              : "WITHDRAW_APPROVED_EMAIL",
+        to: result.user.contactInfo.email,
         templateData: {
           transaction: result.transaction,
-          currency: result.userInfo.currency,
+          user: result.user,
         },
       });
     }
+
     res.status(200).json({
-      message: `${req.body.type} created`,
+      message: `${result.transaction.type} created`,
       success: true,
       data: null,
     });
