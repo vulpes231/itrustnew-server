@@ -30,7 +30,6 @@ function buildNewWithdrawAlert({ user, transaction }) {
         `;
 
   return baseTemplate({
-    title: "New withdrawal Alert",
     content,
   });
 }

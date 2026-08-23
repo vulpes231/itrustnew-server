@@ -1,24 +1,19 @@
+const { capitalize } = require("lodash");
 const { baseTemplate, BRAND_COLOR } = require("../../messages");
 
 function buildSavingsCreatedEmail({ user, account }) {
   const content = `
-        <h2 style="
-          margin: 0 0 24px 0;
-          color: ${BRAND_COLOR};
-          font-size: 24px;
-          line-height: 1.3;
-          font-weight: 600;
-        ">
-          Your ${account?.name} Account Has Been Successfully Created
-        </h2>
+      
 
-        <p style="
-          margin: 0 0 16px 0;
-          font-size: 15px;
-          line-height: 1.7;
+        <h3 style="
+        margin: 0 0 24px 0;
+        color: ${BRAND_COLOR};
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;
         ">
-          Hello, ${user?.personalInfo?.firstName}
-        </p>
+          Hello, ${capitalize(user?.personalInfo?.firstName)}
+        </h3>
 
         <p style="
           margin: 0 0 16px 0;
@@ -59,30 +54,23 @@ function buildSavingsCreatedEmail({ user, account }) {
       `;
 
   return baseTemplate({
-    title: "Savings Account Created",
     content,
   });
 }
 
 function buildContributionEmail({ user, transaction }) {
   const content = `
-        <h2 style="
-          margin: 0 0 24px 0;
-          color: ${BRAND_COLOR};
-          font-size: 24px;
-          line-height: 1.3;
-          font-weight: 600;
-        ">
-          Contribution Added
-        </h2>
+    
 
-        <p style="
-          margin: 0 0 16px 0;
-          font-size: 15px;
-          line-height: 1.7;
+        <h3 style="
+        margin: 0 0 24px 0;
+        color: ${BRAND_COLOR};
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;
         ">
-          Hello, ${user?.personalInfo?.firstName}
-        </p>
+          Hello, ${capitalize(user?.personalInfo?.firstName)}
+        </h3>
 
         <p style="
           margin: 0 0 16px 0;
@@ -123,30 +111,23 @@ function buildContributionEmail({ user, transaction }) {
       `;
 
   return baseTemplate({
-    title: "Contribution Added",
     content,
   });
 }
 
 function buildCashoutReqEmail({ user, transaction }) {
   const content = `
-        <h2 style="
-          margin: 0 0 24px 0;
-          color: ${BRAND_COLOR};
-          font-size: 24px;
-          line-height: 1.3;
-          font-weight: 600;
-        ">
-          Cashout Request
-        </h2>
+       
 
-        <p style="
-          margin: 0 0 16px 0;
-          font-size: 15px;
-          line-height: 1.7;
+        <h3 style="
+        margin: 0 0 24px 0;
+        color: ${BRAND_COLOR};
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;
         ">
-          Hello, ${user?.personalInfo?.firstName}
-        </p>
+          Hello, ${capitalize(user?.personalInfo?.firstName)}
+        </h3>
 
         <p style="
           margin: 0 0 16px 0;
@@ -189,7 +170,6 @@ function buildCashoutReqEmail({ user, transaction }) {
       `;
 
   return baseTemplate({
-    title: "Cashout Requested",
     content,
   });
 }

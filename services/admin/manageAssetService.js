@@ -8,7 +8,6 @@ const {
   fetchQuote,
   fetchProfile,
   fetchKeyMetrics,
-
   fetchETFInfo,
 } = require("../../utils/utils");
 

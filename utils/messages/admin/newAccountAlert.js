@@ -19,7 +19,6 @@ function buildNewAccountAlert(username) {
           `;
 
   return baseTemplate({
-    title: "New Account Created",
     content,
   });
 }

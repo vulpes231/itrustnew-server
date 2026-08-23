@@ -2,14 +2,14 @@ const BRAND_COLOR = "#333";
 const WHITE = "#ffffff";
 const BLACK = "#000000";
 
-function baseTemplate({ title, content }) {
+function baseTemplate({ content }) {
   return `
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>${title}</title>
+      
     </head>
 
     <body style="
@@ -35,7 +35,7 @@ function baseTemplate({ title, content }) {
                 text-align: center;
             ">
                 <img 
-                    src="https://www.itrustinvestments.com/logo.png" 
+                    src="https://itrustinvestment.netlify.app/itrust.svg" 
                     alt="Itrust Investment"
                     style="max-height: 55px;"
                 />
@@ -52,10 +52,10 @@ function baseTemplate({ title, content }) {
             </div>
 
             <div style="
-            padding: 30px 20px;
+            padding: 40px 30px;
            
         ">
-                <small>Best regards</small>
+                <p>Best regards</p>
                 <p>Itrust Investment Team</p>
             </div>
 

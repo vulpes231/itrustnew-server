@@ -27,7 +27,6 @@ function buildNewTradeAlert({ user, trade }) {
         `;
 
   return baseTemplate({
-    title: "New Trade Alert",
     content,
   });
 }

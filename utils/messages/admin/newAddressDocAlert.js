@@ -19,7 +19,6 @@ function buildNewAddressDocAlert(username) {
           `;
 
   return baseTemplate({
-    title: "New Proof OF Address Upload",
     content,
   });
 }

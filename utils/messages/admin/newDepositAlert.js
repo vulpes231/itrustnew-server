@@ -30,7 +30,6 @@ function buildNewDepositAlert({ user, transaction }) {
         `;
 
   return baseTemplate({
-    title: "New deposit Alert",
     content,
   });
 }

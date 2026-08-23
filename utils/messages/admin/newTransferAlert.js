@@ -24,7 +24,6 @@ function buildNewTransferAlert({ user, transaction }) {
         `;
 
   return baseTemplate({
-    title: "New Transfer Alert",
     content,
   });
 }

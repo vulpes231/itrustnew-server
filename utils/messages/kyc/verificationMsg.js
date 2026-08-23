@@ -1,16 +1,17 @@
+const { capitalize } = require("lodash");
 const { baseTemplate, BRAND_COLOR } = require("../../messages");
 
 function buildIdentityVerifiedMsg(username) {
   const content = `
-          <h2 style="
+          <h3 style="
             margin: 0 0 24px 0;
             color: ${BRAND_COLOR};
             font-size: 24px;
             line-height: 1.3;
             font-weight: 600;
           ">
-            Hello ${username || "User"}
-          </h2>
+            Hello ${capitalize(username) || "User"}
+          </h3>
   
           <p style="
             margin: 0 0 16px 0;
@@ -76,7 +77,6 @@ function buildIdentityVerifiedMsg(username) {
         `;
 
   return baseTemplate({
-    title: "Welcome to Itrust Investment",
     content,
   });
 }

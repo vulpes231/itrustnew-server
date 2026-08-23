@@ -107,6 +107,61 @@ function getPositionValue(position) {
   );
 }
 
+/**
+ * Fetch ETF specific information
+ */
+async function fetchETFInfo(symbol) {
+  try {
+    const response = await axios.get(`${FMP_BASE_URL}/etf-info/${symbol}`, {
+      params: {
+        apikey: FMP_API_KEY,
+      },
+    });
+
+    if (response.data) {
+      return response.data;
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error fetching ETF info for ${symbol}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Map exchange string to your enum values
+ */
+function mapExchange(exchange) {
+  if (!exchange) return null;
+
+  const exchangeMap = {
+    NasdaqGS: "NASDAQ",
+    NasdaqGM: "NASDAQ",
+    NasdaqCM: "NASDAQ",
+    NYSE: "NYSE",
+    "NYSE American": "AMEX",
+    "NYSE MKT": "AMEX",
+    AMEX: "AMEX",
+    OTC: "OTC",
+    OTCBB: "OTC",
+    BATS: "BATS",
+    CBOE: "CBOE",
+    NMS: "NASDAQ",
+    "Global Select Market": "NASDAQ",
+    "Global Market": "NASDAQ",
+    "Capital Market": "NASDAQ",
+  };
+
+  // Check for partial matches
+  for (const [key, value] of Object.entries(exchangeMap)) {
+    if (exchange.includes(key) || exchange === key) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 function transformStock(symbol, quoteData, profileData, metricsData) {
   if (!quoteData) return null;
 
@@ -301,4 +356,5 @@ module.exports = {
   transformStock,
   transformToETFAsset,
   transformCrypto,
+  fetchETFInfo,
 };

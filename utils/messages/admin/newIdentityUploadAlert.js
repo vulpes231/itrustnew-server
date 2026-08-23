@@ -19,7 +19,6 @@ function buildNewIdUploadAlert(username) {
           `;
 
   return baseTemplate({
-    title: "New ID Upload",
     content,
   });
 }

@@ -112,6 +112,24 @@ const updateTransaction = async (req, res, next) => {
     if (
       result.success &&
       result.userInfo.sendAlert &&
+      result.transaction.type === "transfer" &&
+      result.transaction.status === "processed"
+    ) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "TRANSFER_EMAIL",
+          to: result.user.contactInfo.email,
+          templateData: {
+            transaction: result.transaction,
+            user: result.user,
+          },
+        })
+        .catch((err) => console.error("Failed to send deposit email:", err));
+    }
+
+    if (
+      result.success &&
+      result.userInfo.sendAlert &&
       result.transaction.type === "withdraw" &&
       result.transaction.status === "processed"
     ) {

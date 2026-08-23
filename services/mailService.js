@@ -128,6 +128,7 @@ async function sendMailVerificationCode(subject, email) {
 
 //USER DEPOSIT EMAILS
 async function sendDepositRequestAlert(user, transaction, settings) {
+  const email = user?.contactInfo?.email;
   const subject = `Deposit Request Confirmation`;
 
   const message = buildDepositEmail({ user, transaction, settings });

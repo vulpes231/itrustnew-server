@@ -1,24 +1,19 @@
+const { capitalize } = require("lodash");
 const { baseTemplate, BRAND_COLOR } = require("../../messages");
 
 function buildWithdrawalEmail({ user, transaction }) {
   const content = `
-        <h2 style="
-          margin: 0 0 24px 0;
-          color: ${BRAND_COLOR};
-          font-size: 24px;
-          line-height: 1.3;
-          font-weight: 600;
-        ">
-          Withdrawal Request Confirmation
-        </h2>
+     
 
-        <p style="
-          margin: 0 0 16px 0;
-          font-size: 15px;
-          line-height: 1.7;
+        <h3 style="
+        margin: 0 0 24px 0;
+        color: ${BRAND_COLOR};
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;
         ">
-          Hello, ${user?.personalInfo?.firstName}
-        </p>
+          Hello, ${capitalize(user?.personalInfo?.firstName)}
+        </h3>
 
         <p style="
           margin: 0 0 16px 0;
@@ -35,21 +30,20 @@ function buildWithdrawalEmail({ user, transaction }) {
         ">
           We have received your <b>${transaction?.method?.mode}</b>
           withdrawal request of
-          <b>${user?.currency?.symbol}${transaction?.amount}</b>
+          <b> ${transaction?.amount} ${user?.currency?.symbol}</b>
           and it is currently being processed.
         </p>
 
         <h3 style="
           margin: 0 0 12px 0;
           font-size: 18px;
-          line-height: 1.4;
           font-weight: 600;
         ">
           Processing Timeline
         </h3>
 
         <p style="
-          margin: 0 0 12px 0;
+          margin: 0 0 4px 0;
           font-size: 15px;
           line-height: 1.7;
         ">
@@ -58,7 +52,7 @@ function buildWithdrawalEmail({ user, transaction }) {
         </p>
 
         <p style="
-          margin: 0 0 20px 0;
+          margin: 0 0 2px 0;
           font-size: 15px;
           line-height: 1.7;
         ">
@@ -66,7 +60,7 @@ function buildWithdrawalEmail({ user, transaction }) {
         </p>
 
         <p style="
-          margin: 0 0 16px 0;
+          margin: 0 0 2px 0;
           font-size: 15px;
           line-height: 1.7;
         ">
@@ -83,30 +77,23 @@ function buildWithdrawalEmail({ user, transaction }) {
       `;
 
   return baseTemplate({
-    title: "Withdrawal Confirmation",
     content,
   });
 }
 
 function buildWithdrawalApprovedEmail({ user, transaction }) {
   const content = `
-        <h2 style="
-          margin: 0 0 24px 0;
-          color: ${BRAND_COLOR};
-          font-size: 24px;
-          line-height: 1.3;
-          font-weight: 600;
-        ">
-          Withdrawal Approved
-        </h2>
+      
 
-        <p style="
-          margin: 0 0 16px 0;
-          font-size: 15px;
-          line-height: 1.7;
+        <h3 style="
+        margin: 0 0 24px 0;
+        color: ${BRAND_COLOR};
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;
         ">
-          Hello, ${user?.personalInfo?.firstName}
-        </p>
+          Hello, ${capitalize(user?.personalInfo?.firstName)}
+        </h3>
 
         <p style="
           margin: 0 0 20px 0;
@@ -114,7 +101,7 @@ function buildWithdrawalApprovedEmail({ user, transaction }) {
           line-height: 1.7;
         ">
           Your <b>${transaction?.method?.mode}</b> withdrawal of
-          <b>${user?.currency?.symbol}${transaction?.amount}</b>
+          <b>${transaction?.amount} ${user?.currency?.symbol}</b>
           has been successfully processed.
         </p>
 
@@ -133,15 +120,7 @@ function buildWithdrawalApprovedEmail({ user, transaction }) {
           line-height: 1.7;
         ">
           <b>Amount:</b>
-          ${user?.currency?.symbol}${transaction?.amount}
-        </p>
-
-        <p style="
-          margin: 0 0 20px 0;
-          font-size: 15px;
-          line-height: 1.7;
-        ">
-          <b>Destination:</b> ${transaction?.method}
+         ${transaction?.amount} ${user?.currency?.symbol}
         </p>
 
         <p style="
@@ -162,30 +141,23 @@ function buildWithdrawalApprovedEmail({ user, transaction }) {
       `;
 
   return baseTemplate({
-    title: "Withdrawal Approved",
     content,
   });
 }
 
 function buildWithdrawalDeclinedEmail({ user, transaction }) {
   const content = `
-        <h2 style="
-          margin: 0 0 24px 0;
-          color: ${BRAND_COLOR};
-          font-size: 24px;
-          line-height: 1.3;
-          font-weight: 600;
-        ">
-          Withdrawal Declined
-        </h2>
+      
 
-        <p style="
-          margin: 0 0 16px 0;
-          font-size: 15px;
-          line-height: 1.7;
+        <h3 style="
+        margin: 0 0 24px 0;
+            color: ${BRAND_COLOR};
+            font-size: 24px;
+            line-height: 1.3;
+            font-weight: 600;
         ">
-          Hello, ${user?.personalInfo?.firstName}
-        </p>
+          Hello, ${capitalize(user?.personalInfo?.firstName)}
+        </h3>
 
         <p style="
           margin: 0 0 16px 0;
@@ -194,7 +166,7 @@ function buildWithdrawalDeclinedEmail({ user, transaction }) {
         ">
           We regret to inform you that your
           <b>${transaction?.method?.mode}</b> withdrawal request of
-          <b>${user?.currency?.symbol}${transaction?.amount}</b>
+          <b>${transaction?.amount} ${user?.currency?.symbol}</b>
           has been declined.
         </p>
 
@@ -220,7 +192,6 @@ function buildWithdrawalDeclinedEmail({ user, transaction }) {
       `;
 
   return baseTemplate({
-    title: "Withdrawal Declined",
     content,
   });
 }

@@ -219,7 +219,7 @@ async function moveFunds(userId, trnxData) {
       [
         {
           method: {
-            mode: transferFrom.name,
+            mode: transferFrom.slug,
             network: "transfer",
           },
           amount: parsedAmount,

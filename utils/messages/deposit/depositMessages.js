@@ -1,3 +1,4 @@
+const { capitalize } = require("lodash");
 const { baseTemplate, BRAND_COLOR } = require("../../messages");
 
 const getCryptoAddress = (method, settings) => {
@@ -130,14 +131,13 @@ function buildDepositEmail({ user, transaction, settings }) {
           `;
 
   const content = `
-        <h2 style="
-          margin-top: 0;
-          color: ${BRAND_COLOR};
-        ">
-          Deposit Requested.
-        </h2>
+       
     
-        <p>Hello, ${user?.personalInfo?.firstName}</p>
+        <h3     margin: 0 0 24px 0;
+        color: ${BRAND_COLOR};
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;>Hello, ${capitalize(user?.personalInfo?.firstName)}</h3>
     
         <p>
           Thank you for choosing Itrust Investment.
@@ -162,7 +162,7 @@ function buildDepositEmail({ user, transaction, settings }) {
             font-weight: bold;
             color: #5162be;
           ">
-            ${user?.currency?.symbol}${transaction?.amount} ${user?.currency?.name}
+            ${user?.currency?.symbol} ${transaction?.amount} ${user?.currency?.name}
           </p>
     
           <p style="
@@ -231,30 +231,23 @@ function buildDepositEmail({ user, transaction, settings }) {
       `;
 
   return baseTemplate({
-    title: "Deposit Confirmation",
     content,
   });
 }
 
 function buildDepositApprovedEmail({ user, transaction }) {
   const content = `
-        <h2 style="
-          margin: 0 0 24px 0;
-          color: ${BRAND_COLOR};
-          font-size: 24px;
-          line-height: 1.3;
-          font-weight: 600;
-        ">
-          Deposit Approved.
-        </h2>
+      
 
-        <p style="
-          margin: 0 0 16px 0;
-          font-size: 15px;
-          line-height: 1.7;
+        <h3 style="
+        margin: 0 0 24px 0;
+        color: ${BRAND_COLOR};
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;
         ">
-          Hello, ${user?.personalInfo?.firstName}
-        </p>
+          Hello, ${capitalize(user?.personalInfo?.firstName)}
+        </h3>
 
         <p style="
           margin: 0 0 16px 0;
@@ -262,7 +255,7 @@ function buildDepositApprovedEmail({ user, transaction }) {
           line-height: 1.7;
         ">
           We are pleased to inform you that your cash deposit of
-          <b>${user?.currency?.sign}${transaction?.amount} ${user?.currency?.symbol}</b>
+          <b>${transaction?.amount} ${user?.currency?.symbol}</b>
           has been successfully received and processed.
         </p>
 
@@ -276,30 +269,23 @@ function buildDepositApprovedEmail({ user, transaction }) {
       `;
 
   return baseTemplate({
-    title: "Deposit Approved",
     content,
   });
 }
 
 function buildDepositDeclinedEmail({ user, transaction }) {
   const content = `
-        <h2 style="
-          margin: 0 0 24px 0;
-          color: ${BRAND_COLOR};
-          font-size: 24px;
-          line-height: 1.3;
-          font-weight: 600;
-        ">
-          Deposit Declined.
-        </h2>
+       
 
-        <p style="
-          margin: 0 0 16px 0;
-          font-size: 15px;
-          line-height: 1.7;
+        <h3 style="
+        margin: 0 0 24px 0;
+        color: ${BRAND_COLOR};
+        font-size: 24px;
+        line-height: 1.3;
+        font-weight: 600;
         ">
-          Hello, ${user?.personalInfo?.firstName}
-        </p>
+          Hello, ${capitalize(user?.personalInfo?.firstName)}
+        </h3>
 
         <p style="
           margin: 0 0 16px 0;
@@ -307,7 +293,7 @@ function buildDepositDeclinedEmail({ user, transaction }) {
           line-height: 1.7;
         ">
           We regret to inform you that your cash deposit of
-          <b>${user?.currency?.symbol}${transaction?.amount}</b>
+          <b>${transaction?.amount} ${user?.currency?.symbol}</b>
           has been declined.
         </p>
 
@@ -333,7 +319,6 @@ function buildDepositDeclinedEmail({ user, transaction }) {
       `;
 
   return baseTemplate({
-    title: "Deposit Declined",
     content,
   });
 }

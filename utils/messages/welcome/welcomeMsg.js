@@ -77,7 +77,6 @@ function buildWelcomeMsg(username) {
         `;
 
   return baseTemplate({
-    title: "Welcome to Itrust Investment",
     content,
   });
 }
