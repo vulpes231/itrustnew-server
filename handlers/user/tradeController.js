@@ -1,3 +1,4 @@
+const queueService = require("../../services/queueService");
 const {
   buyAsset,
   sellAsset,
