@@ -1,8 +1,42 @@
 const Position = require("../../models/Position");
+const Trade = require("../../models/Trade");
 const { CustomError } = require("../../utils/utils");
 const mongoose = require("mongoose");
 
 class PositionService {
+  async redistributeTradeExtra(position, session) {
+    const trades = await Trade.find({
+      _id: { $in: position.tradeIds },
+    }).session(session);
+
+    if (!trades.length) return;
+
+    const positionExtra = position.performance?.extra || 0;
+
+    const totalAmount = trades.reduce(
+      (sum, trade) => sum + (trade.execution?.amount || 0),
+      0,
+    );
+
+    if (totalAmount === 0) {
+      const equalExtra = positionExtra / trades.length;
+
+      for (const trade of trades) {
+        trade.extra = equalExtra;
+        await trade.save({ session });
+      }
+
+      return;
+    }
+
+    for (const trade of trades) {
+      const tradeAmount = trade.execution?.amount || 0;
+
+      trade.extra = positionExtra * (tradeAmount / totalAmount);
+
+      await trade.save({ session });
+    }
+  }
   async updatePosition(trade, session = null) {
     const {
       userId,
@@ -32,42 +66,59 @@ class PositionService {
       const tradeExtra = extra || 0;
 
       if (position) {
+        const tradeQuantity = execution.quantity;
+        const tradeAmount = execution.amount;
+        const tradePrice = execution.price;
+
         const existingValue = position.amountInvested;
         const existingQuantity = position.quantity;
-        const existingExtra = position.performance.extra || 0;
 
         const newTotalAmount = existingValue + tradeAmount;
         const newTotalQuantity = existingQuantity + tradeQuantity;
+
         const newAveragePrice = newTotalAmount / newTotalQuantity;
+
         const newCurrentValue =
           position.performance.currentValue + execution.positionAmount;
-        const newExtra = existingExtra + tradeExtra;
 
         position.amountInvested = newTotalAmount;
         position.quantity = newTotalQuantity;
         position.averageEntryPrice = newAveragePrice;
         position.performance.currentValue = newCurrentValue;
-        position.performance.extra = newExtra;
-        position.performance.totalReturn =
-          newCurrentValue + newExtra - newTotalAmount;
-        position.performance.totalReturnPercent =
-          (position.performance.totalReturn / newTotalAmount) * 100;
 
-        if (!position.tradeIds) position.tradeIds = [];
+        // DON'T add trade.extra here
+        // Position extra remains authoritative.
+
+        position.performance.totalReturn =
+          newCurrentValue + position.performance.extra - newTotalAmount;
+
+        position.performance.totalReturnPercent =
+          newTotalAmount > 0
+            ? (position.performance.totalReturn / newTotalAmount) * 100
+            : 0;
+
+        if (!position.tradeIds) {
+          position.tradeIds = [];
+        }
+
         position.tradeIds.push(trade._id);
 
-        if (!position.history) position.history = [];
+        if (!position.history) {
+          position.history = [];
+        }
+
         position.history.push({
           action: "add",
           tradeId: trade._id,
           quantity: tradeQuantity,
           amount: tradeAmount,
           price: tradePrice,
-          extra: tradeExtra,
           timestamp: new Date(),
         });
 
         await position.save({ session });
+
+        await this.redistributeTradeExtra(position, session);
       } else {
         const positionData = {
           userId,
