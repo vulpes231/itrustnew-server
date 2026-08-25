@@ -18,28 +18,26 @@ class PositionService {
       0,
     );
 
-    if (totalAmount === 0) {
-      const equalExtra = positionExtra / trades.length;
+    for (const trade of trades) {
+      console.log("before", trade);
+      let tradeExtra;
 
-      for (const trade of trades) {
-        trade.extra = equalExtra;
+      if (totalAmount === 0) {
+        tradeExtra = positionExtra / trades.length;
+      } else {
+        const tradeAmount = trade.execution?.amount || 0;
 
-        trade.performance.currentValue += equalExtra;
-
-        await trade.save({ session });
+        tradeExtra = positionExtra * (tradeAmount / totalAmount);
       }
 
-      return;
-    }
-
-    for (const trade of trades) {
-      const tradeAmount = trade.execution?.amount || 0;
-
-      const tradeExtra = positionExtra * (tradeAmount / totalAmount);
+      const currentValueWithoutExtra =
+        (trade.performance.currentValue || 0) - (trade.extra || 0);
 
       trade.extra = tradeExtra;
 
-      trade.performance.currentValue += tradeExtra;
+      trade.performance.currentValue = currentValueWithoutExtra + tradeExtra;
+
+      console.log("after", trade);
 
       await trade.save({ session });
     }

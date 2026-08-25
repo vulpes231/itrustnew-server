@@ -55,12 +55,18 @@ const tradeSchema = new Schema(
       exitPoint: { type: Number, default: null },
     },
     performance: {
-      totalReturn: { type: Number, default: 0 },
-      totalReturnPercent: { type: Number, default: 0 },
-      todayReturn: { type: Number, default: 0 },
-      todayReturnPercent: { type: Number, default: 0 },
-      currentValue: { type: Number, default: 0 },
-      currentPrice: { type: Number, default: 0 },
+      currentValue: { type: Number },
+      totalReturn: { type: Number },
+      totalReturnPercent: { type: Number },
+
+      todayMarketReturn: { type: Number },
+      todayExtra: { type: Number },
+
+      todayReturn: { type: Number },
+      todayReturnPercent: { type: Number },
+
+      todayStartValue: { type: Number },
+      todayStartDate: { type: Date },
     },
     status: {
       type: String,

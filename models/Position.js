@@ -44,12 +44,70 @@ const positionSchema = new Schema(
     marketType: { type: String },
     customDate: { type: Date },
     performance: {
-      totalReturn: { type: Number, default: 0 },
-      totalReturnPercent: { type: Number, default: 0 },
-      todayReturn: { type: Number, default: 0 },
-      todayReturnPercent: { type: Number, default: 0 },
-      currentValue: { type: Number, default: 0 },
-      extra: { type: Number, default: 0 },
+      totalReturn: {
+        type: Number,
+        default: 0,
+      },
+
+      totalReturnPercent: {
+        type: Number,
+        default: 0,
+      },
+
+      todayReturn: {
+        type: Number,
+        default: 0,
+      },
+
+      todayReturnPercent: {
+        type: Number,
+        default: 0,
+      },
+
+      currentValue: {
+        type: Number,
+        default: 0,
+      },
+
+      extra: {
+        type: Number,
+        default: 0,
+      },
+
+      currentBaseValue: {
+        type: Number,
+        default: 0,
+      },
+
+      todayStartValue: {
+        type: Number,
+        default: 0,
+      },
+
+      todayStartDate: {
+        type: Date,
+        default: null,
+      },
+
+      todayMarketReturn: {
+        type: Number,
+        default: 0,
+      },
+
+      todayExtra: {
+        type: Number,
+        default: 0,
+      },
+
+      currentPrice: {
+        type: Number,
+        default: 0,
+      },
+
+      previousClose: {
+        type: Number,
+        default: 0,
+      },
     },
     status: {
       type: String,

@@ -297,6 +297,7 @@ class ManagePositionService {
 
       let shouldCreateSnapshots = false;
       let parsedExtra = null;
+      let extraDifference = 0;
 
       if (customDate !== undefined) {
         position.customDate = customDate;
@@ -309,38 +310,87 @@ class ManagePositionService {
           throw new CustomError("Extra P&L must be a valid number", 400);
         }
 
-        const currentExtra = position.performance?.extra || 0;
+        const currentExtra = Number(position.performance?.extra || 0);
 
         if (currentExtra !== parsedExtra) {
           shouldCreateSnapshots = true;
+
+          extraDifference = parsedExtra - currentExtra;
+
+          // Update position-level extra
+          position.performance.extra = parsedExtra;
+
+          position.performance.extra = parsedExtra;
+
+          position.performance.todayExtra =
+            Number(position.performance?.todayExtra || 0) + extraDifference;
+
+          position.performance.currentValue =
+            Number(position.performance?.currentBaseValue || 0) + parsedExtra;
 
           const trades = await Trade.find({
             _id: { $in: position.tradeIds },
           }).session(session);
 
-          if (trades.length === 0) {
-            position.performance.extra = parsedExtra;
-          } else {
+          if (trades.length > 0) {
             const totalInvested = trades.reduce(
-              (sum, trade) => sum + (trade.amount || 0),
+              (sum, trade) =>
+                sum + Number(trade.execution?.amount || trade.amount || 0),
               0,
             );
 
-            if (totalInvested === 0) {
-              trades.forEach((trade) => {
-                trade.extra = parsedExtra / trades.length;
-              });
-            } else {
-              trades.forEach((trade) => {
-                const proportion = (trade.amount || 0) / totalInvested;
+            trades.forEach((trade) => {
+              const tradeAmount = Number(
+                trade.execution?.amount || trade.amount || 0,
+              );
 
-                trade.extra = parsedExtra * proportion;
-              });
-            }
+              let newTradeExtra;
+
+              if (totalInvested === 0) {
+                // If there is no investment amount, split equally.
+                newTradeExtra = parsedExtra / trades.length;
+              } else {
+                // Allocate position extra according to trade investment.
+                const proportion = tradeAmount / totalInvested;
+
+                newTradeExtra = parsedExtra * proportion;
+              }
+
+              const oldTradeExtra = Number(trade.extra || 0);
+
+              const tradeExtraDifference = newTradeExtra - oldTradeExtra;
+
+              // Update trade extra
+              trade.extra = newTradeExtra;
+
+              trade.performance.currentValue =
+                Number(trade.performance?.currentValue || 0) +
+                tradeExtraDifference;
+
+              trade.performance.totalReturn =
+                Number(trade.performance?.totalReturn || 0) +
+                tradeExtraDifference;
+
+              if (tradeAmount > 0) {
+                trade.performance.totalReturnPercent =
+                  (trade.performance.totalReturn / tradeAmount) * 100;
+              }
+
+              trade.performance.todayExtra =
+                Number(trade.performance.todayExtra || 0) +
+                tradeExtraDifference;
+
+              trade.performance.todayReturn =
+                Number(trade.performance.todayMarketReturn || 0) +
+                Number(trade.performance.todayExtra || 0);
+
+              trade.performance.todayReturnPercent =
+                tradeAmount > 0
+                  ? (trade.performance.todayReturn / tradeAmount) * 100
+                  : 0;
+            });
 
             await Promise.all(trades.map((trade) => trade.save({ session })));
-
-            position.performance.extra = parsedExtra;
           }
         }
       }
@@ -354,7 +404,7 @@ class ManagePositionService {
           {
             positionId: position._id,
             assetSymbol: position.asset.symbol,
-            extraAmount: parsedExtra,
+            extraAmount: extraDifference,
           },
           session,
         );
@@ -365,7 +415,7 @@ class ManagePositionService {
           {
             positionId: position._id,
             assetSymbol: position.asset.symbol,
-            extraAmount: parsedExtra,
+            extraAmount: extraDifference,
           },
           session,
         );

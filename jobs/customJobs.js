@@ -625,6 +625,7 @@ const calculateTradeValue = (trade, currentPrice) => {
 const updateTradePerformance = async () => {
   try {
     console.log("Starting trade performance update...");
+
     const startTime = Date.now();
 
     const openTrades = await Trade.find(
@@ -635,19 +636,28 @@ const updateTradePerformance = async () => {
       {
         assetType: 1,
         "asset.symbol": 1,
+
         "execution.price": 1,
         "execution.quantity": 1,
         "execution.amount": 1,
         "execution.leverage": 1,
         "execution.positionAmount": 1,
         "execution.type": 1,
+
         "performance.totalReturn": 1,
         "performance.todayReturn": 1,
+        "performance.todayReturnPercent": 1,
+        "performance.todayMarketReturn": 1,
+        "performance.todayExtra": 1,
+        "performance.todayStartValue": 1,
+        "performance.todayStartDate": 1,
         "performance.currentValue": 1,
         "performance.currentPrice": 1,
         "performance.previousClose": 1,
+
         "targets.takeProfit": 1,
         "targets.stopLoss": 1,
+
         orderType: 1,
         extra: 1,
         "wallet.id": 1,
@@ -664,18 +674,24 @@ const updateTradePerformance = async () => {
     const stockTrades = openTrades.filter(
       (trade) => trade.assetType === "stock",
     );
+
     if (stockTrades.length > 0 && !isMarketOpen()) {
       console.log("Stock market is closed, using last known prices");
     }
 
     console.log(`Found ${openTrades.length} open trades to update.`);
 
-    // Collect unique symbols
+    // ==========================================
+    // COLLECT UNIQUE SYMBOLS
+    // ==========================================
+
     const assetSymbols = [];
     const symbolSet = new Set();
+
     for (const trade of openTrades) {
       if (trade.asset?.symbol) {
         const symbol = trade.asset.symbol.toUpperCase();
+
         if (!symbolSet.has(symbol)) {
           symbolSet.add(symbol);
           assetSymbols.push(symbol);
@@ -691,15 +707,21 @@ const updateTradePerformance = async () => {
     console.log(`Fetching current prices for ${assetSymbols.length} assets...`);
 
     let currentAssets;
+
     try {
       currentAssets = await fetchAssetsWithRetry(assetSymbols);
     } catch (error) {
       console.error("Error fetching assets after retries:", error.message);
+
       return;
     }
 
-    // Price map: { current, previousClose }
+    // ==========================================
+    // PRICE MAP
+    // ==========================================
+
     const assetPriceMap = new Map();
+
     for (const asset of currentAssets) {
       if (asset?.symbol) {
         assetPriceMap.set(asset.symbol.toUpperCase(), {
@@ -709,15 +731,26 @@ const updateTradePerformance = async () => {
       }
     }
 
+    // ==========================================
+    // PREPARE UPDATES
+    // ==========================================
+
     const tradeUpdates = [];
     const tradesToClose = [];
+
     const now = new Date();
+
+    // Start of current day
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
 
     for (const trade of openTrades) {
       const symbol = trade.asset?.symbol?.toUpperCase();
+
       if (!symbol) continue;
 
       const assetData = assetPriceMap.get(symbol);
+
       if (!assetData) continue;
 
       const currentPrice = assetData.current;
@@ -725,50 +758,116 @@ const updateTradePerformance = async () => {
 
       if (!currentPrice || currentPrice <= 0) continue;
 
-      // ========== TOTAL PERFORMANCE ==========
+      // ==========================================
+      // TOTAL PERFORMANCE
+      // ==========================================
+
       const result = calculateTradeValue(trade, currentPrice);
+
       const totalCurrentValue = result.currentValue;
       const totalReturn = result.totalReturn;
       const totalReturnPercent = result.totalReturnPercent;
 
-      // ========== TODAY RETURN (FIXED) ==========
-      const entryPrice = parseFloat(trade.execution?.price) || 0;
+      // ==========================================
+      // TODAY PERFORMANCE
+      // ==========================================
 
-      // Check if trade was opened today
-      const tradeDate = new Date(trade.createdAt);
-      const isOpenedToday =
-        tradeDate.getFullYear() === now.getFullYear() &&
-        tradeDate.getMonth() === now.getMonth() &&
-        tradeDate.getDate() === now.getDate();
+      const currentMarketValue = totalCurrentValue;
 
-      // Reference price for "today"
-      // - Opened today → use entry price
-      // - Opened earlier → use previousClose
-      let referencePrice = 0;
-      if (isOpenedToday) {
-        referencePrice = entryPrice;
-      } else if (previousClose > 0) {
-        referencePrice = previousClose;
+      const executionAmount = Number(trade.execution?.amount) || 0;
+
+      const createdAt = trade.createdAt ? new Date(trade.createdAt) : null;
+
+      const openedToday =
+        createdAt &&
+        createdAt.getFullYear() === now.getFullYear() &&
+        createdAt.getMonth() === now.getMonth() &&
+        createdAt.getDate() === now.getDate();
+
+      /*
+       * todayStartValue represents the MARKET VALUE
+       * at the beginning of the current day.
+       *
+       * For a trade opened today, its starting market
+       * value is its entry amount.
+       *
+       * For an older trade, we use the stored daily
+       * baseline.
+       */
+
+      let todayStartValue = Number(trade.performance?.todayStartValue);
+
+      const storedStartDate = trade.performance?.todayStartDate
+        ? new Date(trade.performance.todayStartDate)
+        : null;
+
+      const hasValidStartDate =
+        storedStartDate && !Number.isNaN(storedStartDate.getTime());
+
+      const startDateIsToday =
+        hasValidStartDate &&
+        storedStartDate.getFullYear() === now.getFullYear() &&
+        storedStartDate.getMonth() === now.getMonth() &&
+        storedStartDate.getDate() === now.getDate();
+
+      /*
+       * Initialize today's baseline when:
+       *
+       * 1. There is no baseline yet
+       * 2. The stored baseline belongs to another day
+       */
+
+      if (!Number.isFinite(todayStartValue) || !startDateIsToday) {
+        if (openedToday) {
+          // Trade opened today:
+          // start today's return from the amount invested.
+          todayStartValue = executionAmount;
+        } else {
+          /*
+           * Existing trade entering a new day.
+           *
+           * At the first cron run of the new day,
+           * the current market value becomes the new
+           * daily baseline.
+           */
+          todayStartValue = currentMarketValue;
+        }
       }
 
-      let todayReturn = 0;
-      let todayReturnPercent = 0;
+      // ==========================================
+      // TODAY MARKET RETURN
+      // ==========================================
 
-      if (referencePrice > 0) {
-        // Calculate what the trade would be worth at the reference price
-        const resultAtReference = calculateTradeValue(trade, referencePrice);
+      const todayMarketReturn = currentMarketValue - todayStartValue;
 
-        // Day P&L = current value - value at reference price
-        // This automatically respects leverage, side, and extra
-        todayReturn = totalCurrentValue - resultAtReference.currentValue;
+      // ==========================================
+      // TODAY EXTRA
+      // ==========================================
 
-        // Percent relative to margin (same base as totalReturnPercent)
-        const marginAmount = parseFloat(trade.execution?.amount) || 0;
-        todayReturnPercent =
-          marginAmount > 0 ? (todayReturn / marginAmount) * 100 : 0;
-      }
+      /*
+       * todayExtra is maintained separately by
+       * editPositionData() when an extra bonus is added.
+       *
+       * The cron must NOT derive it from `extra`,
+       * because `extra` may contain bonuses from
+       * previous days.
+       */
 
-      // ========== TP / SL CHECK ==========
+      const todayExtra = Number(trade.performance?.todayExtra || 0);
+
+      // ==========================================
+      // TODAY TOTAL RETURN
+      // ==========================================
+
+      const todayReturn = todayMarketReturn + todayExtra;
+
+      const todayReturnPercent =
+        executionAmount > 0 ? (todayReturn / executionAmount) * 100 : 0;
+
+      // ==========================================
+      // TP / SL CHECK
+      // ==========================================
+
       const shouldCloseByTP =
         trade.targets?.takeProfit &&
         totalReturnPercent >= trade.targets.takeProfit;
@@ -786,29 +885,60 @@ const updateTradePerformance = async () => {
         });
       }
 
-      // ========== PREPARE UPDATE ==========
+      // ==========================================
+      // PREPARE UPDATE
+      // ==========================================
+
       tradeUpdates.push({
         updateOne: {
-          filter: { _id: trade._id },
+          filter: {
+            _id: trade._id,
+          },
+
           update: {
             $set: {
+              // ------------------------------
               // Total performance
+              // ------------------------------
+
               "performance.totalReturn": parseFloat(totalReturn.toFixed(4)),
+
               "performance.totalReturnPercent": parseFloat(
                 totalReturnPercent.toFixed(4),
               ),
 
-              // Daily performance (now correct)
+              // ------------------------------
+              // Today's performance
+              // ------------------------------
+
+              "performance.todayStartValue": parseFloat(
+                todayStartValue.toFixed(4),
+              ),
+
+              "performance.todayStartDate": todayStart,
+
+              "performance.todayMarketReturn": parseFloat(
+                todayMarketReturn.toFixed(4),
+              ),
+
+              "performance.todayExtra": parseFloat(todayExtra.toFixed(4)),
+
               "performance.todayReturn": parseFloat(todayReturn.toFixed(4)),
+
               "performance.todayReturnPercent": parseFloat(
                 todayReturnPercent.toFixed(4),
               ),
 
-              // Price data
+              // ------------------------------
+              // Current price/value
+              // ------------------------------
+
               "performance.currentValue": parseFloat(
                 totalCurrentValue.toFixed(4),
               ),
+
               "performance.currentPrice": parseFloat(currentPrice.toFixed(4)),
+
               "performance.previousClose": parseFloat(previousClose.toFixed(4)),
 
               updatedAt: now,
@@ -818,13 +948,21 @@ const updateTradePerformance = async () => {
       });
     }
 
-    // ========== BULK UPDATE ==========
+    // ==========================================
+    // BULK UPDATE
+    // ==========================================
+
     if (tradeUpdates.length > 0) {
       const BATCH_SIZE = 500;
+
       for (let i = 0; i < tradeUpdates.length; i += BATCH_SIZE) {
         const batch = tradeUpdates.slice(i, i + BATCH_SIZE);
+
         try {
-          await Trade.bulkWrite(batch, { ordered: false });
+          await Trade.bulkWrite(batch, {
+            ordered: false,
+          });
+
           console.log(
             `Updated ${batch.length} trades in batch ${
               Math.floor(i / BATCH_SIZE) + 1
@@ -839,16 +977,22 @@ const updateTradePerformance = async () => {
       }
     }
 
-    // ========== CLOSE TP/SL TRADES ==========
+    // ==========================================
+    // CLOSE TP / SL TRADES
+    // ==========================================
+
     if (tradesToClose.length > 0) {
       console.log(`Closing ${tradesToClose.length} trades (TP/SL reached)`);
+
       await closeTradesInBatch(tradesToClose, now);
     }
 
     const duration = Date.now() - startTime;
+
     console.log(`Trade performance update completed in ${duration}ms.`);
   } catch (error) {
     console.error("Error in updateTradePerformance:", error);
+
     throw error;
   }
 };
@@ -866,12 +1010,28 @@ const updatePositionsPerformance = async () => {
         userId: 1,
         "wallet.id": 1,
         "asset.symbol": 1,
+
         quantity: 1,
         amountInvested: 1,
+
         "performance.currentValue": 1,
+        "performance.currentBaseValue": 1,
+        "performance.currentExtra": 1,
+
         "performance.currentPrice": 1,
         "performance.previousClose": 1,
-        createdAt: 1, // needed to detect if opened today
+
+        "performance.totalReturn": 1,
+        "performance.totalReturnPercent": 1,
+
+        "performance.todayStartValue": 1,
+        "performance.todayStartDate": 1,
+        "performance.todayMarketReturn": 1,
+        "performance.todayExtra": 1,
+        "performance.todayReturn": 1,
+        "performance.todayReturnPercent": 1,
+
+        createdAt: 1,
         updatedAt: 1,
       },
     ).lean();
@@ -885,13 +1045,18 @@ const updatePositionsPerformance = async () => {
      * UNIQUE SYMBOLS
      */
     const assetSymbols = [
-      ...new Set(openPositions.map((p) => p.asset.symbol.toUpperCase())),
+      ...new Set(
+        openPositions
+          .map((p) => p.asset?.symbol?.toUpperCase())
+          .filter(Boolean),
+      ),
     ];
 
     /**
      * FETCH MARKET DATA
      */
     let currentAssets;
+
     try {
       currentAssets = await fetchAssetsWithRetry(assetSymbols);
     } catch (error) {
@@ -900,13 +1065,16 @@ const updatePositionsPerformance = async () => {
     }
 
     /**
-     * MAP: SYMBOL => { current, previousClose }
+     * MAP:
+     * SYMBOL => { current, previousClose }
      */
     const assetPriceMap = new Map();
+
     for (const asset of currentAssets) {
       if (asset?.symbol) {
         assetPriceMap.set(asset.symbol.toUpperCase(), {
           current: asset?.priceData?.current || 0,
+
           previousClose: asset?.priceData?.previousClose || 0,
         });
       }
@@ -914,22 +1082,33 @@ const updatePositionsPerformance = async () => {
 
     const affectedWalletIds = new Set();
     const affectedUserIds = new Set();
+
     const positionUpdates = [];
+
     const now = new Date();
+
+    /**
+     * START OF CURRENT DAY
+     */
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
 
     /**
      * UPDATE POSITIONS
      */
     for (const position of openPositions) {
       affectedUserIds.add(position.userId.toString());
+
       if (position.wallet?.id) {
         affectedWalletIds.add(position.wallet.id.toString());
       }
 
       const symbol = position.asset?.symbol?.toUpperCase();
+
       if (!symbol) continue;
 
       const assetData = assetPriceMap.get(symbol);
+
       if (!assetData) {
         console.warn(`No price found for ${symbol}`);
         continue;
@@ -938,78 +1117,217 @@ const updatePositionsPerformance = async () => {
       const currentPrice = assetData.current;
       const previousClose = assetData.previousClose;
 
-      if (!currentPrice || currentPrice <= 0) continue;
+      if (!currentPrice || currentPrice <= 0) {
+        continue;
+      }
 
-      const quantity = position.quantity || 0;
-      const amountInvested = position.amountInvested || 0;
+      const quantity = Number(position.quantity) || 0;
+
+      const amountInvested = Number(position.amountInvested) || 0;
 
       /**
-       * CURRENT VALUE
+       * ==========================================
+       * CURRENT MARKET VALUE
+       * ==========================================
+       *
+       * This is the value of the actual asset
+       * before adding any bonus/extra.
        */
-      const currentValue = quantity * currentPrice;
+      const currentBaseValue = quantity * currentPrice;
 
       /**
+       * ==========================================
+       * CURRENT EXTRA
+       * ==========================================
+       *
+       * currentExtra is the accumulated extra
+       * on the position.
+       *
+       * IMPORTANT:
+       * Do NOT derive this from today's extra.
+       */
+      const currentExtra = Number(position.performance?.currentExtra) || 0;
+
+      /**
+       * ==========================================
+       * CURRENT TOTAL VALUE
+       * ==========================================
+       */
+      const currentValue = currentBaseValue + currentExtra;
+
+      /**
+       * ==========================================
        * TOTAL RETURN
+       * ==========================================
        */
       const totalReturn = currentValue - amountInvested;
+
       const totalReturnPercent =
         amountInvested > 0 ? (totalReturn / amountInvested) * 100 : 0;
 
       /**
-       * ========== TODAY RETURN (FIXED) ==========
-       * - If position was opened today → use average cost
-       * - Otherwise → use previousClose
+       * ==========================================
+       * TODAY BASELINE
+       * ==========================================
+       *
+       * todayStartValue represents the market
+       * value of the position at the beginning
+       * of the current day.
+       *
+       * It EXCLUDES today's extra.
        */
-      const avgCost = quantity > 0 ? amountInvested / quantity : 0;
 
-      // Check if position was created today
       const positionDate = new Date(position.createdAt);
+
       const isOpenedToday =
         positionDate.getFullYear() === now.getFullYear() &&
         positionDate.getMonth() === now.getMonth() &&
         positionDate.getDate() === now.getDate();
 
-      let referencePrice = 0;
+      let todayStartValue = Number(position.performance?.todayStartValue);
 
-      if (isOpenedToday || previousClose <= 0) {
-        // Opened today (or no previous close available) → use average cost
-        referencePrice = avgCost;
-      } else {
-        // Existing position → use previous market close
-        referencePrice = previousClose;
+      const storedStartDate = position.performance?.todayStartDate
+        ? new Date(position.performance.todayStartDate)
+        : null;
+
+      const hasValidStartDate =
+        storedStartDate && !Number.isNaN(storedStartDate.getTime());
+
+      const startDateIsToday =
+        hasValidStartDate &&
+        storedStartDate.getFullYear() === now.getFullYear() &&
+        storedStartDate.getMonth() === now.getMonth() &&
+        storedStartDate.getDate() === now.getDate();
+
+      /**
+       * Initialize today's baseline if:
+       *
+       * - there is no baseline
+       * - baseline belongs to another day
+       */
+      if (!Number.isFinite(todayStartValue) || !startDateIsToday) {
+        if (isOpenedToday) {
+          /**
+           * Position opened today.
+           *
+           * Start from the amount invested,
+           * because this is the market value at
+           * the moment the position was opened.
+           */
+          todayStartValue = amountInvested;
+        } else {
+          /**
+           * Existing position entering a new day.
+           *
+           * Use the current market base value as
+           * the initial baseline.
+           *
+           * This intentionally excludes currentExtra.
+           */
+          todayStartValue = currentBaseValue;
+        }
       }
 
-      let todayReturn = 0;
-      let todayReturnPercent = 0;
+      /**
+       * ==========================================
+       * TODAY MARKET RETURN
+       * ==========================================
+       *
+       * ONLY market movement.
+       *
+       * Extra is deliberately excluded.
+       */
+      const todayMarketReturn = currentBaseValue - todayStartValue;
 
-      if (referencePrice > 0 && quantity > 0) {
-        todayReturn = (currentPrice - referencePrice) * quantity;
-        todayReturnPercent =
-          ((currentPrice - referencePrice) / referencePrice) * 100;
-      }
+      /**
+       * ==========================================
+       * TODAY EXTRA
+       * ==========================================
+       *
+       * This is maintained by editPositionData()
+       * when extra is added to the position.
+       */
+      const todayExtra = Number(position.performance?.todayExtra) || 0;
 
+      /**
+       * ==========================================
+       * TODAY TOTAL RETURN
+       * ==========================================
+       */
+      const todayReturn = todayMarketReturn + todayExtra;
+
+      const todayReturnPercent =
+        amountInvested > 0 ? (todayReturn / amountInvested) * 100 : 0;
+
+      /**
+       * ==========================================
+       * PREPARE UPDATE
+       * ==========================================
+       */
       positionUpdates.push({
         updateOne: {
-          filter: { _id: position._id },
+          filter: {
+            _id: position._id,
+          },
+
           update: {
             $set: {
-              // VALUE
+              /**
+               * ------------------------------
+               * CURRENT VALUE
+               * ------------------------------
+               */
+
+              "performance.currentBaseValue": Number(
+                currentBaseValue.toFixed(4),
+              ),
+
+              "performance.currentExtra": Number(currentExtra.toFixed(4)),
+
               "performance.currentValue": Number(currentValue.toFixed(4)),
 
-              // TOTAL PERFORMANCE
+              /**
+               * ------------------------------
+               * TOTAL PERFORMANCE
+               * ------------------------------
+               */
+
               "performance.totalReturn": Number(totalReturn.toFixed(4)),
+
               "performance.totalReturnPercent": Number(
                 totalReturnPercent.toFixed(4),
               ),
 
-              // DAILY PERFORMANCE
+              /**
+               * ------------------------------
+               * TODAY PERFORMANCE
+               * ------------------------------
+               */
+
+              "performance.todayStartValue": Number(todayStartValue.toFixed(4)),
+
+              "performance.todayStartDate": todayStart,
+
+              "performance.todayMarketReturn": Number(
+                todayMarketReturn.toFixed(4),
+              ),
+
+              "performance.todayExtra": Number(todayExtra.toFixed(4)),
+
               "performance.todayReturn": Number(todayReturn.toFixed(4)),
+
               "performance.todayReturnPercent": Number(
                 todayReturnPercent.toFixed(4),
               ),
 
-              // MARKET DATA
+              /**
+               * ------------------------------
+               * MARKET DATA
+               * ------------------------------
+               */
+
               "performance.currentPrice": Number(currentPrice.toFixed(4)),
+
               "performance.previousClose": Number(previousClose.toFixed(4)),
 
               updatedAt: now,
@@ -1020,13 +1338,20 @@ const updatePositionsPerformance = async () => {
     }
 
     /**
+     * ==========================================
      * BULK UPDATE
+     * ==========================================
      */
     if (positionUpdates.length > 0) {
       const BATCH_SIZE = 500;
+
       for (let i = 0; i < positionUpdates.length; i += BATCH_SIZE) {
         const batch = positionUpdates.slice(i, i + BATCH_SIZE);
-        await Position.bulkWrite(batch, { ordered: false });
+
+        await Position.bulkWrite(batch, {
+          ordered: false,
+        });
+
         console.log(
           `Updated ${batch.length} positions in batch ${
             Math.floor(i / BATCH_SIZE) + 1
@@ -1036,10 +1361,14 @@ const updatePositionsPerformance = async () => {
     }
 
     /**
+     * ==========================================
      * SNAPSHOTS
+     * ==========================================
      */
     const snapshotTime = new Date();
+
     console.log(affectedUserIds.size, "userIds");
+
     console.log(affectedWalletIds.size, "walletIds");
 
     /**
@@ -1050,7 +1379,9 @@ const updatePositionsPerformance = async () => {
         walletSnapshotService.createWalletSnapshot(
           walletId,
           "cron_update",
-          { timestamp: snapshotTime },
+          {
+            timestamp: snapshotTime,
+          },
           null,
         ),
       ),
@@ -1075,7 +1406,9 @@ const updatePositionsPerformance = async () => {
         portfolioService.createPortfolioSnapshot(
           userId,
           "cron_update",
-          { timestamp: snapshotTime },
+          {
+            timestamp: snapshotTime,
+          },
           null,
         ),
       ),
@@ -1093,11 +1426,13 @@ const updatePositionsPerformance = async () => {
     });
 
     const duration = Date.now() - startTime;
+
     console.log(
       `Position performance update completed in ${duration}ms. Updated ${positionUpdates.length} positions`,
     );
   } catch (error) {
     console.error("Error in updatePositionsPerformance:", error);
+
     throw error;
   }
 };
@@ -1220,10 +1555,100 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+const captureDailyPositionPerformanceBaseline = async () => {
+  const now = new Date();
+
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+
+  const result = await Position.updateMany(
+    {
+      status: "open",
+      $or: [
+        {
+          "performance.todayStartDate": {
+            $lt: todayStart,
+          },
+        },
+        {
+          "performance.todayStartDate": {
+            $exists: false,
+          },
+        },
+      ],
+    },
+    [
+      {
+        $set: {
+          "performance.todayStartValue": "$performance.currentBaseValue",
+          "performance.todayStartDate": todayStart,
+          "performance.todayMarketReturn": 0,
+          "performance.todayExtra": 0,
+          "performance.todayReturn": 0,
+          "performance.todayReturnPercent": 0,
+        },
+      },
+    ],
+  );
+
+  console.log(
+    `Daily position baseline captured at ${todayStart.toISOString()}. ` +
+      `Updated ${result.modifiedCount} positions.`,
+  );
+};
+const captureDailyTradePerformanceBaseline = async () => {
+  const now = new Date();
+
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+
+  const result = await Trade.updateMany(
+    {
+      status: "open",
+      $or: [
+        {
+          "performance.todayStartDate": {
+            $lt: todayStart,
+          },
+        },
+        {
+          "performance.todayStartDate": {
+            $exists: false,
+          },
+        },
+      ],
+    },
+    [
+      {
+        $set: {
+          // Start today's market P&L from the
+          // current base value, excluding extra.
+          "performance.todayStartValue": "$performance.currentBaseValue",
+
+          "performance.todayStartDate": todayStart,
+
+          // Reset today's performance.
+          "performance.todayMarketReturn": 0,
+          "performance.todayExtra": 0,
+          "performance.todayReturn": 0,
+          "performance.todayReturnPercent": 0,
+        },
+      },
+    ],
+  );
+
+  console.log(
+    `Daily trade baseline captured at ${todayStart.toISOString()}. ` +
+      `Updated ${result.modifiedCount} trades.`,
+  );
+};
+
 module.exports = {
   updateTradePerformance,
   updateWalletPerformance,
   updateAssetsData,
   fetchAssetsWithRetry,
   updatePositionsPerformance,
+  captureDailyPositionPerformanceBaseline,
+  captureDailyTradePerformanceBaseline,
 };

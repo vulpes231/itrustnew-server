@@ -4,6 +4,8 @@ const {
   updateWalletPerformance,
   updateAssetsData,
   updatePositionsPerformance,
+  captureDailyPositionPerformanceBaseline,
+  captureDailyTradePerformanceBaseline,
 } = require("./customJobs");
 require("dotenv").config();
 
@@ -27,7 +29,39 @@ function initCronJobs() {
     tradePerformance: process.env.CRON_TRADE_PERFORMANCE || "*/30 * * * *",
     positionPerformance:
       process.env.CRON_POSITION_PERFORMANCE || "*/30 * * * *",
+    positionBaseline: process.env.CRON_POSITION_BASELINE || "0 0 * * *",
   };
+
+  const positionBaselineJob = cron.schedule(
+    schedules.positionBaseline,
+    async () => {
+      const jobName = "positionBaseline";
+
+      try {
+        console.log(
+          `Starting daily performance baseline at ${new Date().toISOString()}`,
+        );
+
+        lastRunTimestamps.set(jobName, Date.now());
+
+        await Promise.all([
+          captureDailyPositionPerformanceBaseline(),
+          captureDailyTradePerformanceBaseline(),
+        ]);
+
+        console.log(
+          `Daily performance baseline completed at ${new Date().toISOString()}`,
+        );
+      } catch (error) {
+        console.error("Daily performance baseline update failed:", error);
+      }
+    },
+    {
+      scheduled: enableCrons,
+    },
+  );
+
+  activeJobs.add(positionBaselineJob);
 
   const assetUpdateJob = cron.schedule(
     schedules.assetUpdate,
