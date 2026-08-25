@@ -7,6 +7,7 @@ const {
 } = require("../utils/messages/deposit/depositMessages");
 const {
   buildIdentityVerifiedMsg,
+  buildIdentityDeclinedMsg,
 } = require("../utils/messages/kyc/verificationMsg");
 const { buildEmailMsg } = require("../utils/messages/otp/emailMessage");
 const {
@@ -296,6 +297,22 @@ async function sendIdVerifiedAlert(user) {
     throw new CustomError(error.message, 500);
   }
 }
+async function sendIdDeclinedAlert(user) {
+  const email = user.contactInfo.email;
+  const username = user.personalInfo.username;
+
+  const subject = "ID Verification Declined";
+
+  const message = buildIdentityDeclinedMsg(username);
+  try {
+    await sendMail(email, subject, message);
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+    throw new CustomError(error.message, 500);
+  }
+}
 
 //USER TRANSFER EMAIL
 async function sendTranferAlert(user, transaction) {
@@ -380,6 +397,7 @@ module.exports = {
   sendWithdrawalApprovedAlert,
   sendWithdrawalDeclinedAlert,
   sendIdVerifiedAlert, //kyc
+  sendIdDeclinedAlert,
   sendTranferAlert, //transfer
   sendSavingsCreatedAlert, //savings
   sendContributionAlert,

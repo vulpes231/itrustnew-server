@@ -138,7 +138,7 @@ async function verifyMail(verifyData) {
     user.accountStatus.otpSentAt = null;
 
     await user.save();
-    return true;
+    return { success: true, user };
   } catch (error) {
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, error.statusCode);

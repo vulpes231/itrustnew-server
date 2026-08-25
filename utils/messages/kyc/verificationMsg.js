@@ -4,9 +4,9 @@ const { baseTemplate, BRAND_COLOR } = require("../../messages");
 function buildIdentityVerifiedMsg(username) {
   const content = `
           <h3 style="
-            margin: 0 0 24px 0;
+            margin: 0 0 8px 0;
             color: ${BRAND_COLOR};
-            font-size: 24px;
+            font-size: 15px;
             line-height: 1.3;
             font-weight: 600;
           ">
@@ -40,7 +40,7 @@ function buildIdentityVerifiedMsg(username) {
           </p>
   
           <ul style="
-            margin: 0 0 24px 0;
+            margin: 0 0 8px 0;
             padding-left: 24px;
             font-size: 15px;
             line-height: 1.8;
@@ -74,6 +74,10 @@ function buildIdentityVerifiedMsg(username) {
           ">
             Thank you for choosing Itrust!
           </p>
+          <div>
+              <p>Best regards</p>
+              <p>Itrust Investment Team</p>
+          </div>
         `;
 
   return baseTemplate({
@@ -81,4 +85,52 @@ function buildIdentityVerifiedMsg(username) {
   });
 }
 
-module.exports = { buildIdentityVerifiedMsg };
+function buildIdentityDeclinedMsg(username) {
+  const content = `
+          <h3 style="
+            margin: 0 0 8px 0;
+            color: ${BRAND_COLOR};
+            font-size: 15px;
+            line-height: 1.3;
+            font-weight: 600;
+          ">
+            Hello ${capitalize(username) || "User"}
+          </h3>
+  
+          <p style="
+            margin: 0 0 16px 0;
+            font-size: 15px;
+            line-height: 1.7;
+          ">
+            We're regret to inform you that your identity verification request has been declined.
+          </p>
+  
+          <p style="
+            margin: 0 0 16px 0;
+            font-size: 15px;
+            line-height: 1.7;
+          ">
+            If you have any questions, our support team is here for you.
+            Simply reply to this email or visit our Help Center.
+          </p>
+  
+          <p style="
+            margin: 0;
+            font-size: 15px;
+            line-height: 1.7;
+          ">
+            Thank you for choosing Itrust!
+          </p>
+
+          <div>
+              <p>Best regards</p>
+              <p>Itrust Investment Team</p>
+          </div>
+        `;
+
+  return baseTemplate({
+    content,
+  });
+}
+
+module.exports = { buildIdentityVerifiedMsg, buildIdentityDeclinedMsg };

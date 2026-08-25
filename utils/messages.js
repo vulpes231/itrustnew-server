@@ -50,16 +50,7 @@ function baseTemplate({ content }) {
             ">
                 ${content}
             </div>
-
-            <div style="
-            padding: 40px 30px;
-           
-        ">
-                <p>Best regards</p>
-                <p>Itrust Investment Team</p>
-            </div>
-
-         
+            
             <div style="
                 border-top: 1px solid #eeeeee;
                 padding: 20px 30px;

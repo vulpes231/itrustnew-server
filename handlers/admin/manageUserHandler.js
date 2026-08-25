@@ -11,6 +11,7 @@ const {
   rejectVerification,
   verifyUserAddress,
 } = require("../../services/admin/manageUserService");
+const queueService = require("../../services/queueService");
 const { getUserVerifyInfo } = require("../../services/user/verifyService");
 
 const getUser = async (req, res, next) => {
@@ -97,7 +98,17 @@ const failVerification = async (req, res, next) => {
   const { verifyId } = req.body;
   const { userId } = req.params;
   try {
-    await rejectVerification(userId, verifyId);
+    const result = await rejectVerification(userId, verifyId);
+
+    if (result.success && result.user.mailing.emailNotification) {
+      await queueService.sendToQueue("email_queue", {
+        type: "IDENTITY_DECLINED_EMAIL",
+        to: result.user.contactInfo.email,
+        templateData: {
+          user: result.user,
+        },
+      });
+    }
 
     res.status(200).json({
       data: null,

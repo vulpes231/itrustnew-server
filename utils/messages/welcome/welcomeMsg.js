@@ -3,9 +3,9 @@ const { baseTemplate, BRAND_COLOR } = require("../../messages");
 function buildWelcomeMsg(username) {
   const content = `
           <h2 style="
-            margin: 0 0 24px 0;
+            margin: 0 0 8px 0;
             color: ${BRAND_COLOR};
-            font-size: 24px;
+            font-size: 15px;
             line-height: 1.3;
             font-weight: 600;
           ">
@@ -74,6 +74,10 @@ function buildWelcomeMsg(username) {
           ">
             Thank you for using Itrust Investment!
           </p>
+          <div>
+              <p>Best regards</p>
+              <p>Itrust Investment Team</p>
+          </div>
         `;
 
   return baseTemplate({

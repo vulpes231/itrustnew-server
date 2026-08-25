@@ -164,6 +164,9 @@ class EmailWorkerService {
         case "IDENTITY_VERIFIED_EMAIL":
           await emailService.sendIdVerifiedAlert(emailData.templateData.user);
           break;
+        case "IDENTITY_DECLINED_EMAIL":
+          await emailService.sendIdDeclinedAlert(emailData.templateData.user);
+          break;
 
         case "SAVINGS_CREATED_EMAIL":
           await emailService.sendSavingsCreatedAlert(

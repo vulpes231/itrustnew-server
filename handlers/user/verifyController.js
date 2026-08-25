@@ -248,16 +248,14 @@ const verifyEmailCode = async (req, res, next) => {
   const userId = req.user.userId;
   try {
     const verifyData = { code, userId };
-    const emailVerified = await verifyService.verifyMail(verifyData);
+    const result = await verifyService.verifyMail(verifyData);
 
-    if (emailVerified) {
-      const user = await userService.getUserById(userId);
+    if (result.success) {
       await queueService.sendToQueue("email_queue", {
         type: "WELCOME_EMAIL",
-        to: user.contactInfo.email,
+        to: result.user.contactInfo.email,
         templateData: {
-          name: user.personalInfo.username,
-          email: user.contactInfo.email,
+          name: result.user.personalInfo.username,
         },
       });
     }

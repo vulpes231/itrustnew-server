@@ -18,124 +18,17 @@ const getCryptoAddress = (method, settings) => {
 };
 
 function buildDepositEmail({ user, transaction, settings }) {
-  const paymentDetails =
-    transaction?.method?.mode === "bank"
-      ? `
-            <table style="
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 25px;
-            ">
-              <tr>
-                <td style="padding: 10px 0; color: #666;">
-                  Bank Name
-                </td>
-                <td style="
-                  padding: 10px 0;
-                  text-align: right;
-                  font-weight: bold;
-                ">
-                  ${settings?.bankDetails?.bankName || "-"}
-                </td>
-              </tr>
-    
-              <tr>
-                <td style="padding: 10px 0; color: #666;">
-                  Account Name
-                </td>
-                <td style="
-                  padding: 10px 0;
-                  text-align: right;
-                  font-weight: bold;
-                ">
-                  ${settings?.bankDetails?.accountName || "-"}
-                </td>
-              </tr>
-    
-              <tr>
-                <td style="padding: 10px 0; color: #666;">
-                  Account Number
-                </td>
-                <td style="
-                  padding: 10px 0;
-                  text-align: right;
-                  font-weight: bold;
-                ">
-                  ${settings?.bankDetails?.accountNumber || "-"}
-                </td>
-              </tr>
-    
-              <tr>
-                <td style="padding: 10px 0; color: #666;">
-                  Routing Number
-                </td>
-                <td style="
-                  padding: 10px 0;
-                  text-align: right;
-                  font-weight: bold;
-                ">
-                  ${settings?.bankDetails?.routing || "-"}
-                </td>
-              </tr>
-    
-              <tr>
-                <td style="padding: 10px 0; color: #666;">
-                  Reference Number
-                </td>
-                <td style="
-                  padding: 10px 0;
-                  text-align: right;
-                  font-weight: bold;
-                ">
-                  ${settings?.bankDetails?.reference || "-"}
-                </td>
-              </tr>
-            </table>
-          `
-      : `
-            <table style="
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 25px;
-            ">
-              <tr>
-                <td style="padding: 10px 0; color: #666;">
-                  Address
-                </td>
-    
-                <td style="
-                  padding: 10px 0;
-                  text-align: right;
-                  font-weight: bold;
-                  word-break: break-all;
-                ">
-                  ${getCryptoAddress(transaction.method.mode, settings) || "-"}
-                </td>
-              </tr>
-    
-              <tr>
-                <td style="padding: 10px 0; color: #666;">
-                  Network
-                </td>
-    
-                <td style="
-                  padding: 10px 0;
-                  text-align: right;
-                  font-weight: bold;
-                  color: green;
-                ">
-                  ${transaction?.method?.network || "-"}
-                </td>
-              </tr>
-            </table>
+  const paymentDetails = `
+            <p>  ${getCryptoAddress(transaction.method.mode, settings) || "-"}</p>
+          
           `;
 
   const content = `
        
     
-        <h3     margin: 0 0 24px 0;
+        <h3     margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;>Hello, ${capitalize(user?.personalInfo?.firstName)}</h3>
     
@@ -144,77 +37,23 @@ function buildDepositEmail({ user, transaction, settings }) {
         </p>
     
         <p>
-          We have received your <b>${transaction?.method?.mode}</b> deposit request.
+          We have received your <b>${transaction?.method?.mode}</b> deposit request of ${transaction?.amount} in ${user?.currency?.symbol}.
           To proceed, please make a payment to the following
           ${transaction?.method?.mode === "bank" ? "bank details" : "crypto address"}.
         </p>
     
-        <div style="
-          background: #f4f0ff;
-          border-left: 4px solid #5162be;
-          padding: 20px;
-          border-radius: 8px;
-          margin: 30px 0;
-        ">
-          <p style="
-            margin: 0;
-            font-size: 22px;
-            font-weight: bold;
-            color: #5162be;
-          ">
-            ${user?.currency?.symbol} ${transaction?.amount}
-          </p>
-    
-          <p style="
-            margin: 10px 0 0;
-            color: #555;
-          ">
-            via ${transaction?.method?.mode}
-          </p>
-        </div>
+      
     
         <h3 style="
           color: #222;
           margin-bottom: 15px;
         ">
-          Payment Details
+          ${transaction?.method?.mode === "bank" ? "" : "Payment Address"}
         </h3>
     
         ${paymentDetails}
     
-        <table style="
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 25px;
-        ">
-          <tr>
-            <td style="padding: 10px 0; color: #666;">
-              Method
-            </td>
-    
-            <td style="
-              padding: 10px 0;
-              text-align: right;
-              font-weight: bold;
-            ">
-              ${transaction?.method?.mode}
-            </td>
-          </tr>
-    
-          <tr>
-            <td style="padding: 10px 0; color: #666;">
-              Date
-            </td>
-    
-            <td style="
-              padding: 10px 0;
-              text-align: right;
-              font-weight: bold;
-            ">
-              ${new Date().toLocaleString()}
-            </td>
-          </tr>
-        </table>
+      
     
         <p>
           Once your payment is received, we will process your deposit
@@ -228,6 +67,10 @@ function buildDepositEmail({ user, transaction, settings }) {
             support@itrustinvestment.com
           </a>
         </p>
+        <div >
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({
@@ -240,9 +83,9 @@ function buildDepositApprovedEmail({ user, transaction }) {
       
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;
         ">
@@ -266,6 +109,10 @@ function buildDepositApprovedEmail({ user, transaction }) {
         ">
           You can now view the updated balance in your account dashboard.
         </p>
+        <div>
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({
@@ -278,9 +125,9 @@ function buildDepositDeclinedEmail({ user, transaction }) {
        
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;
         ">
@@ -316,6 +163,10 @@ function buildDepositDeclinedEmail({ user, transaction }) {
         ">
           We are here to assist you every step of the way.
         </p>
+        <div>
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({

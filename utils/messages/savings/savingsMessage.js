@@ -6,9 +6,9 @@ function buildSavingsCreatedEmail({ user, account }) {
       
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;
         ">
@@ -51,6 +51,10 @@ function buildSavingsCreatedEmail({ user, account }) {
         ">
           Welcome to smarter retirement planning.
         </p>
+        <div >
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({
@@ -63,9 +67,9 @@ function buildContributionEmail({ user, transaction }) {
     
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;
         ">
@@ -108,6 +112,10 @@ function buildContributionEmail({ user, transaction }) {
         ">
           Thank you for taking a step toward your financial future.
         </p>
+        <div >
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({
@@ -120,9 +128,9 @@ function buildCashoutReqEmail({ user, transaction }) {
        
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;
         ">
@@ -167,6 +175,10 @@ function buildCashoutReqEmail({ user, transaction }) {
         ">
           Thank you for taking a step toward your financial future.
         </p>
+        <div >
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({

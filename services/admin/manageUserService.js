@@ -120,11 +120,14 @@ async function completeVerification(userId, verifyData) {
       updatedUser = user;
     });
 
+    const userInfo = await User.findById(userId).select("-credentials");
+
     return {
       success: true,
-      user: updatedUser,
+      user: userInfo,
     };
   } catch (error) {
+    console.log(error);
     if (error instanceof CustomError) {
       throw error;
     }
@@ -312,7 +315,7 @@ async function rejectVerification(userId, verifyId) {
     await session.commitTransaction();
     session.endSession();
 
-    return { status: "failed" };
+    return { success: true, user, status: "failed" };
   } catch (error) {
     await session.abortTransaction();
     session.endSession();

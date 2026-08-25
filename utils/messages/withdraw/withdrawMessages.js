@@ -6,9 +6,9 @@ function buildWithdrawalEmail({ user, transaction }) {
      
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;
         ">
@@ -74,6 +74,10 @@ function buildWithdrawalEmail({ user, transaction }) {
         ">
           Thank you for choosing Itrust Investment.
         </p>
+        <div>
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({
@@ -86,9 +90,9 @@ function buildWithdrawalApprovedEmail({ user, transaction }) {
       
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;
         ">
@@ -105,23 +109,7 @@ function buildWithdrawalApprovedEmail({ user, transaction }) {
           has been successfully processed.
         </p>
 
-        <h3 style="
-          margin: 0 0 12px 0;
-          font-size: 18px;
-          line-height: 1.4;
-          font-weight: 600;
-        ">
-          Details
-        </h3>
-
-        <p style="
-          margin: 0 0 12px 0;
-          font-size: 15px;
-          line-height: 1.7;
-        ">
-          <b>Amount:</b>
-         ${transaction?.amount} ${user?.currency?.symbol}
-        </p>
+      
 
         <p style="
           margin: 0 0 16px 0;
@@ -138,6 +126,10 @@ function buildWithdrawalApprovedEmail({ user, transaction }) {
         ">
           Thank you for investing with us.
         </p>
+        <div>
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({
@@ -150,9 +142,9 @@ function buildWithdrawalDeclinedEmail({ user, transaction }) {
       
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
             color: ${BRAND_COLOR};
-            font-size: 24px;
+            font-size: 15px;
             line-height: 1.3;
             font-weight: 600;
         ">
@@ -189,6 +181,10 @@ function buildWithdrawalDeclinedEmail({ user, transaction }) {
         ">
           We are here to help.
         </p>
+        <div>
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({

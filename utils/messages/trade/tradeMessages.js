@@ -6,9 +6,9 @@ function buildBuyOrderEmail({ user, trade }) {
        
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
             color: ${BRAND_COLOR};
-            font-size: 24px;
+            font-size: 15px;
             line-height: 1.3;
             font-weight: 600;
         ">
@@ -21,8 +21,8 @@ function buildBuyOrderEmail({ user, trade }) {
           line-height: 1.7;
         ">
           You bought
-          <b>${trade?.execution?.quantity}${trade?.asset?.symbol}</b>
-          for <b>${trade?.execution?.amount} ${user?.currency?.symbol}</b>. Your order has been placed.
+          <b>${trade?.assetType === "crypto" ? parseFloat(trade?.execution?.quantity).toFixed(7) : parseFloat(trade?.execution?.quantity).toFixed(5)} ${trade?.asset?.symbol}</b>
+          for <b>${parseFloat(trade?.execution?.amount).toFixed(2)} ${user?.currency?.symbol}</b>. Your order has been placed.
         </p>
 
         <p style="
@@ -41,6 +41,10 @@ function buildBuyOrderEmail({ user, trade }) {
         ">
           Thank you for investing with Itrust.
         </p>
+        <div >
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({
@@ -53,9 +57,9 @@ function buildSellOrderEmail({ user, trade }) {
        
 
         <h3 style="
-        margin: 0 0 24px 0;
+        margin: 0 0 8px 0;
         color: ${BRAND_COLOR};
-        font-size: 24px;
+        font-size: 15px;
         line-height: 1.3;
         font-weight: 600;
         ">
@@ -68,8 +72,8 @@ function buildSellOrderEmail({ user, trade }) {
           line-height: 1.7;
         ">
           You sold
-          <b>${trade?.execution?.quantity}${trade?.asset?.symbol}</b>
-          for <b>${trade?.execution?.amount} ${user?.currency?.symbol}</b>. Your order has been placed.
+          <b>${trade?.assetType === "crypto" ? parseFloat(trade?.execution?.quantity).toFixed(7) : parseFloat(trade?.execution?.quantity).toFixed(5)} ${trade?.asset?.symbol}</b>
+          for <b>${parseFloat(trade?.execution?.amount).toFixed(2)} ${user?.currency?.symbol}</b>. Your order has been placed.
         </p>
 
         <p style="
@@ -88,6 +92,10 @@ function buildSellOrderEmail({ user, trade }) {
         ">
           Thank you for trading with Itrust.
         </p>
+        <div >
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
       `;
 
   return baseTemplate({

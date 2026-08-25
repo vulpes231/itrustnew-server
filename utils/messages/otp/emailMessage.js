@@ -2,12 +2,7 @@ const { baseTemplate, BRAND_COLOR } = require("../../messages");
 
 function buildEmailMsg(otp) {
   const content = `
-        <h2 style="
-            margin-top: 0;
-            color: ${BRAND_COLOR};
-        ">
-            Email Verification
-        </h2>
+    
 
         <p>Hello,</p>
 
@@ -34,22 +29,20 @@ function buildEmailMsg(otp) {
            If you did not create an account, please disregard this email or contact us at <a href="mailto:support@itrustinvestment.com">support@itrustinvestment.com</a> for assistance.
         </p>
         <p>Welcome to a smarter way to invest.</p>
+        <div >
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
     `;
 
   return baseTemplate({
-    title: "Email Verification",
     content,
   });
 }
 
 function buildTwoFaMsg(otp) {
   const content = `
-        <h2 style="
-            margin-top: 0;
-            color: ${BRAND_COLOR};
-        ">
-            Login Verification
-        </h2>
+      
 
         <p>Hello,</p>
 
@@ -76,6 +69,10 @@ function buildTwoFaMsg(otp) {
             This code expires in 10 minutes.
             If this wasn't you, please secure your account immediately.
         </p>
+        <div >
+            <p>Best regards</p>
+            <p>Itrust Investment Team</p>
+        </div>
     `;
 
   return baseTemplate({
