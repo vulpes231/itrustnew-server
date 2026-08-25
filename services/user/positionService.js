@@ -24,9 +24,7 @@ class PositionService {
       for (const trade of trades) {
         trade.extra = equalExtra;
 
-        const baseCurrentValue = trade.execution?.positionAmount || 0;
-
-        trade.performance.currentValue = baseCurrentValue + equalExtra;
+        trade.performance.currentValue += equalExtra;
 
         await trade.save({ session });
       }
@@ -41,13 +39,12 @@ class PositionService {
 
       trade.extra = tradeExtra;
 
-      const baseCurrentValue = trade.execution?.positionAmount || 0;
-
-      trade.performance.currentValue = baseCurrentValue + tradeExtra;
+      trade.performance.currentValue += tradeExtra;
 
       await trade.save({ session });
     }
   }
+
   async updatePosition(trade, session = null) {
     const {
       userId,
