@@ -23,6 +23,11 @@ class PositionService {
 
       for (const trade of trades) {
         trade.extra = equalExtra;
+
+        const baseCurrentValue = trade.execution?.positionAmount || 0;
+
+        trade.performance.currentValue = baseCurrentValue + equalExtra;
+
         await trade.save({ session });
       }
 
@@ -32,7 +37,13 @@ class PositionService {
     for (const trade of trades) {
       const tradeAmount = trade.execution?.amount || 0;
 
-      trade.extra = positionExtra * (tradeAmount / totalAmount);
+      const tradeExtra = positionExtra * (tradeAmount / totalAmount);
+
+      trade.extra = tradeExtra;
+
+      const baseCurrentValue = trade.execution?.positionAmount || 0;
+
+      trade.performance.currentValue = baseCurrentValue + tradeExtra;
 
       await trade.save({ session });
     }
