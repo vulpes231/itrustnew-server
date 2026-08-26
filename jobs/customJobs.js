@@ -1016,7 +1016,7 @@ const updatePositionsPerformance = async () => {
 
         "performance.currentValue": 1,
         "performance.currentBaseValue": 1,
-        "performance.currentExtra": 1,
+        "performance.extra": 1, // ← corrected (was currentExtra)
 
         "performance.currentPrice": 1,
         "performance.previousClose": 1,
@@ -1074,7 +1074,6 @@ const updatePositionsPerformance = async () => {
       if (asset?.symbol) {
         assetPriceMap.set(asset.symbol.toUpperCase(), {
           current: asset?.priceData?.current || 0,
-
           previousClose: asset?.priceData?.previousClose || 0,
         });
       }
@@ -1082,9 +1081,7 @@ const updatePositionsPerformance = async () => {
 
     const affectedWalletIds = new Set();
     const affectedUserIds = new Set();
-
     const positionUpdates = [];
-
     const now = new Date();
 
     /**
@@ -1104,11 +1101,9 @@ const updatePositionsPerformance = async () => {
       }
 
       const symbol = position.asset?.symbol?.toUpperCase();
-
       if (!symbol) continue;
 
       const assetData = assetPriceMap.get(symbol);
-
       if (!assetData) {
         console.warn(`No price found for ${symbol}`);
         continue;
@@ -1122,16 +1117,14 @@ const updatePositionsPerformance = async () => {
       }
 
       const quantity = Number(position.quantity) || 0;
-
       const amountInvested = Number(position.amountInvested) || 0;
 
       /**
        * ==========================================
-       * CURRENT MARKET VALUE
+       * CURRENT MARKET VALUE (pure)
        * ==========================================
        *
-       * This is the value of the actual asset
-       * before adding any bonus/extra.
+       * Value of the actual asset before any bonus/extra.
        */
       const currentBaseValue = quantity * currentPrice;
 
@@ -1140,13 +1133,10 @@ const updatePositionsPerformance = async () => {
        * CURRENT EXTRA
        * ==========================================
        *
-       * currentExtra is the accumulated extra
-       * on the position.
-       *
-       * IMPORTANT:
-       * Do NOT derive this from today's extra.
+       * This is the accumulated extra/bonus on the position.
+       * Schema field is "extra", NOT "currentExtra".
        */
-      const currentExtra = Number(position.performance?.currentExtra) || 0;
+      const currentExtra = Number(position.performance?.extra) || 0;
 
       /**
        * ==========================================
@@ -1170,13 +1160,9 @@ const updatePositionsPerformance = async () => {
        * TODAY BASELINE
        * ==========================================
        *
-       * todayStartValue represents the market
-       * value of the position at the beginning
-       * of the current day.
-       *
-       * It EXCLUDES today's extra.
+       * todayStartValue = market value at the beginning of the day.
+       * It deliberately EXCLUDES extra.
        */
-
       const positionDate = new Date(position.createdAt);
 
       const isOpenedToday =
@@ -1201,29 +1187,15 @@ const updatePositionsPerformance = async () => {
 
       /**
        * Initialize today's baseline if:
-       *
        * - there is no baseline
        * - baseline belongs to another day
        */
       if (!Number.isFinite(todayStartValue) || !startDateIsToday) {
         if (isOpenedToday) {
-          /**
-           * Position opened today.
-           *
-           * Start from the amount invested,
-           * because this is the market value at
-           * the moment the position was opened.
-           */
+          // Position opened today → start from amount invested
           todayStartValue = amountInvested;
         } else {
-          /**
-           * Existing position entering a new day.
-           *
-           * Use the current market base value as
-           * the initial baseline.
-           *
-           * This intentionally excludes currentExtra.
-           */
+          // Existing position entering a new day → use current market base
           todayStartValue = currentBaseValue;
         }
       }
@@ -1233,9 +1205,7 @@ const updatePositionsPerformance = async () => {
        * TODAY MARKET RETURN
        * ==========================================
        *
-       * ONLY market movement.
-       *
-       * Extra is deliberately excluded.
+       * ONLY market movement. Extra is excluded.
        */
       const todayMarketReturn = currentBaseValue - todayStartValue;
 
@@ -1244,8 +1214,7 @@ const updatePositionsPerformance = async () => {
        * TODAY EXTRA
        * ==========================================
        *
-       * This is maintained by editPositionData()
-       * when extra is added to the position.
+       * Maintained by editPositionData() when extra is added.
        */
       const todayExtra = Number(position.performance?.todayExtra) || 0;
 
@@ -1269,65 +1238,43 @@ const updatePositionsPerformance = async () => {
           filter: {
             _id: position._id,
           },
-
           update: {
             $set: {
-              /**
-               * ------------------------------
-               * CURRENT VALUE
-               * ------------------------------
-               */
-
+              // ------------------------------
+              // CURRENT VALUE
+              // ------------------------------
               "performance.currentBaseValue": Number(
                 currentBaseValue.toFixed(4),
               ),
-
-              "performance.currentExtra": Number(currentExtra.toFixed(4)),
-
+              "performance.extra": Number(currentExtra.toFixed(4)), // ← corrected
               "performance.currentValue": Number(currentValue.toFixed(4)),
 
-              /**
-               * ------------------------------
-               * TOTAL PERFORMANCE
-               * ------------------------------
-               */
-
+              // ------------------------------
+              // TOTAL PERFORMANCE
+              // ------------------------------
               "performance.totalReturn": Number(totalReturn.toFixed(4)),
-
               "performance.totalReturnPercent": Number(
                 totalReturnPercent.toFixed(4),
               ),
 
-              /**
-               * ------------------------------
-               * TODAY PERFORMANCE
-               * ------------------------------
-               */
-
+              // ------------------------------
+              // TODAY PERFORMANCE
+              // ------------------------------
               "performance.todayStartValue": Number(todayStartValue.toFixed(4)),
-
               "performance.todayStartDate": todayStart,
-
               "performance.todayMarketReturn": Number(
                 todayMarketReturn.toFixed(4),
               ),
-
               "performance.todayExtra": Number(todayExtra.toFixed(4)),
-
               "performance.todayReturn": Number(todayReturn.toFixed(4)),
-
               "performance.todayReturnPercent": Number(
                 todayReturnPercent.toFixed(4),
               ),
 
-              /**
-               * ------------------------------
-               * MARKET DATA
-               * ------------------------------
-               */
-
+              // ------------------------------
+              // MARKET DATA
+              // ------------------------------
               "performance.currentPrice": Number(currentPrice.toFixed(4)),
-
               "performance.previousClose": Number(previousClose.toFixed(4)),
 
               updatedAt: now,
@@ -1368,7 +1315,6 @@ const updatePositionsPerformance = async () => {
     const snapshotTime = new Date();
 
     console.log(affectedUserIds.size, "userIds");
-
     console.log(affectedWalletIds.size, "walletIds");
 
     /**
@@ -1432,7 +1378,6 @@ const updatePositionsPerformance = async () => {
     );
   } catch (error) {
     console.error("Error in updatePositionsPerformance:", error);
-
     throw error;
   }
 };

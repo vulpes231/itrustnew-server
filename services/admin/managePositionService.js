@@ -295,14 +295,25 @@ class ManagePositionService {
         throw new CustomError("Position not found!", 404);
       }
 
+      // Ensure performance sub-document exists
+      if (!position.performance) {
+        position.performance = {};
+      }
+
       let shouldCreateSnapshots = false;
       let parsedExtra = null;
       let extraDifference = 0;
 
+      // ------------------------------------------
+      // CUSTOM DATE
+      // ------------------------------------------
       if (customDate !== undefined) {
         position.customDate = customDate;
       }
 
+      // ------------------------------------------
+      // EXTRA / BONUS
+      // ------------------------------------------
       if (extra !== undefined && extra !== null && extra !== "") {
         parsedExtra = Number(extra);
 
@@ -310,24 +321,64 @@ class ManagePositionService {
           throw new CustomError("Extra P&L must be a valid number", 400);
         }
 
-        const currentExtra = Number(position.performance?.extra || 0);
+        const currentExtra = Number(position.performance.extra || 0);
 
         if (currentExtra !== parsedExtra) {
           shouldCreateSnapshots = true;
-
           extraDifference = parsedExtra - currentExtra;
 
-          // Update position-level extra
-          position.performance.extra = parsedExtra;
+          // ==========================================
+          // 1. RE-DERIVE PURE MARKET VALUE (critical)
+          // ==========================================
+          const quantity = Number(position.quantity || 0);
 
-          position.performance.extra = parsedExtra;
+          let currentPrice = Number(position.performance.currentPrice || 0);
+          if (!currentPrice || currentPrice === 0) {
+            currentPrice = Number(position.averageEntryPrice || 0);
+          }
 
+          // Pure market value – never trust a potentially stale currentBaseValue
+          const currentBaseValue = quantity * currentPrice;
+
+          // ==========================================
+          // 2. POSITION EXTRA + VALUES
+          // ==========================================
+          position.performance.extra = parsedExtra;
+          position.performance.currentBaseValue = currentBaseValue;
+          position.performance.currentValue = currentBaseValue + parsedExtra;
+          position.performance.currentPrice = currentPrice; // keep in sync
+
+          // ==========================================
+          // 3. POSITION TOTAL RETURN
+          // ==========================================
+          const amountInvested = Number(position.amountInvested || 0);
+
+          position.performance.totalReturn =
+            position.performance.currentValue - amountInvested;
+
+          position.performance.totalReturnPercent =
+            amountInvested > 0
+              ? (position.performance.totalReturn / amountInvested) * 100
+              : 0;
+
+          // ==========================================
+          // 4. POSITION TODAY RETURN
+          // ==========================================
           position.performance.todayExtra =
-            Number(position.performance?.todayExtra || 0) + extraDifference;
+            Number(position.performance.todayExtra || 0) + extraDifference;
 
-          position.performance.currentValue =
-            Number(position.performance?.currentBaseValue || 0) + parsedExtra;
+          position.performance.todayReturn =
+            Number(position.performance.todayMarketReturn || 0) +
+            Number(position.performance.todayExtra || 0);
 
+          position.performance.todayReturnPercent =
+            amountInvested > 0
+              ? (position.performance.todayReturn / amountInvested) * 100
+              : 0;
+
+          // ==========================================
+          // 5. UPDATE TRADES (proportional split)
+          // ==========================================
           const trades = await Trade.find({
             _id: { $in: position.tradeIds },
           }).session(session);
@@ -339,43 +390,45 @@ class ManagePositionService {
               0,
             );
 
-            trades.forEach((trade) => {
+            for (const trade of trades) {
+              if (!trade.performance) {
+                trade.performance = {};
+              }
+
               const tradeAmount = Number(
                 trade.execution?.amount || trade.amount || 0,
               );
 
               let newTradeExtra;
-
               if (totalInvested === 0) {
-                // If there is no investment amount, split equally.
                 newTradeExtra = parsedExtra / trades.length;
               } else {
-                // Allocate position extra according to trade investment.
                 const proportion = tradeAmount / totalInvested;
-
                 newTradeExtra = parsedExtra * proportion;
               }
 
               const oldTradeExtra = Number(trade.extra || 0);
-
               const tradeExtraDifference = newTradeExtra - oldTradeExtra;
 
-              // Update trade extra
+              // Trade extra (top-level on Trade model)
               trade.extra = newTradeExtra;
 
+              // Trade current value
               trade.performance.currentValue =
-                Number(trade.performance?.currentValue || 0) +
+                Number(trade.performance.currentValue || 0) +
                 tradeExtraDifference;
 
+              // Trade total return
               trade.performance.totalReturn =
-                Number(trade.performance?.totalReturn || 0) +
+                Number(trade.performance.totalReturn || 0) +
                 tradeExtraDifference;
 
-              if (tradeAmount > 0) {
-                trade.performance.totalReturnPercent =
-                  (trade.performance.totalReturn / tradeAmount) * 100;
-              }
+              trade.performance.totalReturnPercent =
+                tradeAmount > 0
+                  ? (trade.performance.totalReturn / tradeAmount) * 100
+                  : 0;
 
+              // Trade today extra + return
               trade.performance.todayExtra =
                 Number(trade.performance.todayExtra || 0) +
                 tradeExtraDifference;
@@ -388,7 +441,7 @@ class ManagePositionService {
                 tradeAmount > 0
                   ? (trade.performance.todayReturn / tradeAmount) * 100
                   : 0;
-            });
+            }
 
             await Promise.all(trades.map((trade) => trade.save({ session })));
           }
@@ -397,6 +450,9 @@ class ManagePositionService {
 
       await position.save({ session });
 
+      // ==========================================
+      // SNAPSHOTS
+      // ==========================================
       if (shouldCreateSnapshots) {
         await portfolioService.createPortfolioSnapshot(
           position.userId,

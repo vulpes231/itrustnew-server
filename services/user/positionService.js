@@ -69,50 +69,52 @@ class PositionService {
       const tradeQuantity = execution.quantity;
       const tradeAmount = execution.amount;
       const tradePrice = execution.price;
-      const tradeExtra = extra || 0;
+      const tradeExtra = Number(extra || 0);
+
+      // Pure market value of this trade (positionAmount should already be market value)
+      const tradeMarketValue = Number(execution.positionAmount ?? tradeAmount);
 
       if (position) {
-        const tradeQuantity = execution.quantity;
-        const tradeAmount = execution.amount;
-        const tradePrice = execution.price;
+        // ---------- ADD TO EXISTING POSITION ----------
+        const existingAmount = Number(position.amountInvested || 0);
+        const existingQuantity = Number(position.quantity || 0);
+        const existingExtra = Number(position.performance?.extra || 0);
 
-        const existingValue = position.amountInvested;
-        const existingQuantity = position.quantity;
-
-        const newTotalAmount = existingValue + tradeAmount;
+        const newTotalAmount = existingAmount + tradeAmount;
         const newTotalQuantity = existingQuantity + tradeQuantity;
+        const newAveragePrice =
+          newTotalQuantity > 0 ? newTotalAmount / newTotalQuantity : 0;
 
-        const newAveragePrice = newTotalAmount / newTotalQuantity;
+        // Keep pure market value
+        const existingBaseValue = Number(
+          position.performance?.currentBaseValue || 0,
+        );
+        const newBaseValue = existingBaseValue + tradeMarketValue;
 
-        const newCurrentValue =
-          position.performance.currentValue + execution.positionAmount;
+        // Position extra stays authoritative (we redistribute later)
+        const newCurrentValue = newBaseValue + existingExtra;
 
         position.amountInvested = newTotalAmount;
         position.quantity = newTotalQuantity;
         position.averageEntryPrice = newAveragePrice;
+
+        if (!position.performance) position.performance = {};
+
+        position.performance.currentBaseValue = newBaseValue;
         position.performance.currentValue = newCurrentValue;
+        position.performance.currentPrice = tradePrice; // or keep previous if you prefer
+        position.performance.extra = existingExtra; // do NOT add tradeExtra here
 
-        // DON'T add trade.extra here
-        // Position extra remains authoritative.
-
-        position.performance.totalReturn =
-          newCurrentValue + position.performance.extra - newTotalAmount;
-
+        position.performance.totalReturn = newCurrentValue - newTotalAmount;
         position.performance.totalReturnPercent =
           newTotalAmount > 0
             ? (position.performance.totalReturn / newTotalAmount) * 100
             : 0;
 
-        if (!position.tradeIds) {
-          position.tradeIds = [];
-        }
-
+        if (!position.tradeIds) position.tradeIds = [];
         position.tradeIds.push(trade._id);
 
-        if (!position.history) {
-          position.history = [];
-        }
-
+        if (!position.history) position.history = [];
         position.history.push({
           action: "add",
           tradeId: trade._id,
@@ -124,8 +126,13 @@ class PositionService {
 
         await position.save({ session });
 
+        // Redistribute the (unchanged) position extra across all trades
         await this.redistributeTradeExtra(position, session);
       } else {
+        // ---------- CREATE NEW POSITION ----------
+        const currentBaseValue = tradeMarketValue;
+        const currentValue = currentBaseValue + tradeExtra;
+
         const positionData = {
           userId,
           asset: {
@@ -136,34 +143,49 @@ class PositionService {
             type: assetType,
           },
           planId: planId || null,
-          orderType: orderType,
+          orderType,
           wallet: {
             id: wallet.id,
             name: wallet.name,
           },
-          amountInvested: execution.amount,
-          quantity: execution.quantity,
-          averageEntryPrice: execution.price,
+          amountInvested: tradeAmount,
+          quantity: tradeQuantity,
+          averageEntryPrice: tradePrice,
           performance: {
-            currentValue: execution.positionAmount,
-            totalReturn: tradeExtra, // Total return includes extra
+            // Pure market
+            currentBaseValue: currentBaseValue,
+            currentPrice: tradePrice,
+
+            // Market + extra
+            currentValue: currentValue,
+            extra: tradeExtra,
+
+            // Returns
+            totalReturn: currentValue - tradeAmount, // normally just the extra
             totalReturnPercent:
-              execution.amount > 0 ? (tradeExtra / execution.amount) * 100 : 0,
+              tradeAmount > 0
+                ? ((currentValue - tradeAmount) / tradeAmount) * 100
+                : 0,
+
             todayReturn: 0,
             todayReturnPercent: 0,
-            extra: tradeExtra,
+            todayMarketReturn: 0,
+            todayExtra: 0,
+            todayStartValue: currentBaseValue,
+            todayStartDate: new Date(),
+            previousClose: tradePrice,
           },
           status: "open",
-          fullname: fullname,
+          fullname,
           partialCloses: [],
           tradeIds: [trade._id],
           history: [
             {
               action: "create",
               tradeId: trade._id,
-              quantity: execution.quantity,
-              amount: execution.amount,
-              price: execution.price,
+              quantity: tradeQuantity,
+              amount: tradeAmount,
+              price: tradePrice,
               extra: tradeExtra,
               timestamp: new Date(),
             },
@@ -176,17 +198,19 @@ class PositionService {
         position = createdPosition[0];
       }
     } else if (orderType === "sell") {
+      // ---------- SELL (kept mostly as-is, only made consistent) ----------
       if (!position) {
         throw new CustomError("No open position found for this asset", 400);
       }
 
+      if (!position.performance) position.performance = {};
+
       const sellQuantity = execution.quantity;
       const sellAmount = execution.amount;
-      const sellValue = execution.positionAmount;
-      const tradeExtra = extra || 0;
+      const sellMarketValue = Number(execution.positionAmount ?? sellAmount);
+      const tradeExtra = Number(extra || 0);
 
-      // Calculate profit/loss including extra
-      const profitLossFromBase = sellValue - sellAmount;
+      const profitLossFromBase = sellMarketValue - sellAmount;
       const totalProfitLoss = profitLossFromBase + tradeExtra;
 
       if (Math.abs(sellQuantity - position.quantity) < 0.000001) {
@@ -194,8 +218,11 @@ class PositionService {
         position.status = "closed";
         position.performance.totalReturn = totalProfitLoss;
         position.performance.totalReturnPercent =
-          (totalProfitLoss / position.amountInvested) * 100;
+          position.amountInvested > 0
+            ? (totalProfitLoss / position.amountInvested) * 100
+            : 0;
         position.performance.currentValue = 0;
+        position.performance.currentBaseValue = 0;
         position.performance.extra = 0;
         position.closedAt = new Date();
 
@@ -209,7 +236,7 @@ class PositionService {
           timestamp: new Date(),
         });
       } else {
-        // Calculate proportional extra to close
+        // Partial close
         const closeRatio = sellQuantity / position.quantity;
         const extraToClose = (position.performance.extra || 0) * closeRatio;
 
@@ -218,9 +245,10 @@ class PositionService {
         const remainingPrincipal = position.amountInvested - sellAmount;
         const remainingExtra = (position.performance.extra || 0) - extraToClose;
 
-        const newCurrentValue = position.performance.currentValue - sellValue;
-        const remainingProfitLoss =
-          newCurrentValue + remainingExtra - remainingPrincipal;
+        const newBaseValue =
+          (position.performance.currentBaseValue || 0) - sellMarketValue;
+        const newCurrentValue = newBaseValue + remainingExtra;
+        const remainingProfitLoss = newCurrentValue - remainingPrincipal;
 
         position.partialCloses.push({
           percentClosed: parseFloat(percentClosed.toFixed(2)),
@@ -229,20 +257,24 @@ class PositionService {
           profitLossClosed: totalProfitLoss,
           extraClosed: tradeExtra,
           closedAt: new Date(),
-          remainingQuantity: remainingQuantity,
-          remainingPrincipal: remainingPrincipal,
-          remainingProfitLoss: remainingProfitLoss,
-          remainingExtra: remainingExtra,
+          remainingQuantity,
+          remainingPrincipal,
+          remainingProfitLoss,
+          remainingExtra,
           priceAtClose: execution.price,
         });
 
         position.quantity = remainingQuantity;
         position.amountInvested = remainingPrincipal;
+
+        position.performance.currentBaseValue = newBaseValue;
         position.performance.currentValue = newCurrentValue;
         position.performance.extra = remainingExtra;
         position.performance.totalReturn = remainingProfitLoss;
         position.performance.totalReturnPercent =
-          (remainingProfitLoss / remainingPrincipal) * 100;
+          remainingPrincipal > 0
+            ? (remainingProfitLoss / remainingPrincipal) * 100
+            : 0;
 
         position.history.push({
           action: "remove",
@@ -323,20 +355,33 @@ class PositionService {
     };
 
     for (const position of positions) {
-      const currentBaseValue = position.performance?.currentValue || 0;
-      const currentExtra = position.performance?.extra || 0;
-      const currentValue = currentBaseValue + currentExtra;
-      const amountInvested = position.amountInvested || 0;
+      // ---------- CORRECT MAPPING ----------
+      const currentBaseValue = Number(
+        position.performance?.currentBaseValue || 0,
+      );
+      const currentExtra = Number(position.performance?.extra || 0);
+
+      // Prefer the already-stored currentValue (it should already be base + extra)
+      // Fall back only if it is missing
+      const currentValue =
+        Number(position.performance?.currentValue) ||
+        currentBaseValue + currentExtra;
+
+      const amountInvested = Number(position.amountInvested || 0);
       const totalReturn = currentValue - amountInvested;
+
+      // Prefer the stored currentPrice, fall back to calculation from pure base
+      const currentPrice =
+        Number(position.performance?.currentPrice) ||
+        (position.quantity > 0 ? currentBaseValue / position.quantity : 0);
+
+      // -------------------------------------
 
       summary.totalInvested += amountInvested;
       summary.totalCurrentValue += currentValue;
       summary.totalReturn += totalReturn;
       summary.totalQuantity += position.quantity || 0;
       summary.totalExtra += currentExtra;
-
-      const currentPrice =
-        position.quantity > 0 ? currentBaseValue / position.quantity : 0;
 
       summary.positions.push({
         asset: position.asset,

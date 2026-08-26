@@ -101,11 +101,9 @@ function getDurationInMs(milestone, duration) {
 }
 
 function getPositionValue(position) {
-  return (
-    (position.performance?.totalReturn || 0) +
-    (position.performance?.extra || 0)
-  );
+  return position.performance?.totalReturn || 0;
 }
+//+(position.performance?.extra || 0)
 
 /**
  * Fetch ETF specific information

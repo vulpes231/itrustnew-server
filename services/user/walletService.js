@@ -263,15 +263,12 @@ async function getWalletInvestData(userId) {
       (acc, pos) => {
         const walletId = pos.wallet.id.toString();
 
-        const extra = pos.performance?.extra || 0;
-        const totalReturn =
-          pos.performance?.currentValue + extra - pos.amountInvested || 0;
-        const currentValue = pos.performance?.currentValue || 0;
+        // currentValue already includes extra
+        const currentValue = Number(pos.performance?.currentValue || 0);
+        const amountInvested = Number(pos.amountInvested || 0);
 
-        // console.log(pos);
-
-        const profitLoss = totalReturn;
-        const invested = currentValue + extra;
+        const profitLoss = currentValue - amountInvested;
+        const invested = currentValue; // present value of the position
 
         if (walletId === brokerageId) {
           acc.brokerage.profitLoss += profitLoss;
