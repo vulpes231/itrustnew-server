@@ -32,16 +32,13 @@ const getUser = async (req, res, next) => {
 const getAllUsers = async (req, res, next) => {
   const sortBy = req.query["sort_by"];
   const filterBy = req.query["filter_by"];
-  const page = Math.max(req.query.page || 1);
-  const limit = Math.min(req.query.limit || 15);
+
   try {
-    const queryData = { sortBy, filterBy, page, limit };
-    const { users, totalUser, totalPages } = await fetchAllUsers(queryData);
+    const queryData = { sortBy, filterBy };
+    const { users, totalUser } = await fetchAllUsers(queryData);
     res.status(200).json({
       data: users,
       pagination: {
-        totalPage: totalPages,
-        currentPage: page,
         totalItems: totalUser,
       },
       success: true,

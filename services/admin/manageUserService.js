@@ -14,16 +14,10 @@ const Portfolio = require("../../models/Portfolio");
 const fs = require("fs").promises;
 
 async function fetchAllUsers(queryData) {
-  const {
-    sortBy = "createdAt",
-    sortOrder = "desc",
-    page = 1,
-    limit = 15,
-    filterBy,
-  } = queryData;
+  const { sortBy = "createdAt", sortOrder = "desc", filterBy } = queryData;
   try {
     const filter = {};
-    // Expecting filterBy to be like { field: value }
+
     if (filterBy && typeof filterBy === "object") {
       Object.assign(filter, filterBy);
     }
@@ -31,16 +25,10 @@ async function fetchAllUsers(queryData) {
     const sort = {};
     if (sortBy) sort[sortBy] = sortOrder === "asc" ? 1 : -1;
 
-    const users = await User.find(filter)
-      .sort(sort)
-      .skip((page - 1) * limit)
-      .limit(limit);
-
+    const users = await User.find(filter).sort(sort);
     const totalUser = await User.countDocuments(filter);
-    const totalPages =
-      Math.ceil(totalUser / limit) === 0 ? 1 : Math.ceil(totalUser / limit);
 
-    return { users, totalUser, totalPages };
+    return { users, totalUser };
   } catch (error) {
     throw new CustomError(error.message, error.statusCode);
   }
