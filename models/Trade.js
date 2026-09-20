@@ -14,6 +14,12 @@ const tradeSchema = new Schema(
       symbol: { type: String },
       img: { type: String },
     },
+    legacyId: {
+      type: String,
+      index: true,
+      unique: true,
+      sparse: true,
+    },
     planId: {
       type: Schema.Types.ObjectId,
       ref: "Autoplan",

@@ -27,9 +27,25 @@ const assetSchema = new Schema(
       enum: ["stock", "etf", "crypto"],
       required: true,
     },
+    legacyId: {
+      type: String,
+      index: true,
+      unique: true,
+      sparse: true,
+    },
     exchange: {
       type: String,
-      enum: ["NYSE", "NASDAQ", "AMEX", "OTC", "BINANCE", "COINBASE", "FOREX"],
+      enum: [
+        "NYSE",
+        "NASDAQ",
+        "AMEX",
+        "OTC",
+        "BINANCE",
+        "COINBASE",
+        "FOREX",
+        "CRYPTO",
+        "CBOE",
+      ],
     },
     priceData: {
       current: { type: Number, required: true },
