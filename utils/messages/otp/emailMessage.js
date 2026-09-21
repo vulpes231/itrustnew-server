@@ -76,7 +76,6 @@ function buildTwoFaMsg(otp) {
     `;
 
   return baseTemplate({
-    title: "Login Verification",
     content,
   });
 }

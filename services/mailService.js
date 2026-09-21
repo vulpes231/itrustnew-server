@@ -9,7 +9,10 @@ const {
   buildIdentityVerifiedMsg,
   buildIdentityDeclinedMsg,
 } = require("../utils/messages/kyc/verificationMsg");
-const { buildEmailMsg } = require("../utils/messages/otp/emailMessage");
+const {
+  buildEmailMsg,
+  buildTwoFaMsg,
+} = require("../utils/messages/otp/emailMessage");
 const {
   buildSavingsCreatedEmail,
   buildContributionEmail,
@@ -22,6 +25,7 @@ const {
 const {
   buildTransferEmail,
 } = require("../utils/messages/transfer/transferMessages");
+const { buildWelcomeMsg } = require("../utils/messages/welcome/welcomeMsg");
 const {
   buildWithdrawalEmail,
   buildWithdrawalApprovedEmail,
