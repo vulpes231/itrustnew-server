@@ -5,8 +5,6 @@ const {
 } = require("../../handlers/user/verifyController");
 const { verifyJWT } = require("../../middlewares/verifyJWT");
 
-verifyJWT;
-
 const router = Router();
 
 router.route("/auth").post(verifyLoginCode);

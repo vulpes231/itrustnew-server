@@ -8,6 +8,7 @@ const fs = require("fs").promises;
 
 const { generateFileName, allowedMimeTypes } = require("../../utils/utils");
 const User = require("../../models/User");
+const changeMailService = require("../../services/user/changeMailService");
 
 const ID_PUBLIC_STORAGE_PATH = "/storage/accounts";
 const PROOF_PUBLIC_STORAGE_PATH = "/storage/proofs";
@@ -268,8 +269,63 @@ const verifyEmailCode = async (req, res, next) => {
   }
 };
 
+const sendChangeOfEmailCode = async (req, res, next) => {
+  const { email } = req.body;
+  const userId = req.user.userId;
+
+  try {
+    const { oldEmail, newEmail } = await changeMailService.getMail(
+      userId,
+      email,
+    );
+
+    await queueService.sendToQueue("email_queue", {
+      type: "CHANGE_OF_EMAIL_VERIFICATION",
+      to: newEmail,
+      templateData: {
+        oldEmail,
+        newEmail,
+      },
+    });
+
+    res.status(200).json({
+      message: "Verification code sent.",
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const verifyChangeOfEmailCode = async (req, res, next) => {
+  const { code } = req.body;
+  const userId = req.user.userId;
+  try {
+    const result = await changeMailService.verifyMail(userId, code);
+
+    if (result.success) {
+      await queueService.sendToQueue("email_queue", {
+        type: "EMAIL_CHANGE_NOTIFICATION",
+        to: result.user.contactInfo.email,
+        templateData: {
+          name: result.user.personalInfo.username,
+        },
+      });
+    }
+
+    res
+      .status(200)
+      .json({ message: "Email change success.", success: true, data: null });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   verifyLoginCode,
+  sendChangeOfEmailCode,
+  verifyChangeOfEmailCode,
   verifyEmailCode,
   submitDetails,
   verifyAddress,

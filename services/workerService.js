@@ -55,6 +55,12 @@ class EmailWorkerService {
             emailData.to,
           );
           break;
+        case "CHANGE_OF_EMAIL_VERIFICATION":
+          await emailService.sendEmailChangeCode(
+            emailData.templateData.oldEmail,
+            emailData.templateData.newEmail,
+          );
+          break;
         case "DEPOSIT_REQUEST_EMAIL":
           await Promise.all([
             emailService.sendDepositRequestAlert(

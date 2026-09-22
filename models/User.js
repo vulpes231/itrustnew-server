@@ -275,6 +275,10 @@ const userSchema = new Schema(
         risk: { type: String },
       },
     ],
+    pendingEmailVerification: {
+      email: { type: String },
+      // status: { type: String, enum: ["pending", "approved", "rejected"] },
+    },
     watchList: [
       {
         assetId: { type: Schema.Types.ObjectId, ref: "Asset" },

@@ -67,6 +67,7 @@ const userRegisterRoute = require("./routes/user/register.js");
 const userLoginRoute = require("./routes/user/login.js");
 const userLogoutRoute = require("./routes/user/logout.js");
 const resetAccountPassRoute = require("./routes/resetaccountpass.js");
+const articleRoute = require("./routes/article.js");
 
 //protected routes
 const otpVerificationRoute = require("./routes/user/verification.js");
@@ -83,7 +84,7 @@ const settingsRoute = require("./routes/user/settings.js");
 const profileSettingsRoute = require("./routes/user/profileSettings.js");
 const chartRoute = require("./routes/user/portfolio.js");
 const positionRoute = require("./routes/user/position.js");
-const articleRoute = require("./routes/article.js");
+const comRoute = require("./routes/user/com.js");
 
 // admin routers
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
@@ -134,6 +135,7 @@ app.use("/invest", investPlanRoute);
 app.use("/profile", profileSettingsRoute);
 app.use("/chart", chartRoute);
 app.use("/position", positionRoute);
+app.use("/com", comRoute);
 
 //admin protected routes
 app.use("/register", enrollAdminRoute);

@@ -12,6 +12,7 @@ const {
 const {
   buildEmailMsg,
   buildTwoFaMsg,
+  buildEmailChangeMsg,
 } = require("../utils/messages/otp/emailMessage");
 const {
   buildSavingsCreatedEmail,
@@ -110,6 +111,58 @@ async function sendMailVerificationCode(subject, email) {
     user.accountStatus.otpBlockedUntil = null;
 
     const sendResult = await sendMail(email, subject, msg);
+
+    user.accountStatus.otpSentAt = new Date();
+    await user.save();
+
+    if (!sendResult?.messageId) {
+      throw new Error("Email sent but no messageId returned");
+    }
+
+    return {
+      status: "email sent",
+      messageId: sendResult.messageId,
+      otpSent: true,
+    };
+  } catch (error) {
+    throw new CustomError(
+      `Failed to send email verification code: ${error.message}`,
+      500,
+    );
+  }
+}
+
+async function sendEmailChangeCode(oldEmail, newEmail) {
+  if (!oldEmail || !newEmail) {
+    throw new CustomError("Email and subject required!", 400);
+  }
+
+  const otp = generateOtp();
+
+  const msg = buildEmailChangeMsg(otp);
+  const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+  try {
+    const user = await User.findOne({ "contactInfo.email": oldEmail });
+    if (!user) throw new CustomError("User not found!", 400);
+
+    if (
+      user.accountStatus.otpSentAt &&
+      user.accountStatus.otpExpires > new Date()
+    ) {
+      console.log("OTP already sent recently — skipping email");
+      return { skipped: true };
+    }
+
+    const hashedOtp = await bcrypt.hash(otp, 10);
+    user.accountStatus.otp = hashedOtp;
+    user.accountStatus.otpExpires = otpExpires;
+    user.accountStatus.otpAttempts = 0;
+    user.accountStatus.otpBlockedUntil = null;
+
+    const subject = "Verify Your New Email";
+
+    const sendResult = await sendMail(newEmail, subject, msg);
 
     user.accountStatus.otpSentAt = new Date();
     await user.save();
@@ -392,6 +445,7 @@ module.exports = {
   sendMailVerificationCode, //otp
   sendWelcomeMessage,
   sendLoginCode,
+  sendEmailChangeCode,
   sendBuyAlert, //trade
   sendSellAlert,
   sendDepositRequestAlert, //deposit

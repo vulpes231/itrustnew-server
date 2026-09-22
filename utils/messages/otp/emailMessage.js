@@ -40,6 +40,59 @@ function buildEmailMsg(otp) {
   });
 }
 
+function buildEmailChangeMsg(otp) {
+  const content = `
+    <p>Hello,</p>
+
+    <p>
+      We received a request to change the email address associated with your
+      <b>Itrust Investment</b> account.
+    </p>
+
+    <p>
+      To verify your new email address, please enter the confirmation code
+      below:
+    </p>
+
+    <div style="
+      background: #f4f0ff;
+      color: ${BRAND_COLOR};
+      padding: 18px;
+      text-align: center;
+      font-size: 28px;
+      font-weight: bold;
+      letter-spacing: 4px;
+      border-radius: 8px;
+      margin: 30px 0;
+    ">
+      <b>${otp}</b>
+    </div>
+
+    <p>
+      This code is required to confirm and activate your new email address.
+      For your security, please do not share this code with anyone.
+    </p>
+
+    <p>
+      If you did not request an email address change, please disregard this
+      email and contact us at
+      <a href="mailto:support@itrustinvestment.com">
+        support@itrustinvestment.com
+      </a>
+      immediately.
+    </p>
+
+    <p>
+      Best regards,<br />
+      <b>Itrust Investment Team</b>
+    </p>
+  `;
+
+  return baseTemplate({
+    content,
+  });
+}
+
 function buildTwoFaMsg(otp) {
   const content = `
       
@@ -80,4 +133,4 @@ function buildTwoFaMsg(otp) {
   });
 }
 
-module.exports = { buildEmailMsg, buildTwoFaMsg };
+module.exports = { buildEmailMsg, buildTwoFaMsg, buildEmailChangeMsg };

@@ -1,3 +1,4 @@
+const manageWalletService = require("../../services/admin/manageWalletService");
 const { fetchUserWallets } = require("../../services/user/walletService");
 
 const adminGetUserWallets = async (req, res, next) => {
@@ -14,4 +15,18 @@ const adminGetUserWallets = async (req, res, next) => {
   }
 };
 
-module.exports = { adminGetUserWallets };
+const editWalletBalance = async (req, res, next) => {
+  try {
+    const result = await manageWalletService.editWalletBalance(req.body);
+
+    res.status(200).json({
+      message: "User wallets updated successfully",
+      data: result.balance,
+      success: true,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { adminGetUserWallets, editWalletBalance };
