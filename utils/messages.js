@@ -35,7 +35,7 @@ function baseTemplate({ content }) {
                 text-align: center;
             ">
                 <img 
-                    src="https://itrustinvestment.netlify.app/itrust.svg" 
+                    src="https://itrustinvestment.netlify.app/itrust.png" 
                     alt="Itrust Investment"
                     style="max-height: 75px; width: 130px;"
                 />

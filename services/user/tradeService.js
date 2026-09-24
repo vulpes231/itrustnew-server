@@ -478,16 +478,15 @@ async function fetchUserTrades(userId, queryData) {
 
   try {
     const filter = { userId };
-    if (status) filter.status = status;
+    // if (status) filter.status = status;
 
     const sort = {};
     if (sortBy === "createdAt") sort.createdAt = -1;
     if (sortBy === "status") sort.status = 1;
 
-    const filteredTrades = await Trade.find(filter)
-      .sort(sort)
-      .skip((page - 1) * limit)
-      .limit(limit);
+    const filteredTrades = await Trade.find(filter).sort(sort);
+    // .skip((page - 1) * limit)
+    // .limit(limit);
 
     const totalResultCount = await Trade.countDocuments(filter);
     const totalPageCount = Math.ceil(totalResultCount / limit);
