@@ -16,6 +16,7 @@ const { requireRole } = require("./middlewares/requireRole.js");
 const workerService = require("./services/workerService.js");
 const queueService = require("./services/queueService.js");
 const { closeTransporter } = require("./utils/mailer.js");
+const { connectRedis, redisClient } = require("./configs/redis.js");
 
 async function initializeServices() {
   try {
@@ -39,6 +40,8 @@ async function initializeServices() {
 initCronJobs();
 
 const app = express();
+app.set("trust proxy", 1);
+
 const PORT = process.env.PORT || 3000;
 
 app.use(cors(corsOptions));
@@ -209,10 +212,19 @@ app.use(
 let server;
 
 mongoose.connection.once("connected", async () => {
-  await initializeServices();
-  server = app.listen(PORT, () =>
-    console.log(`Server started on http://localhost:${PORT}`),
-  );
+  try {
+    await connectRedis();
+    console.log("Redis connected");
+
+    await initializeServices();
+
+    server = app.listen(PORT, () =>
+      console.log(`Server started on http://localhost:${PORT}`),
+    );
+  } catch (error) {
+    console.error("Failed to initialize server:", error);
+    process.exit(1);
+  }
 });
 
 app.use(errorHandler);
@@ -248,6 +260,12 @@ const shutdown = async (signal) => {
     await closeTransporter();
 
     await queueService.close();
+
+    if (redisClient.isOpen) {
+      console.log("Closing Redis connection...");
+      await redisClient.quit();
+      console.log("Redis connection closed");
+    }
 
     if (mongoose.connection.readyState === 1) {
       console.log("Closing MongoDB connection...");

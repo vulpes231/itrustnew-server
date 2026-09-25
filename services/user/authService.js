@@ -112,15 +112,15 @@ async function registerService(userData) {
       );
     }
 
-    queueService
-      .sendToQueue("email_queue", {
-        type: "VERIFICATION_EMAIL",
-        to: email,
-        subject: "Confirm Your Email",
-      })
-      .catch((error) => {
-        console.error("Failed to queue verification email:", error);
-      });
+    // queueService
+    //   .sendToQueue("email_queue", {
+    //     type: "VERIFICATION_EMAIL",
+    //     to: email,
+    //     subject: "Confirm Your Email",
+    //   })
+    //   .catch((error) => {
+    //     console.error("Failed to queue verification email:", error);
+    //   });
 
     return {
       accessToken: result.accessToken,
