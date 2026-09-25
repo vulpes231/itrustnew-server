@@ -218,8 +218,12 @@ mongoose.connection.once("connected", async () => {
 
     await initializeServices();
 
-    server = app.listen(PORT, () =>
-      console.log(`Server started on http://localhost:${PORT}`),
+    // server = app.listen(PORT, () =>
+    //   console.log(`Server started on http://localhost:${PORT}`),
+    // );
+
+    server = app.listen(PORT, "127.0.0.1", () =>
+      console.log(`Server started on http://127.0.0.1:${PORT}`),
     );
   } catch (error) {
     console.error("Failed to initialize server:", error);
