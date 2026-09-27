@@ -429,6 +429,7 @@ async function loginService(loginData) {
           twoFaActivated: user.accountStatus.twoFaActivated,
           twoFaVerified: user.accountStatus.twoFaVerified,
         },
+        loginType: "user",
       };
 
       return { userInfo, accessToken: authToken };
