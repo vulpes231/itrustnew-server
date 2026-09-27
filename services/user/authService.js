@@ -19,6 +19,8 @@ const Usersetting = require("../../models/Usersetting");
 async function registerService(userData) {
   const { firstname, lastname, username, email, password } = userData;
 
+  console.log("service-data-recived", userData);
+
   if (!firstname || !lastname) {
     throw new CustomError("Fullname required!", 400);
   }

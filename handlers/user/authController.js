@@ -9,6 +9,8 @@ const registerUser = async (req, res, next) => {
     });
   }
 
+  console.log("re-body:", req.body);
+
   const { email, turnstileToken, website, ...userData } = req.body;
 
   if (website) {
@@ -28,12 +30,14 @@ const registerUser = async (req, res, next) => {
 
     if (!isHuman) {
       return res.status(400).json({
-        message: "Verification failed. Please try again.",
+        message: "Turnstile Verification failed. Please try again.",
       });
     }
 
-    const { accessToken, refreshToken } =
-      await authService.registerService(userData);
+    const { accessToken, refreshToken } = await authService.registerService({
+      ...userData,
+      email,
+    });
 
     await queueService.sendToQueue("email_queue", {
       type: "VERIFICATION_EMAIL",
