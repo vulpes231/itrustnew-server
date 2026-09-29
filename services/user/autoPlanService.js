@@ -116,7 +116,7 @@ async function activatePlan(formData) {
     session.endSession();
 
     if (error instanceof CustomError) throw error;
-    throw new CustomError(error.message, 500);
+    throw new CustomError(error.message, error.statusCode || 500);
   }
 }
 

@@ -88,6 +88,7 @@ const profileSettingsRoute = require("./routes/user/profileSettings.js");
 const chartRoute = require("./routes/user/portfolio.js");
 const positionRoute = require("./routes/user/position.js");
 const comRoute = require("./routes/user/com.js");
+const tierRoute = require("./routes/user/tier.js");
 
 // admin routers
 const enrollAdminRoute = require("./routes/admin/enrolladmin.js");
@@ -106,6 +107,7 @@ const manageConfigRoute = require("./routes/admin/manageconfig.js");
 const manageSysInfoRoute = require("./routes/admin/systemanalytics.js");
 const manageAssetRoute = require("./routes/admin/manageAsset.js");
 const manageArticleRoute = require("./routes/admin/managearticle.js");
+const manageTierRoute = require("./routes/admin/managetier.js");
 
 // routes
 
@@ -139,6 +141,7 @@ app.use("/profile", profileSettingsRoute);
 app.use("/chart", chartRoute);
 app.use("/position", positionRoute);
 app.use("/com", comRoute);
+app.use("/tier", tierRoute);
 
 //admin protected routes
 app.use("/register", enrollAdminRoute);
@@ -202,6 +205,11 @@ app.use(
   "/manageasset",
   requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
   manageAssetRoute,
+);
+app.use(
+  "/managetier",
+  requireRole([ROLES.ADMIN, ROLES.SUPER_USER]),
+  manageTierRoute,
 );
 app.use(
   "/manage-article",
