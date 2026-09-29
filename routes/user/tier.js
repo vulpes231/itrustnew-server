@@ -7,7 +7,7 @@ const {
 
 const router = Router();
 
-router.route().get(getAvailableTiers).patch(submitTierCode);
+router.route("/").get(getAvailableTiers).patch(submitTierCode);
 router.route("/:tierId").get(getTierById);
 
 module.exports = router;

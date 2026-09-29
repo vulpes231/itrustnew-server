@@ -127,6 +127,7 @@ app.use("/login", loginAdminRoute);
 
 // user protected routes
 app.use(verifyJWT);
+app.use("/tier", tierRoute);
 app.use("/user", userProfileRoute);
 app.use("/signout", userLogoutRoute);
 app.use("/wallet", walletRoute);
@@ -141,7 +142,6 @@ app.use("/profile", profileSettingsRoute);
 app.use("/chart", chartRoute);
 app.use("/position", positionRoute);
 app.use("/com", comRoute);
-app.use("/tier", tierRoute);
 
 //admin protected routes
 app.use("/register", enrollAdminRoute);
