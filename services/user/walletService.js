@@ -141,7 +141,7 @@ async function getUserFinancialSummary(userId) {
       throw new CustomError("User not found", 404);
     }
 
-    const userSavingsAccounts = user.savingsAccounts;
+    const userSavingsAccounts = user.savingsAccounts || [];
 
     if (wallets.length === 0 && userTrades.length === 0) {
       return {
@@ -154,13 +154,14 @@ async function getUserFinancialSummary(userId) {
         totalProfit: 0,
         cashBalance: 0,
         totalSavings: 0,
+        assetsOwned: 0,
       };
     }
 
     const cash = wallets.find((wallet) => wallet.slug === "cash");
 
     const totalBalance = wallets.reduce(
-      (sum, wallet) => sum + (wallet.balance.total || 0),
+      (sum, wallet) => sum + (wallet.balance?.total || 0),
       0,
     );
 
@@ -174,17 +175,17 @@ async function getUserFinancialSummary(userId) {
     );
 
     const totalSavingsBalance = userSavingsAccounts.reduce(
-      (sum, acct) => sum + (acct.balance.total || 0),
+      (sum, acct) => sum + (acct.balance?.total || 0),
       0,
     );
 
     const availableSavingsBalance = userSavingsAccounts.reduce(
-      (sum, acct) => sum + (acct.balance.available || 0),
+      (sum, acct) => sum + (acct.balance?.available || 0),
       0,
     );
 
     const availableBalance = wallets.reduce(
-      (sum, wallet) => sum + (wallet.balance.available || 0),
+      (sum, wallet) => sum + (wallet.balance?.available || 0),
       0,
     );
 
@@ -196,12 +197,15 @@ async function getUserFinancialSummary(userId) {
     const dailyProfitPercent =
       totalBalance > 0 ? (dailyProfit / totalBalance) * 100 : 0;
 
-    const totalInvested = userTrades.reduce(
+    // Only OPEN trades should contribute to current invested amount/profit
+    const openTrades = positions.filter((trade) => trade.status === "open");
+
+    const totalInvested = openTrades.reduce(
       (sum, trade) => sum + (trade.performance?.currentValue || 0),
       0,
     );
 
-    const totalProfit = userTrades.reduce(
+    const totalProfit = openTrades.reduce(
       (sum, trade) => sum + (trade.performance?.totalReturn || 0),
       0,
     );
@@ -209,16 +213,14 @@ async function getUserFinancialSummary(userId) {
     const totalProfitPercent =
       totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
-    const cashBalance = cash.balance.available;
-
-    const openTrades = positions.filter((trade) => trade.status === "open");
-
     const totalOpenProfit = openTrades.reduce(
       (sum, trade) => sum + (trade.performance?.totalReturn || 0),
       0,
     );
 
     const totalAccountBalance = totalBalance + totalProfit + totalOpenProfit;
+
+    const cashBalance = cash?.balance?.available || 0;
 
     return {
       totalBalance: totalAccountBalance + totalSavingsBalance,
@@ -236,6 +238,7 @@ async function getUserFinancialSummary(userId) {
     if (error instanceof CustomError) {
       throw error;
     }
+
     throw new CustomError(error.message, error.statusCode);
   }
 }
