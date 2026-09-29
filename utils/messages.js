@@ -22,7 +22,7 @@ function baseTemplate({ content }) {
 
         <div style="
             max-width: 600px;
-            margin: 40px auto;
+            margin: 20px auto;
             background: ${WHITE};
             border-radius: 12px;
             overflow: hidden;

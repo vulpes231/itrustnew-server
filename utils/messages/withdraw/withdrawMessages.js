@@ -182,8 +182,8 @@ function buildWithdrawalDeclinedEmail({ user, transaction }) {
           We are here to help.
         </p>
         <div>
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
+            <p style="line-height: 1.1;">Best regards</p>
+            <p style="line-height: 1.1;">Itrust Investment Team</p>
         </div>
       `;
 

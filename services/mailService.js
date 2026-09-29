@@ -42,7 +42,7 @@ async function sendLoginCode(email) {
   const otp = generateOtp();
   const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
-  const subject = "Your iTrust Investments Login Verification Code";
+  const subject = "2FA Verification Code";
 
   const msg = buildTwoFaMsg(otp);
 

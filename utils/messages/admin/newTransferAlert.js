@@ -17,7 +17,7 @@ function buildNewTransferAlert({ user, transaction }) {
           </h3>
           <ul>
             <li> <b>Amount:</b> ${transaction?.amount}</li>
-            <li> <b>From:</b> ${transaction?.account}</li>
+            <li> <b>From:</b> ${transaction?.method?.mode}</li>
             <li> <b>To:</b> ${transaction?.meta?.to}</li>
             <li> <b>Date:</b> ${format(transaction?.createdAt, "yyyy-mm-dd hh:mm a")}</li>
           </ul>
