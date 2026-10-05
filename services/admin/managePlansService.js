@@ -218,6 +218,31 @@ async function fetchSinglePlan(planId) {
   }
 }
 
+async function getAllUserPlans() {
+  try {
+    const users = await User.find(
+      {},
+      {
+        activePlans: 1,
+      },
+    ).lean();
+
+    const plans = users.flatMap((user) => user.activePlans || []);
+
+    if (plans.length === 0) {
+      throw new CustomError("Cannot find plans!", 404);
+    }
+
+    return plans;
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
+  }
+}
+
 async function editUserPlan(form) {
   const { planId, userId, start, end } = form;
 
@@ -288,7 +313,7 @@ async function editUserPlan(form) {
 
         // Return the plan balance to the auto wallet
         autoAccount.balance.available += userPlan.balance.total;
-        autoAccount.balance.total += userPlan.balance.total;
+        // autoAccount.balance.total += userPlan.balance.total;
 
         // Reset the plan
         userPlan.balance.available = 0;
@@ -319,4 +344,5 @@ module.exports = {
   removePlan,
   fetchSinglePlan,
   editUserPlan,
+  getAllUserPlans,
 };

@@ -58,23 +58,15 @@ const getTradeInfo = async (req, res, next) => {
 };
 
 const getAllTrades = async (req, res, next) => {
-  const page = Math.max(1, req.query.page || 1);
-  const limit = Math.min(15, req.query.limit || 15);
   const sortBy = req.query.sortBy || "createdAt";
   const filterBy = req.query.filterBy;
-  const queryData = { page, limit, sortBy, filterBy };
+  const queryData = { sortBy, filterBy };
   try {
-    const { trades, totalItems, totalPages, currentPage } =
-      await tradeService.getAllTrades(queryData);
+    const { trades } = await tradeService.getAllTrades(queryData);
     res.status(200).json({
       message: "Trades fetched successfully.",
       data: trades,
       success: true,
-      pagination: {
-        totalItems,
-        totalPages,
-        currentPage,
-      },
     });
   } catch (error) {
     next(error);

@@ -354,6 +354,7 @@ async function sendIdVerifiedAlert(user) {
     throw new CustomError(error.message, 500);
   }
 }
+
 async function sendIdDeclinedAlert(user) {
   const email = user.contactInfo.email;
   const username = user.personalInfo.username;

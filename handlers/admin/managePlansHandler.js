@@ -4,6 +4,7 @@ const {
   editPlan,
   fetchSinglePlan,
   editUserPlan,
+  getAllUserPlans,
 } = require("../../services/admin/managePlansService");
 const { fetchPlans } = require("../../services/user/autoPlanService");
 
@@ -234,8 +235,22 @@ const getMyPlans = async (req, res, next) => {
   }
 };
 
+const getUserPlans = async (req, res, next) => {
+  try {
+    const plans = await getAllUserPlans();
+
+    res.status(200).json({
+      success: true,
+      data: plans,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createPlan,
+  getUserPlans,
   updatePlan,
   deletePlan,
   singlePlan,

@@ -87,7 +87,8 @@ class AdminTierService {
   }
 
   async updateUserTier(formData) {
-    const { threshold, minDeposit, userId, isCodeActivated, code } = formData;
+    const { threshold, minDeposit, userId, isCodeActivated, code, tierId } =
+      formData;
 
     if (!userId) {
       throw new CustomError("Bad request!", 400);
@@ -99,20 +100,30 @@ class AdminTierService {
       throw new CustomError("User not found!", 404);
     }
 
+    const tiers = user.tiers;
+
+    const tierToUpdate = tiers.find(
+      (tr) => tr._id.toString() === tierId.toString(),
+    );
+
+    if (!tierToUpdate) {
+      throw new CustomError("Tier not found!", 404);
+    }
+
     if (!user.accountTier) {
       user.accountTier = {};
     }
 
     if (minDeposit !== undefined && minDeposit !== null) {
-      user.accountTier.minDeposit = Number(minDeposit);
+      tierToUpdate.minDeposit = Number(minDeposit);
     }
 
     if (threshold !== undefined && threshold !== null) {
-      user.accountTier.threshold = Number(threshold);
+      tierToUpdate.threshold = Number(threshold);
     }
 
     if (code !== undefined && code !== null) {
-      user.accountTier.withdrawalCode = await bcrypt.hash(String(code), 12);
+      user.accountTier.withdrawalCode = code;
     }
 
     if (isCodeActivated !== undefined) {

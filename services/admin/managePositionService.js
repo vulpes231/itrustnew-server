@@ -10,8 +10,16 @@ const User = require("../../models/User");
 const walletSnapshotService = require("../user/walletSnapshotService");
 
 class ManagePositionService {
-  async fetchAllPositions() {
-    const positions = await Position.find().lean();
+  async fetchAllPositions(queryData) {
+    const { sortBy } = queryData;
+
+    const sort = {};
+
+    if (sortBy) {
+      sort.createdAt = -1;
+    }
+
+    const positions = await Position.find().sort(sort).lean();
     return positions;
   }
 

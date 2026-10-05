@@ -3,8 +3,9 @@ const managePositionService = require("../../services/admin/managePositionServic
 const queueService = require("../../services/queueService");
 
 const getAllPositions = async (req, res, next) => {
+  const { sortBy } = req.query;
   try {
-    const positions = await managePositionService.fetchAllPositions();
+    const positions = await managePositionService.fetchAllPositions({ sortBy });
 
     res
       .status(200)

@@ -118,7 +118,7 @@ const submitDetails = async (req, res, next) => {
       await queueService.sendToQueue("email_queue", {
         type: "IDENTITY_UPLOAD_EMAIL",
         templateData: {
-          name: result.user.personalInfo.username,
+          username: result.user.personalInfo.username,
         },
       });
     }
@@ -206,7 +206,7 @@ const verifyAddress = async (req, res, next) => {
       await queueService.sendToQueue("email_queue", {
         type: "POA_UPLOAD_EMAIL",
         templateData: {
-          name: result.user.personalInfo.username,
+          username: result.user.personalInfo.username, //personalInfo.username
         },
       });
     }

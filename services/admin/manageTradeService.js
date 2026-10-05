@@ -471,25 +471,16 @@ class TradeService {
   }
 
   async getAllTrades(filters = {}) {
-    const { status, assetType, limit = 15, skip = 0, page } = filters;
+    const { status, assetType } = filters;
     const query = {};
 
     if (status) query.status = status;
     if (assetType) query.assetType = assetType;
 
-    const trades = await Trade.find(query)
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .skip(skip);
-
-    const totalTrades = await Asset.countDocuments(query);
-    const totalPages = Math.ceil(totalTrades / limit);
+    const trades = await Trade.find(query).sort({ createdAt: -1 });
 
     return {
       trades,
-      totalItems: totalTrades,
-      totalPages,
-      currentPage: page,
     };
   }
 
