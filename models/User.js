@@ -303,7 +303,11 @@ const userSchema = new Schema(
       },
     ],
     accountTier: {
-      withdrawalCode: { type: Number },
+      currentTier: {
+        type: Number,
+        default: 0,
+      },
+      withdrawalCode: { type: String },
       isCodeActivated: { type: Boolean, default: false },
     },
     watchList: [

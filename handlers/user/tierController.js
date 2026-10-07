@@ -2,8 +2,9 @@
 const userTierService = require("../../services/user/tierService");
 
 const getAvailableTiers = async (req, res, next) => {
+  const { userId } = req.user;
   try {
-    const tiers = await userTierService.getTiers();
+    const tiers = await userTierService.getTiers(userId);
     res.status(200).json({
       message: "Tiers fetched successfully",
       data: tiers,

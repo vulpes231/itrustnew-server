@@ -6,6 +6,7 @@ const { fetchTransactionInfo } = require("../user/transactionService");
 const { default: mongoose } = require("mongoose");
 const walletSnapshotService = require("../user/walletSnapshotService");
 const portfolioService = require("../user/portfolioService");
+const userTierService = require("../user/tierService");
 
 async function fetchAllTransactions(queryData) {
   const {
@@ -121,6 +122,7 @@ async function editTransaction(transactionId, action) {
             },
             session,
           );
+          await userTierService.updateTierProgress(user._id);
         } else if (transaction.type === "withdraw") {
           await portfolioService.createPortfolioSnapshot(
             transaction.userId,
@@ -379,6 +381,8 @@ async function createTransaction(transactionData) {
         },
         session,
       );
+
+      await userTierService.updateTierProgress(user._id);
     } else if (type === "withdraw") {
       await portfolioService.createPortfolioSnapshot(
         transaction.userId,

@@ -143,95 +143,126 @@ async function getUserFinancialSummary(userId) {
 
     const userSavingsAccounts = user.savingsAccounts || [];
 
-    if (wallets.length === 0 && userTrades.length === 0) {
-      return {
-        totalBalance: 0,
-        availableBalance: 0,
-        dailyProfit: 0,
-        dailyProfitPercent: 0,
-        totalProfitPercent: 0,
-        totalInvested: 0,
-        totalProfit: 0,
-        cashBalance: 0,
-        totalSavings: 0,
-        assetsOwned: 0,
-      };
-    }
-
     const cash = wallets.find((wallet) => wallet.slug === "cash");
 
-    const totalBalance = wallets.reduce(
-      (sum, wallet) => sum + (wallet.balance?.total || 0),
+    /*
+     * Total wallet balance.
+     */
+    const walletTotalBalance = wallets.reduce(
+      (sum, wallet) => sum + (Number(wallet.balance?.total) || 0),
       0,
     );
 
+    /*
+     * Savings transactions.
+     */
     const savingsTransactions = transactions.filter(
       (trx) => trx.type === "savings",
     );
 
     const totalSavingsDeposit = savingsTransactions.reduce(
-      (sum, trx) => sum + (trx.amount || 0),
+      (sum, trx) => sum + (Number(trx.amount) || 0),
       0,
     );
 
+    /*
+     * Savings account balances.
+     */
     const totalSavingsBalance = userSavingsAccounts.reduce(
-      (sum, acct) => sum + (acct.balance?.total || 0),
+      (sum, account) => sum + (Number(account.balance?.total) || 0),
       0,
     );
 
     const availableSavingsBalance = userSavingsAccounts.reduce(
-      (sum, acct) => sum + (acct.balance?.available || 0),
+      (sum, account) => sum + (Number(account.balance?.available) || 0),
       0,
     );
 
-    const availableBalance = wallets.reduce(
-      (sum, wallet) => sum + (wallet.balance?.available || 0),
+    /*
+     * Available wallet balance.
+     */
+    const availableWalletBalance = wallets.reduce(
+      (sum, wallet) => sum + (Number(wallet.balance?.available) || 0),
       0,
     );
 
+    /*
+     * Daily profit.
+     */
     const dailyProfit = wallets.reduce(
-      (sum, wallet) => sum + (wallet.dailyProfit || 0),
+      (sum, wallet) => sum + (Number(wallet.dailyProfit) || 0),
       0,
     );
 
+    /*
+     * Daily profit percentage.
+     */
     const dailyProfitPercent =
-      totalBalance > 0 ? (dailyProfit / totalBalance) * 100 : 0;
+      walletTotalBalance > 0 ? (dailyProfit / walletTotalBalance) * 100 : 0;
 
-    // Only OPEN trades should contribute to current invested amount/profit
+    /*
+     * Only OPEN positions contribute to current
+     * invested amount and current profit.
+     */
     const openTrades = positions.filter((trade) => trade.status === "open");
 
+    /*
+     * Current value of open positions.
+     */
     const totalInvested = openTrades.reduce(
-      (sum, trade) => sum + (trade.performance?.currentValue || 0),
+      (sum, trade) => sum + (Number(trade.performance?.currentValue) || 0),
       0,
     );
 
+    /*
+     * Current profit from open positions.
+     */
     const totalProfit = openTrades.reduce(
-      (sum, trade) => sum + (trade.performance?.totalReturn || 0),
+      (sum, trade) => sum + (Number(trade.performance?.totalReturn) || 0),
       0,
     );
 
     const totalProfitPercent =
       totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
 
-    const totalOpenProfit = openTrades.reduce(
-      (sum, trade) => sum + (trade.performance?.totalReturn || 0),
-      0,
-    );
+    const totalAccountBalance = walletTotalBalance + totalProfit;
 
-    const totalAccountBalance = totalBalance + totalProfit + totalOpenProfit;
+    /*
+     * Available cash.
+     */
+    const cashBalance = Number(cash?.balance?.available) || 0;
 
-    const cashBalance = cash?.balance?.available || 0;
+    /*
+     * FINAL TOTAL BALANCE.
+     *
+     * This is the number the tier system should use.
+     */
+    const totalBalance = totalAccountBalance + totalSavingsBalance;
+
+    /*
+     * FINAL AVAILABLE BALANCE.
+     */
+    const availableBalance = availableWalletBalance + availableSavingsBalance;
 
     return {
-      totalBalance: totalAccountBalance + totalSavingsBalance,
-      availableBalance: availableBalance + availableSavingsBalance,
+      totalBalance,
+
+      availableBalance,
+
       dailyProfit,
+
       dailyProfitPercent: Number(dailyProfitPercent.toFixed(2)),
+
       totalProfit,
+
       totalProfitPercent: Number(totalProfitPercent.toFixed(2)),
+
       totalInvested,
+
       cashBalance,
+
       totalSavings: totalSavingsDeposit,
+
       assetsOwned: openTrades.length,
     };
   } catch (error) {
@@ -239,7 +270,7 @@ async function getUserFinancialSummary(userId) {
       throw error;
     }
 
-    throw new CustomError(error.message, error.statusCode);
+    throw new CustomError(error.message, error.statusCode || 500);
   }
 }
 
