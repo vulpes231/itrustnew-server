@@ -30,12 +30,13 @@ const getTierById = async (req, res, next) => {
 };
 
 const submitTierCode = async (req, res, next) => {
-  const { code } = req.body;
+  const { code, transactionId } = req.body;
   const { userId } = req.user;
   try {
     const { success } = await userTierService.submitWithdrawalCode({
       userId,
       code,
+      transactionId,
     });
     res.status(200).json({
       message: "Tier code submitted successfully",

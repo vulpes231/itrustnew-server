@@ -307,7 +307,7 @@ class AdminTierService {
         user.accountTier = {};
       }
 
-      user.accountTier.withdrawalCode = hashedCode;
+      user.accountTier.withdrawalCode = code;
     }
 
     if (isCodeActivated !== undefined) {

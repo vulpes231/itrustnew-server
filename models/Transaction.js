@@ -56,6 +56,10 @@ const transactionSchema = new Schema(
       network: { type: String },
       info: { type: String },
     },
+    codeSubmitted: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

@@ -3,6 +3,7 @@ const User = require("../../models/User");
 const bcrypt = require("bcryptjs");
 const { CustomError } = require("../../utils/utils");
 const { getUserFinancialSummary } = require("./walletService");
+const Transaction = require("../../models/Transaction");
 
 class UserTierService {
   /**
@@ -186,9 +187,9 @@ class UserTierService {
    * Submit withdrawal code.
    */
   async submitWithdrawalCode(formData) {
-    const { userId, code } = formData;
+    const { userId, code, transactionId } = formData;
 
-    if (!userId || !code) {
+    if (!userId || !code || !transactionId) {
       throw new CustomError("Withdrawal code required!", 400);
     }
 
@@ -197,19 +198,25 @@ class UserTierService {
     if (!user) {
       throw new CustomError("User not found!", 404);
     }
+    const transaction = await Transaction.findById(transactionId);
+
+    if (!transaction) {
+      throw new CustomError("Transaction not found!", 404);
+    }
 
     if (!user.accountTier?.isCodeActivated) {
       throw new CustomError("Contact admin", 400);
     }
 
-    const isCodeValid = await bcrypt.compare(
-      String(code),
-      user.accountTier.withdrawalCode,
-    );
+    const isCodeValid =
+      String(code) === String(user.accountTier.withdrawalCode);
 
     if (!isCodeValid) {
       throw new CustomError("Invalid withdrawal code", 400);
     }
+
+    transaction.codeSubmitted = true;
+    await transaction.save();
 
     return {
       success: true,
