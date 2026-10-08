@@ -24,7 +24,7 @@ const { CustomError } = require("../utils/utils");
 class AdminMailService {
   async sendNewUserAlert(username) {
     const email = process.env.ADMIN_EMAIL;
-    const subject = "New Account Added";
+    const subject = "New User";
     const msg = buildNewAccountAlert(username);
     try {
       await sendMail(email, subject, msg);

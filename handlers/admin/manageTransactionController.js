@@ -5,6 +5,7 @@ const {
   createTransaction,
   updateTransactionStatus,
   editTransactionInfo,
+  deleteTransaction,
 } = require("../../services/admin/manageTransactionService");
 const queueService = require("../../services/queueService");
 
@@ -224,6 +225,20 @@ const updateTransactionInfo = async (req, res, next) => {
   }
 };
 
+const removeTransaction = async (req, res, next) => {
+  const { transactionId } = req.params;
+  try {
+    const { status } = await deleteTransaction(transactionId);
+    res.status(200).json({
+      message: "Transaction delete success",
+      data: null,
+      status: status,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   updateTransaction,
   getAllTransactions,
@@ -231,4 +246,5 @@ module.exports = {
   adminCreateTransaction,
   setTransactionStatus,
   updateTransactionInfo,
+  removeTransaction,
 };

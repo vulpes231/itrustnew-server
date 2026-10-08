@@ -520,6 +520,70 @@ async function editTransactionInfo(transactionData) {
   }
 }
 
+async function deleteTransaction(transactionId) {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const transaction =
+      await Transaction.findById(transactionId).session(session);
+
+    if (!transaction) {
+      throw new CustomError("Transaction not found!", 404);
+    }
+
+    const transactionAccount = await Wallet.findOne({
+      userId: transaction.userId,
+      slug: transaction.account,
+    }).session(session);
+
+    if (!transactionAccount) {
+      throw new CustomError("Transaction account not found!", 404);
+    }
+
+    const parsedAmount = Number(transaction.amount);
+
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+      throw new CustomError("Invalid transaction amount!", 400);
+    }
+
+    if (transaction.type === "deposit") {
+      if (transactionAccount.balance.available < parsedAmount) {
+        throw new CustomError(
+          "Insufficient funds to reverse this deposit!",
+          400,
+        );
+      }
+
+      transactionAccount.balance.total -= parsedAmount;
+      transactionAccount.balance.available -= parsedAmount;
+    } else if (
+      transaction.type === "withdraw" &&
+      ["pending", "in process"].includes(transaction.status)
+    ) {
+      transactionAccount.balance.total += parsedAmount;
+      transactionAccount.balance.available += parsedAmount;
+    }
+
+    await transactionAccount.save({ session });
+
+    await Transaction.deleteOne({ _id: transactionId }, { session });
+
+    await session.commitTransaction();
+
+    return { status: true };
+  } catch (error) {
+    await session.abortTransaction();
+
+    throw new CustomError(
+      error.message || "Unable to complete operation",
+      error.statusCode || 500,
+    );
+  } finally {
+    await session.endSession();
+  }
+}
+
 module.exports = {
   getTransactionInfo,
   editTransaction,
@@ -527,4 +591,5 @@ module.exports = {
   createTransaction,
   updateTransactionStatus,
   editTransactionInfo,
+  deleteTransaction,
 };
