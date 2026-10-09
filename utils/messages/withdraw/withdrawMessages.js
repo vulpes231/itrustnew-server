@@ -75,9 +75,9 @@ function buildWithdrawalEmail({ user, transaction }) {
           Thank you for choosing Itrust Investment.
         </p>
         <div>
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({
@@ -127,9 +127,9 @@ function buildWithdrawalApprovedEmail({ user, transaction }) {
           Thank you for investing with us.
         </p>
         <div>
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({
@@ -182,9 +182,9 @@ function buildWithdrawalDeclinedEmail({ user, transaction }) {
           We are here to help.
         </p>
         <div>
-            <p style="line-height: 1.1;">Best regards</p>
-            <p style="line-height: 1.1;">Itrust Investment Team</p>
-        </div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({

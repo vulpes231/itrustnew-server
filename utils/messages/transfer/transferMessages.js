@@ -42,8 +42,8 @@ function buildTransferEmail({ user, transaction }) {
           Thank you for choosing Itrust Investment.
         </p>
         <div>
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
+          <p style="margin: 0; padding: 0;">Best regards</p>
+          <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
         </div>
       `;
 

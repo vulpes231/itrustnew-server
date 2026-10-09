@@ -41,10 +41,10 @@ function buildBuyOrderEmail({ user, trade }) {
         ">
           Thank you for investing with Itrust.
         </p>
-        <div >
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({
@@ -92,10 +92,10 @@ function buildSellOrderEmail({ user, trade }) {
         ">
           Thank you for trading with Itrust.
         </p>
-        <div >
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({

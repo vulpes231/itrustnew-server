@@ -74,10 +74,10 @@ function buildIdentityVerifiedMsg(username) {
           ">
             Thank you for choosing Itrust!
           </p>
-          <div>
-              <p>Best regards</p>
-              <p>Itrust Investment Team</p>
-          </div>
+           <div>
+          <p style="margin: 0; padding: 0;">Best regards</p>
+          <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+        </div>
         `;
 
   return baseTemplate({
@@ -122,10 +122,10 @@ function buildIdentityDeclinedMsg(username) {
             Thank you for choosing Itrust!
           </p>
 
-          <div>
-              <p>Best regards</p>
-              <p>Itrust Investment Team</p>
-          </div>
+           <div>
+          <p style="margin: 0; padding: 0;">Best regards</p>
+          <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+        </div>
         `;
 
   return baseTemplate({

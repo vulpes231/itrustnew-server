@@ -418,10 +418,16 @@ class TradeService {
   }
 
   async editTrade(formData) {
-    const { tradeId, customDate } = formData;
+    const { tradeId, customDate, leverage } = formData;
     const trade = await Trade.findById(tradeId);
     if (!trade) throw new CustomError("Trade not found!", 404);
 
+    const parsedLeverage = Number(leverage);
+
+    if (parsedLeverage > 0) {
+      trade.execution.type = "leverage";
+      trade.execution.leverage = leverage;
+    }
     trade.customDate = customDate;
     await trade.save();
     return trade;

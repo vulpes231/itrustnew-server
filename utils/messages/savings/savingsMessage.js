@@ -51,10 +51,10 @@ function buildSavingsCreatedEmail({ user, account }) {
         ">
           Welcome to smarter retirement planning.
         </p>
-        <div >
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({
@@ -112,10 +112,10 @@ function buildContributionEmail({ user, transaction }) {
         ">
           Thank you for taking a step toward your financial future.
         </p>
-        <div >
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({
@@ -175,10 +175,10 @@ function buildCashoutReqEmail({ user, transaction }) {
         ">
           Thank you for taking a step toward your financial future.
         </p>
-        <div >
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({

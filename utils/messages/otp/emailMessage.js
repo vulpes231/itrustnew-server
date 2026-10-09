@@ -29,9 +29,9 @@ function buildEmailMsg(otp) {
            If you did not create an account, please disregard this email or contact us at <a href="mailto:support@itrustinvestment.com">support@itrustinvestment.com</a> for assistance.
         </p>
         <p>Welcome to a smarter way to invest.</p>
-        <div >
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
+        <div>
+          <p style="margin: 0; padding: 0;">Best regards</p>
+          <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
         </div>
     `;
 
@@ -82,10 +82,10 @@ function buildEmailChangeMsg(otp) {
       immediately.
     </p>
 
-    <p>
-      Best regards,<br />
-      <b>Itrust Investment Team</b>
-    </p>
+    <div>
+    <p style="margin: 0; padding: 0;">Best regards</p>
+    <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+  </div>
   `;
 
   return baseTemplate({
@@ -122,10 +122,10 @@ function buildTwoFaMsg(otp) {
             This code expires in 10 minutes.
             If this wasn't you, please secure your account immediately.
         </p>
-        <div >
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
     `;
 
   return baseTemplate({

@@ -67,10 +67,10 @@ function buildDepositEmail({ user, transaction, settings }) {
             support@itrustinvestment.com
           </a>
         </p>
-        <div >
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
-        </div>
+        <div>
+        <p style="margin: 0; padding: 0;">Best regards</p>
+        <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
+      </div>
       `;
 
   return baseTemplate({
@@ -110,9 +110,10 @@ function buildDepositApprovedEmail({ user, transaction }) {
           You can now view the updated balance in your account dashboard.
         </p>
         <div>
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
+          <p style="margin: 0; padding: 0;">Best regards</p>
+          <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
         </div>
+    
       `;
 
   return baseTemplate({
@@ -164,8 +165,8 @@ function buildDepositDeclinedEmail({ user, transaction }) {
           We are here to assist you every step of the way.
         </p>
         <div>
-            <p>Best regards</p>
-            <p>Itrust Investment Team</p>
+          <p style="margin: 0; padding: 0;">Best regards</p>
+          <p style="margin: 0; padding: 0;">Itrust Investment Team</p>
         </div>
       `;
 
