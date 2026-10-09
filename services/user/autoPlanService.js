@@ -59,6 +59,9 @@ async function activatePlan(formData) {
     if (wallet.balance.available < parsedAmt)
       throw new CustomError("Insufficient funds!", 400);
 
+    wallet.balance.available -= parsedAmt;
+    await wallet.save();
+
     const startDate = Date.now();
 
     const durationMs = getDurationInMs(
@@ -99,7 +102,7 @@ async function activatePlan(formData) {
     };
 
     const planExists = user.activePlans.find(
-      (p) => p.planId.toString() === planId.toString(),
+      (p) => p.planId.toString() === planId.toString() && p.status === "active",
     );
 
     if (planExists) throw new CustomError("Plan already exists!", 409);

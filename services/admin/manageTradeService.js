@@ -47,6 +47,7 @@ class TradeService {
     try {
       const parsedAmt = parseFloat(amount);
       const parsedLeverage = leverage ? parseFloat(leverage) : 1;
+      const parsedExtra = extra ? parseFloat(extra) : 0;
 
       const user = await User.findById(userId).session(session);
       if (!user) throw new CustomError("Invalid request!", 404);
@@ -60,6 +61,7 @@ class TradeService {
       let marginAmount = parsedAmt;
       let positionAmount = parsedAmt;
       let leverageMultiplier = 1;
+      let positionExtra = parsedExtra;
 
       if (executionType === "leverage" && parsedLeverage > 1) {
         if (parsedLeverage > 10 || parsedLeverage < 1) {
@@ -70,6 +72,7 @@ class TradeService {
         }
         leverageMultiplier = parsedLeverage;
         positionAmount = parsedAmt * leverageMultiplier;
+        positionExtra = parsedExtra * leverageMultiplier;
         marginAmount = parsedAmt;
       }
 
@@ -84,11 +87,9 @@ class TradeService {
 
       if (wallet.slug === "auto" && planId) {
         plan = user.activePlans.find(
-          (plan) => plan.planId.toString() === planId,
+          (plan) =>
+            plan.planId.toString() === planId && plan.status === "active",
         );
-
-        console.log(plan.balance.available, "plan balance");
-        console.log(marginAmount, "amount");
 
         if (plan.balance.available < marginAmount) {
           throw new CustomError("Plan balance not sufficient!", 400);
@@ -140,16 +141,16 @@ class TradeService {
         performance: {
           currentValue: positionAmount,
           currentPrice: currentPrice,
-          totalReturn: extra || 0,
+          totalReturn: positionExtra || 0,
           totalReturnPercent: positionAmount
-            ? ((extra || 0) / positionAmount) * 100
+            ? ((positionExtra || 0) / positionAmount) * 100
             : 0,
-          todayReturn: extra || 0,
+          todayReturn: positionExtra || 0,
           todayReturnPercent: positionAmount
-            ? ((extra || 0) / positionAmount) * 100
+            ? ((positionExtra || 0) / positionAmount) * 100
             : 0,
         },
-        extra: extra || 0,
+        extra: positionExtra || 0,
         status: "open",
         fullname: user.fullName,
       };
@@ -172,7 +173,7 @@ class TradeService {
         planId: trade.planId,
         fullname: trade.fullname,
         assetType: trade.assetType,
-        extra: extra,
+        extra: trade.extra,
       };
 
       const position = await positionService.updatePosition(
@@ -419,18 +420,80 @@ class TradeService {
 
   async editTrade(formData) {
     const { tradeId, customDate, leverage } = formData;
-    const trade = await Trade.findById(tradeId);
-    if (!trade) throw new CustomError("Trade not found!", 404);
 
-    const parsedLeverage = Number(leverage);
+    const session = await mongoose.startSession();
 
-    if (parsedLeverage > 0) {
-      trade.execution.type = "leverage";
-      trade.execution.leverage = leverage;
+    try {
+      let updatedTrade;
+
+      await session.withTransaction(async () => {
+        const trade = await Trade.findById(tradeId).session(session);
+
+        if (!trade) {
+          throw new CustomError("Trade not found!", 404);
+        }
+
+        const newLeverage = Number(leverage);
+        const oldLeverage = Number(trade.execution.leverage) || 1;
+
+        if (!Number.isFinite(newLeverage) || newLeverage <= 0) {
+          throw new CustomError("Invalid leverage amount!", 400);
+        }
+
+        if (newLeverage > 10) {
+          throw new CustomError("Leverage cannot exceed 10x!", 400);
+        }
+
+        const ratio = newLeverage / oldLeverage;
+
+        // Update leverage settings
+        trade.execution.type = "leverage";
+        trade.execution.leverage = newLeverage;
+
+        // Update leveraged position exposure
+        trade.execution.positionAmount *= ratio;
+
+        // Scale performance values affected by leverage
+        const performanceFields = [
+          "currentValue",
+          "totalReturn",
+          "totalReturnPercent",
+          "todayExtra",
+          "todayReturn",
+          "todayReturnPercent",
+        ];
+
+        for (const field of performanceFields) {
+          const value = trade.performance?.[field];
+
+          if (Number.isFinite(value)) {
+            trade.performance[field] = value * ratio;
+          }
+        }
+
+        // Keep the trade's extra field consistent
+        trade.extra = (Number(trade.extra) || 0) * ratio;
+
+        // Update the date if supplied
+        if (customDate) {
+          trade.customDate = customDate;
+        }
+
+        await trade.save({ session });
+
+        updatedTrade = trade;
+      });
+
+      return updatedTrade;
+    } catch (error) {
+      if (error instanceof CustomError) {
+        throw error;
+      }
+
+      throw new CustomError(error.message, 500);
+    } finally {
+      await session.endSession();
     }
-    trade.customDate = customDate;
-    await trade.save();
-    return trade;
   }
 
   async deleteTradeOrder(tradeId) {

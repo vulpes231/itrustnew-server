@@ -272,6 +272,19 @@ async function editUserPlan(form) {
 
       const now = new Date();
 
+      // const now = new Date();
+
+      // console.log({
+      //   submittedEnd: end,
+      //   savedEnd: userPlan.end,
+      //   now,
+      //   endTimestamp: userPlan.end?.getTime(),
+      //   nowTimestamp: now.getTime(),
+      //   status: userPlan.status,
+      //   shouldClose:
+      //     userPlan.status !== "closed" && !!userPlan.end && userPlan.end <= now,
+      // });
+
       if (userPlan.status !== "closed" && userPlan.end && userPlan.end <= now) {
         const autoAccount = await Wallet.findOne({
           userId: user._id,
@@ -293,10 +306,11 @@ async function editUserPlan(form) {
           0,
         );
 
+        const initialDeposit = userPlan.balance.total;
+
         userPlan.balance.available += totalReturn;
         userPlan.balance.total += totalReturn;
 
-        // Close all trades
         await Trade.updateMany(
           {
             userId: user._id,
@@ -311,11 +325,8 @@ async function editUserPlan(form) {
           { session },
         );
 
-        // Return the plan balance to the auto wallet
         autoAccount.balance.available += userPlan.balance.total;
-        // autoAccount.balance.total += userPlan.balance.total;
 
-        // Reset the plan
         userPlan.balance.available = 0;
         userPlan.balance.total = 0;
         userPlan.status = "closed";
