@@ -18,7 +18,7 @@ class ManageWalletService {
       throw new CustomError("Incomplete data!", 400);
     }
 
-    if (!["add", "subtract"].includes(action)) {
+    if (!["add", "subtract", "set"].includes(action)) {
       throw new CustomError("Invalid action!", 400);
     }
 
@@ -42,6 +42,9 @@ class ManageWalletService {
       if (action === "add") {
         walletToUpdate.balance.total += amt;
         walletToUpdate.balance.available += amt;
+      } else if (action === "set") {
+        walletToUpdate.balance.total = amt;
+        walletToUpdate.balance.available = amt;
       } else {
         if (walletToUpdate.balance.available < amt) {
           throw new CustomError("Insufficient available balance!", 400);
