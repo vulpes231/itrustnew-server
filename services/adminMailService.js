@@ -1,5 +1,6 @@
 require("dotenv").config();
 const { sendMail } = require("../utils/mailer");
+const { buildAutoPlanMsg } = require("../utils/messages/admin/autoPlanMessage");
 const {
   buildNewAccountAlert,
 } = require("../utils/messages/admin/newAccountAlert");
@@ -110,6 +111,20 @@ class AdminMailService {
     const email = process.env.ADMIN_EMAIL;
     const subject = "Proof Of Address Document Submission";
     const msg = buildNewAddressDocAlert(username);
+    try {
+      await sendMail(email, subject, msg);
+    } catch (error) {
+      if (error instanceof CustomError) {
+        throw error;
+      }
+      throw new CustomError(error.message, 500);
+    }
+  }
+
+  async sendAutoPlanAlert(username, planName) {
+    const email = process.env.ADMIN_EMAIL;
+    const subject = "New Auto Plan Started";
+    const msg = buildAutoPlanMsg(username, planName);
     try {
       await sendMail(email, subject, msg);
     } catch (error) {

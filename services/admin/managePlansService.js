@@ -224,10 +224,23 @@ async function getAllUserPlans() {
       {},
       {
         activePlans: 1,
+        personalInfo: 1,
+        contactInfo: 1,
       },
     ).lean();
 
-    const plans = users.flatMap((user) => user.activePlans || []);
+    const plans = users.flatMap((user) =>
+      (user.activePlans || []).map((plan) => ({
+        ...plan,
+        userData: {
+          fullName: `${user.personalInfo?.firstName || ""}-${
+            user.personalInfo?.lastName || ""
+          }`,
+          username: user.personalInfo?.username,
+          email: user.contactInfo?.email,
+        },
+      })),
+    );
 
     if (plans.length === 0) {
       throw new CustomError("Cannot find plans!", 404);

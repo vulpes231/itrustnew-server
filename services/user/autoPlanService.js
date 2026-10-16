@@ -113,7 +113,12 @@ async function activatePlan(formData) {
     await session.commitTransaction();
     session.endSession();
 
-    return plan;
+    return {
+      planName: plan.name,
+      success: true,
+      username: user.personalInfo.username,
+      email: user.contactInfo.email,
+    };
   } catch (error) {
     await session.abortTransaction();
     session.endSession();

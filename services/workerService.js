@@ -195,6 +195,13 @@ class EmailWorkerService {
           );
           break;
 
+        case "AUTO_PLAN_EMAIL":
+          await adminMailService.sendAutoPlanAlert(
+            emailData.templateData.username,
+            emailData.templateData.planName,
+          );
+          break;
+
         case "WELCOME_EMAIL":
           await Promise.all([
             await emailService.sendWelcomeMessage(

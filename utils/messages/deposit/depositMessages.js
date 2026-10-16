@@ -1,26 +1,28 @@
 const { capitalize } = require("lodash");
 const { baseTemplate, BRAND_COLOR } = require("../../messages");
+const WalletSetting = require("../../../models/Walletsetting");
 
-const getCryptoAddress = (method, settings) => {
-  const coinSelected = method.mode;
-  const network = method.network;
+const getCryptoAddress = async (method, settings) => {
+  const coinSelected = method.mode?.toLowerCase();
+  const network = method.network?.toLowerCase();
 
-  let address;
+  const globalSettings = await WalletSetting.findOne({ name: "global" });
 
-  address =
-    coinSelected === "usdt" && network === "trc20"
-      ? settings.cryptoWallets["usdtTrc"]
-      : settings.cryptoWallets["usdtErc"];
+  const userWallets = settings?.cryptoWallets || {};
+  const globalWallets = globalSettings?.cryptoWallets || {};
 
-  return coinSelected === "usdt"
-    ? address
-    : settings.cryptoWallets[coinSelected];
+  if (coinSelected === "usdt") {
+    const walletKey = network === "trc20" ? "usdtTrc" : "usdtErc";
+
+    return userWallets[walletKey] || globalWallets[walletKey];
+  }
+
+  return userWallets[coinSelected] || globalWallets[coinSelected];
 };
 
 function buildDepositEmail({ user, transaction, settings }) {
   const paymentDetails = `
             <p>  ${getCryptoAddress(transaction.method.mode, settings) || "-"}</p>
-          
           `;
 
   const content = `
