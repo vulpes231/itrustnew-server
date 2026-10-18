@@ -38,93 +38,123 @@ async function fetchPlanById(planId) {
 
 async function activatePlan(formData) {
   const { planId, userId, amount } = formData;
-  if (!planId || !userId || !amount) throw new CustomError("Bad request!", 400);
+
+  if (!planId || !userId || amount === undefined || amount === null) {
+    throw new CustomError("Bad request!", 400);
+  }
+
+  const parsedAmt = Number(amount);
+
+  if (!Number.isFinite(parsedAmt) || parsedAmt <= 0) {
+    throw new CustomError("Invalid investment amount!", 400);
+  }
 
   const session = await mongoose.startSession();
-  session.startTransaction();
+  let result;
 
   try {
-    const plan = await Autoplan.findById(planId).session(session);
-    if (!plan) throw new CustomError("Plan not found!", 404);
+    await session.withTransaction(async () => {
+      const plan = await Autoplan.findById(planId).session(session);
 
-    const user = await User.findById(userId).session(session);
-    if (!user) throw new CustomError("User not found!", 404);
+      if (!plan) {
+        throw new CustomError("Plan not found!", 404);
+      }
 
-    const wallet = await Wallet.findOne({ userId, slug: "auto" }).session(
-      session,
-    );
-    if (!wallet) throw new CustomError("Wallet not found!", 404);
+      const user = await User.findById(userId).session(session);
 
-    const parsedAmt = parseFloat(amount);
-    if (wallet.balance.available < parsedAmt)
-      throw new CustomError("Insufficient funds!", 400);
+      if (!user) {
+        throw new CustomError("User not found!", 404);
+      }
 
-    wallet.balance.available -= parsedAmt;
-    await wallet.save();
+      const planExists = user.activePlans.some(
+        (p) =>
+          p.planId?.toString() === planId.toString() && p.status === "active",
+      );
 
-    const startDate = Date.now();
+      if (planExists) {
+        throw new CustomError("Plan already exists!", 409);
+      }
 
-    const durationMs = getDurationInMs(
-      plan.expiresIn.milestone,
-      plan.expiresIn.duration,
-    );
+      const wallet = await Wallet.findOne({
+        userId,
+        slug: "auto",
+      }).session(session);
 
-    const endDate = startDate + durationMs;
+      if (!wallet) {
+        throw new CustomError("Wallet not found!", 404);
+      }
 
-    const newPlanData = {
-      name: plan.name,
-      title: plan.title,
-      status: "active",
-      aum: plan.performance.aum,
-      min: plan.minInvestment,
-      image: plan.img,
-      duration: `${plan.expiresIn.milestone} ${plan.expiresIn.duration}`,
-      start: Date.now(),
-      end: endDate,
-      planId: plan._id,
-      type: plan.planType,
-      analytics: {
-        dailyReturn: plan.performance.dailyReturnPercent,
-        expectedReturn: plan.performance.expectedReturnPercent,
-        winRate: plan.performance.winRate,
-      },
-      balance: {
-        total: amount,
-        available: amount,
-      },
-      performance: {
-        totalReturn: 0,
-        totalReturnPercent: 0,
-        dailyReturn: 0,
-        dailyreturnPercent: 0,
-      },
-      risk: plan.planType,
-    };
+      if (wallet.balance.available < parsedAmt) {
+        throw new CustomError("Insufficient funds!", 400);
+      }
 
-    const planExists = user.activePlans.find(
-      (p) => p.planId.toString() === planId.toString() && p.status === "active",
-    );
+      const startDate = Date.now();
 
-    if (planExists) throw new CustomError("Plan already exists!", 409);
+      const durationMs = getDurationInMs(
+        plan.expiresIn.milestone,
+        plan.expiresIn.duration,
+      );
 
-    user.activePlans.push(newPlanData);
-    await user.save({ session });
+      const endDate = startDate + durationMs;
 
-    await session.commitTransaction();
-    session.endSession();
+      const newPlanData = {
+        name: plan.name,
+        title: plan.title,
+        status: "active",
+        aum: plan.performance.aum,
+        min: plan.minInvestment,
+        image: plan.img,
+        duration: `${plan.expiresIn.milestone} ${plan.expiresIn.duration}`,
+        start: startDate,
+        end: endDate,
+        planId: plan._id,
+        type: plan.planType,
+        analytics: {
+          dailyReturn: plan.performance.dailyReturnPercent,
+          expectedReturn: plan.performance.expectedReturnPercent,
+          winRate: plan.performance.winRate,
+        },
+        balance: {
+          total: parsedAmt,
+          available: parsedAmt,
+        },
+        performance: {
+          totalReturn: 0,
+          totalReturnPercent: 0,
+          dailyReturn: 0,
+          dailyreturnPercent: 0,
+        },
+        risk: plan.planType,
+      };
 
-    return {
-      planName: plan.name,
-      success: true,
-      username: user.personalInfo.username,
-      email: user.contactInfo.email,
-    };
+      // Every database write must use the same session.
+      wallet.balance.available -= parsedAmt;
+      await wallet.save({ session });
+
+      user.activePlans.push(newPlanData);
+      await user.save({ session });
+
+      result = {
+        planName: plan.name,
+        success: true,
+        username: user.personalInfo.username,
+        email: user.contactInfo.email,
+      };
+    });
+
+    // withTransaction resolves after a successful commit.
+    return result;
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
+    if (error instanceof CustomError) {
+      throw error;
+    }
 
-    if (error instanceof CustomError) throw error;
-    throw new CustomError(error.message, error.statusCode || 500);
+    throw new CustomError(
+      error.message || "Failed to activate plan",
+      error.statusCode || 500,
+    );
+  } finally {
+    await session.endSession();
   }
 }
 

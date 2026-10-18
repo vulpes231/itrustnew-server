@@ -1,3 +1,4 @@
+const queueService = require("../../services/queueService");
 const {
   fetchPlanById,
   fetchPlans,
@@ -35,28 +36,32 @@ const getAutoTotalInvested = async (req, res, next) => {
 };
 
 const startPlan = async (req, res, next) => {
-  const userId = req.user.userId;
   try {
-    const { success, planName, username, email } = await activatePlan({
+    const result = await activatePlan({
       ...req.body,
-      userId,
+      userId: req.user.userId,
     });
 
-    if (success && username) {
-      await queueService.sendToQueue("email_queue", {
-        type: "AUTO_PLAN_EMAIL",
-        to: email,
-        templateData: {
-          planName: planName,
-          username: username,
-        },
-      });
-    }
     res.status(200).json({
-      message: `plan started successfully`,
-      success: success,
+      message: "Plan started successfully",
+      success: true,
       data: null,
     });
+
+    if (result.email && result.username) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "AUTO_PLAN_EMAIL",
+          to: result.email,
+          templateData: {
+            planName: result.planName,
+            username: result.username,
+          },
+        })
+        .catch((error) => {
+          console.error("Plan activation email enqueue failed:", error);
+        });
+    }
   } catch (error) {
     next(error);
   }

@@ -8,6 +8,14 @@ const getCryptoAddress = async (method, settings) => {
 
   const globalSettings = await WalletSetting.findOne({ name: "global" });
 
+  //   cryptoWallets?: {
+  //     note: string;
+  //     btc?: string | null | undefined;
+  //     eth?: string | null | undefined;
+  //     usdtTrc?: string | null | undefined;
+  //     usdtErc?: string | null | undefined;
+  // } | null | undefined;
+
   const userWallets = settings?.cryptoWallets || {};
   const globalWallets = globalSettings?.cryptoWallets || {};
 
@@ -46,14 +54,7 @@ function buildDepositEmail({ user, transaction, settings }) {
     
       
     
-        <h3 style="
-          color: #222;
-          margin-bottom: 15px;
-        ">
-          ${transaction?.method?.mode === "bank" ? "" : "Payment Address"}
-        </h3>
-    
-        ${paymentDetails}
+      
     
       
     
@@ -182,3 +183,12 @@ module.exports = {
   buildDepositApprovedEmail,
   buildDepositDeclinedEmail,
 };
+
+// <h3 style="
+// color: #222;
+// margin-bottom: 15px;
+// ">
+// ${transaction?.method?.mode === "bank" ? "" : "Payment Address"}
+// </h3>
+
+// ${paymentDetails}

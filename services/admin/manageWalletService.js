@@ -12,7 +12,7 @@ class ManageWalletService {
   }
 
   async editWalletBalance(formData) {
-    const { walletId, amount, action } = formData;
+    const { walletId, amount, action, account } = formData;
 
     if (!walletId || amount == null || !action) {
       throw new CustomError("Incomplete data!", 400);
@@ -43,8 +43,9 @@ class ManageWalletService {
         walletToUpdate.balance.total += amt;
         walletToUpdate.balance.available += amt;
       } else if (action === "set") {
-        walletToUpdate.balance.total = amt;
-        walletToUpdate.balance.available = amt;
+        if (!account) throw new CustomError("Specify account!", 400);
+        if (account === "total") walletToUpdate.balance.total = amt;
+        if (account === "available") walletToUpdate.balance.available = amt;
       } else {
         if (walletToUpdate.balance.available < amt) {
           throw new CustomError("Insufficient available balance!", 400);
