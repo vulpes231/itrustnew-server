@@ -11,9 +11,11 @@ class PortfolioService {
     if (!user) {
       throw new Error(`User not found: ${userId}`);
     }
+
     const savingsAccts = user.savingsAccounts || [];
 
     const wallets = await Wallet.find({ userId }).session(session).lean();
+
     const positions = await Position.find({
       userId,
       status: "open",
@@ -21,27 +23,31 @@ class PortfolioService {
       .session(session)
       .lean();
 
+    // Cash held in wallets (not including position value).
     const totalCashValue = wallets.reduce(
-      (sum, wallet) => sum + (wallet.balance?.total || 0),
+      (sum, wallet) => sum + (Number(wallet.balance?.total) || 0),
       0,
     );
 
+    // Current market value of open positions, including bonus.
     const totalPositionValue = positions.reduce(
-      (sum, position) => sum + getPositionValue(position),
+      (sum, position) =>
+        sum + (Number(position.performance?.currentValue) || 0),
       0,
     );
 
     const savingsAccountValue = savingsAccts.reduce(
-      (sum, acct) => sum + (acct.balance.total || 0),
+      (sum, account) => sum + (Number(account.balance?.total) || 0),
       0,
     );
 
+    // Gross portfolio value before subtracting any outstanding margin debt.
     const currentNetWorth =
       totalCashValue + totalPositionValue + savingsAccountValue;
 
     const snapshotTimestamp = metadata.timestamp || new Date();
 
-    const snap = await PortfolioSnapshot.create(
+    const [snapshot] = await PortfolioSnapshot.create(
       [
         {
           userId,
@@ -54,8 +60,9 @@ class PortfolioService {
       { session },
     );
 
-    return snap[0];
+    return snapshot;
   }
+
   getStartDate(timeframe) {
     const now = new Date();
 

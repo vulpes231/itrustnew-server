@@ -2,7 +2,10 @@ const Position = require("../../models/Position");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
 const WalletSnapshot = require("../../models/WalletSnapshot");
-const { getPositionValue } = require("../../utils/utils");
+const {
+  getPositionValue,
+  getPositionUnrealizedPnL,
+} = require("../../utils/utils");
 const { fetchPortfolioAccounts } = require("./walletService");
 
 class WalletSnapshotService {
@@ -40,27 +43,30 @@ class WalletSnapshotService {
       .session(session)
       .lean();
 
-    const cashValue = wallet.balance?.total || 0;
-
-    console.log(wallet, "WalletSnapshot");
+    const cashValue = Number(wallet.balance?.total) || 0;
 
     const positionValue = positions.reduce(
       (sum, position) => sum + getPositionValue(position),
       0,
     );
-    console.log(positionValue, "WalletSnapshot");
 
     const totalInvested = positions.reduce(
-      (sum, position) => sum + (position.amountInvested || 0),
+      (sum, position) => sum + (Number(position.amountInvested) || 0),
       0,
     );
 
     const unrealizedPnL = positions.reduce(
-      (sum, position) => sum + (position.performance?.totalReturn || 0),
+      (sum, position) => sum + getPositionUnrealizedPnL(position),
       0,
     );
 
-    const totalValue = cashValue + positionValue;
+    const marginDebt = positions.reduce(
+      (sum, position) => sum + (Number(position.marginDebt) || 0),
+      0,
+    );
+
+    const totalValue = cashValue + positionValue; //-marginDebt;
+
     const finalUserId = wallet.userId || userId;
     if (!finalUserId) {
       throw new Error(`Could not determine userId for wallet ${walletId}`);

@@ -15,6 +15,33 @@ const lastRunTimestamps = new Map();
 const enableCrons =
   process.env.NODE_ENV === "production" || process.env.ENABLE_CRONS === "1";
 
+const runningJobs = new Set();
+
+async function runWithLock(jobName, task) {
+  if (runningJobs.has(jobName)) {
+    console.warn(
+      `[CRON] Skipping ${jobName}: previous execution is still running`,
+    );
+    return;
+  }
+
+  runningJobs.add(jobName);
+
+  const startedAt = Date.now();
+
+  try {
+    console.log(`[CRON] ${jobName} started`);
+
+    await task();
+
+    console.log(`[CRON] ${jobName} completed in ${Date.now() - startedAt}ms`);
+  } catch (error) {
+    console.error(`[CRON] ${jobName} failed:`, error);
+  } finally {
+    runningJobs.delete(jobName);
+  }
+}
+
 function initCronJobs() {
   if (!enableCrons) {
     console.log(
@@ -116,62 +143,18 @@ function initCronJobs() {
 
   const tradeJob = cron.schedule(
     schedules.tradePerformance,
-    async () => {
-      const now = Date.now();
-      const lastRun = lastRunTimestamps.get("tradePerformance") || 0;
-
-      if (now - lastRun < 55 * 60 * 1000) {
-        console.log(
-          "Skipping trade performance update - previous execution still recent",
-        );
-        return;
-      }
-
-      lastRunTimestamps.set("tradePerformance", now);
-      try {
-        console.log(
-          `Starting trade performance update at ${new Date().toISOString()}`,
-        );
-        await updateTradePerformance();
-        console.log(
-          `Trade performance update completed at ${new Date().toISOString()}`,
-        );
-      } catch (error) {
-        console.error("Trade performance update failed:", error);
-      }
-    },
+    () => runWithLock("tradePerformance", updateTradePerformance),
     { scheduled: enableCrons },
   );
+
   activeJobs.add(tradeJob);
 
   const positionJob = cron.schedule(
     schedules.positionPerformance,
-    async () => {
-      const now = Date.now();
-      const lastRun = lastRunTimestamps.get("positionPerformance") || 0;
-
-      if (now - lastRun < 8 * 60 * 1000) {
-        console.log(
-          "Skipping position performance update - previous execution still recent",
-        );
-        return;
-      }
-
-      lastRunTimestamps.set("positionPerformance", now);
-      try {
-        console.log(
-          `Starting position performance update at ${new Date().toISOString()}`,
-        );
-        await updatePositionsPerformance();
-        console.log(
-          `Position performance update completed at ${new Date().toISOString()}`,
-        );
-      } catch (error) {
-        console.error("Position performance update failed:", error);
-      }
-    },
+    () => runWithLock("positionPerformance", updatePositionsPerformance),
     { scheduled: enableCrons },
   );
+
   activeJobs.add(positionJob);
 
   console.log(

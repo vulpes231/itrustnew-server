@@ -8,43 +8,52 @@ const tradeSchema = new Schema(
       ref: "User",
       required: true,
     },
+
     asset: {
       assetId: { type: Schema.Types.ObjectId, ref: "Asset" },
-      name: { type: String },
-      symbol: { type: String },
-      img: { type: String },
+      name: String,
+      symbol: String,
+      img: String,
     },
+
     legacyId: {
       type: String,
       index: true,
       unique: true,
       sparse: true,
     },
+
     planId: {
       type: Schema.Types.ObjectId,
       ref: "Autoplan",
       default: null,
     },
-    customDate: { type: Date },
+
+    customDate: Date,
+
     assetType: {
       type: String,
       enum: ["stock", "crypto", "etf"],
       required: true,
     },
+
     orderType: {
       type: String,
       enum: ["buy", "sell"],
       required: true,
     },
+
     wallet: {
       id: { type: Schema.Types.ObjectId, ref: "Wallet" },
-      name: { type: String },
-      slug: { type: String },
+      name: String,
+      slug: String,
     },
+
     plan: {
       id: { type: Schema.Types.ObjectId, ref: "Autoplan" },
-      name: { type: String },
+      name: String,
     },
+
     execution: {
       price: { type: Number, required: true },
       quantity: { type: Number, required: true },
@@ -53,40 +62,51 @@ const tradeSchema = new Schema(
       interval: { type: String, default: null },
       type: { type: String, default: null },
       positionAmount: { type: Number, default: null },
+      marginDebt: { type: Number, default: 0 },
+      positionCost: { type: Number, default: null },
     },
+
     targets: {
       takeProfit: { type: Number, default: null },
       stopLoss: { type: Number, default: null },
       entryPoint: { type: Number, default: null },
       exitPoint: { type: Number, default: null },
     },
+
     performance: {
-      currentValue: { type: Number },
-      totalReturn: { type: Number },
-      totalReturnPercent: { type: Number },
+      currentBaseValue: { type: Number, default: 0 },
 
-      todayMarketReturn: { type: Number },
-      todayExtra: { type: Number },
+      currentValue: { type: Number, default: 0 },
 
-      todayReturn: { type: Number },
-      todayReturnPercent: { type: Number },
+      totalReturn: { type: Number, default: 0 },
+      totalReturnPercent: { type: Number, default: 0 },
 
-      todayStartValue: { type: Number },
-      todayStartDate: { type: Date },
+      todayMarketReturn: { type: Number, default: 0 },
+      todayExtra: { type: Number, default: 0 },
+
+      todayReturn: { type: Number, default: 0 },
+      todayReturnPercent: { type: Number, default: 0 },
+
+      todayStartValue: { type: Number, default: 0 },
+      todayStartDate: { type: Date, default: null },
     },
+
     status: {
       type: String,
       enum: ["open", "closed"],
       default: "open",
     },
+
     extra: {
       type: Number,
       default: 0,
     },
+
     fullname: {
       type: String,
       required: true,
     },
+
     partialCloses: {
       type: [
         {
@@ -108,7 +128,11 @@ const tradeSchema = new Schema(
   },
 );
 
-tradeSchema.index({ userId: 1, status: 1, createdAt: -1, assetId: 1 });
+tradeSchema.index({
+  userId: 1,
+  status: 1,
+  createdAt: -1,
+  "asset.assetId": 1,
+});
 
-const Trade = mongoose.model("Trade", tradeSchema);
-module.exports = Trade;
+module.exports = mongoose.model("Trade", tradeSchema);

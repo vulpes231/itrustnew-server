@@ -3,7 +3,12 @@ const Trade = require("../../models/Trade");
 const Transaction = require("../../models/Transaction");
 const User = require("../../models/User");
 const Wallet = require("../../models/Wallet");
-const { CustomError, getPositionValue } = require("../../utils/utils");
+const {
+  CustomError,
+  getPositionValue,
+
+  getPositionUnrealizedPnL,
+} = require("../../utils/utils");
 
 async function fetchUserWallets(userId) {
   try {
@@ -145,17 +150,11 @@ async function getUserFinancialSummary(userId) {
 
     const cash = wallets.find((wallet) => wallet.slug === "cash");
 
-    /*
-     * Total wallet balance.
-     */
     const walletTotalBalance = wallets.reduce(
       (sum, wallet) => sum + (Number(wallet.balance?.total) || 0),
       0,
     );
 
-    /*
-     * Savings transactions.
-     */
     const savingsTransactions = transactions.filter(
       (trx) => trx.type === "savings",
     );
@@ -165,9 +164,6 @@ async function getUserFinancialSummary(userId) {
       0,
     );
 
-    /*
-     * Savings account balances.
-     */
     const totalSavingsBalance = userSavingsAccounts.reduce(
       (sum, account) => sum + (Number(account.balance?.total) || 0),
       0,
@@ -178,45 +174,26 @@ async function getUserFinancialSummary(userId) {
       0,
     );
 
-    /*
-     * Available wallet balance.
-     */
     const availableWalletBalance = wallets.reduce(
       (sum, wallet) => sum + (Number(wallet.balance?.available) || 0),
       0,
     );
 
-    /*
-     * Daily profit.
-     */
     const dailyProfit = wallets.reduce(
       (sum, wallet) => sum + (Number(wallet.dailyProfit) || 0),
       0,
     );
 
-    /*
-     * Daily profit percentage.
-     */
     const dailyProfitPercent =
       walletTotalBalance > 0 ? (dailyProfit / walletTotalBalance) * 100 : 0;
 
-    /*
-     * Only OPEN positions contribute to current
-     * invested amount and current profit.
-     */
     const openTrades = positions.filter((trade) => trade.status === "open");
 
-    /*
-     * Current value of open positions.
-     */
     const totalInvested = openTrades.reduce(
       (sum, trade) => sum + (Number(trade.performance?.currentValue) || 0),
       0,
     );
 
-    /*
-     * Current profit from open positions.
-     */
     const totalProfit = openTrades.reduce(
       (sum, trade) => sum + (Number(trade.performance?.totalReturn) || 0),
       0,
@@ -371,12 +348,12 @@ async function calculateNetworth(userId) {
     const openTrades = positions.filter((trade) => trade.status === "open");
 
     const totalPositionValue = openTrades.reduce(
-      (sum, position) => sum + getPositionValue(position),
+      (sum, position) => sum + getPositionUnrealizedPnL(position),
       0,
     );
 
     const totalNetWorth =
-      totalSavingsBalance + totalPositionValue + totalBalance;
+      totalSavingsBalance + totalBalance + totalPositionValue;
 
     return totalNetWorth;
   } catch (error) {

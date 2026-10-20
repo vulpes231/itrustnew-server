@@ -324,6 +324,8 @@ const userSchema = new Schema(
   { timestamps: true },
 );
 
+userSchema.index({ createdAt: -1 });
+
 userSchema.virtual("fullName").get(function () {
   return `${this.personalInfo.firstName} ${this.personalInfo.lastName}`;
 });

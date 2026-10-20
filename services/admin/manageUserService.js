@@ -13,8 +13,49 @@ const Portfolio = require("../../models/Portfolio");
 
 const fs = require("fs").promises;
 
-async function fetchAllUsers(queryData) {
+async function diagnoseUserQuery() {
+  const db = mongoose.connection.db;
+
+  console.time("A: MongoDB ping");
+  await db.command({ ping: 1 });
+  console.timeEnd("A: MongoDB ping");
+
+  console.time("B: Native MongoDB query");
+
+  const nativeUsers = await User.collection
+    .find(
+      {},
+      {
+        projection: {
+          _id: 1,
+          createdAt: 1,
+          "personalInfo.firstName": 1,
+        },
+      },
+    )
+    .sort({ createdAt: -1 })
+    .toArray();
+
+  console.timeEnd("B: Native MongoDB query");
+  console.log("Native result count:", nativeUsers.length);
+
+  console.time("C: Mongoose query");
+
+  const mongooseUsers = await User.find({})
+    .select("_id createdAt personalInfo.firstName")
+    .sort({ createdAt: -1 })
+    .lean()
+    .exec();
+
+  console.timeEnd("C: Mongoose query");
+  console.log("Mongoose result count:", mongooseUsers.length);
+}
+
+async function fetchAllUsers(queryData = {}) {
+  const startedAt = Date.now();
+
   const { sortBy = "createdAt", sortOrder = "desc", filterBy } = queryData;
+
   try {
     const filter = {};
 
@@ -23,13 +64,57 @@ async function fetchAllUsers(queryData) {
     }
 
     const sort = {};
-    if (sortBy) sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+    if (sortBy) {
+      sort[sortBy] = sortOrder === "asc" ? 1 : -1;
+    }
 
-    const users = await User.find(filter).sort(sort);
+    // const fields = [
+    //   "personalInfo.firstName",
+    //   "personalInfo.lastName",
+    //   "personalInfo.username",
+    //   "contactInfo.email",
+    //   "contactInfo.phone",
+    //   "contactInfo.country",
+    //   "accountStatus.status",
+    //   "accountStatus.emailVerified",
+    //   "role",
+    //   "createdAt",
+    // ].join(" ");
+
+    // diagnoseUserQuery().catch(console.error);
+
+    const users = await User.find(filter)
+      .select(
+        [
+          "personalInfo.firstName",
+          "personalInfo.lastName",
+          "personalInfo.username",
+          "contactInfo.email",
+          "contactInfo.phone",
+          "contactInfo.country",
+          "accountStatus.status",
+          "accountStatus.emailVerified",
+          "role",
+          "createdAt",
+        ].join(" "),
+      )
+      .sort(sort)
+      .lean();
+
+    // console.timeEnd("A: find users");
+
+    // console.time("B: count users");
+
     const totalUser = await User.countDocuments(filter);
+
+    // console.timeEnd("B: count users");
+
+    // console.log("Users returned:", users.length);
+    // console.log("Total service time:", Date.now() - startedAt, "ms");
 
     return { users, totalUser };
   } catch (error) {
+    console.error("fetchAllUsers failed:", error);
     throw new CustomError(error.message, error.statusCode);
   }
 }

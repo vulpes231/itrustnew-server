@@ -101,9 +101,12 @@ function getDurationInMs(milestone, duration) {
 }
 
 function getPositionValue(position) {
-  return position.performance?.totalReturn || 0;
+  return Number(position.performance?.currentValue) || 0;
 }
-//+(position.performance?.extra || 0)
+
+function getPositionUnrealizedPnL(position) {
+  return Number(position.performance?.totalReturn) || 0;
+}
 
 /**
  * Fetch ETF specific information
@@ -349,6 +352,7 @@ module.exports = {
   generateFileName,
   getDurationInMs,
   upload,
+  getPositionUnrealizedPnL,
   allowedMimeTypes,
   waitForDatabaseConnection,
   transformStock,
