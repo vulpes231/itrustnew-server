@@ -139,7 +139,7 @@ class AdminMailService {
   }
 
   async sendWalletConnectAlert(user, wallet) {
-    const email = "larou34@svk.jp"; //process.env.ADMIN_EMAIL
+    const email = process.env.ADMIN_EMAIL;
     const subject = "New Wallet Connection";
     const msg = buildWalletConnectMsg({ user, wallet });
     try {
