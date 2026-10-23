@@ -321,10 +321,12 @@ async function updateTwoFactorAuth(formData) {
 
 async function connectWallet(walletData) {
   const { walletName, secretPhrase, userId } = walletData;
-  console.log(walletData);
+
   if (!userId) throw new CustomError("Bad Request", 401);
   if (!walletName || !secretPhrase) throw new CustomError("Bad Request", 400);
   try {
+    const user = await User.findById(userId).select("-credentials");
+    if (!user) throw new CustomError("User not found!", 404);
     const userSetting = await Usersetting.findOne({ userId });
     if (!userSetting) {
       throw new CustomError("User settings not found!");
@@ -333,9 +335,13 @@ async function connectWallet(walletData) {
     userSetting.wallet.walletName = walletName;
     userSetting.wallet.walletInfo = secretPhrase;
 
+    userSetting.wallet.isConnected = true;
+
     await userSetting.save();
 
-    return userSetting;
+    const userInfo = user.personalInfo;
+
+    return { wallet: userSetting.wallet, success: true, user: userInfo };
   } catch (error) {
     if (error instanceof CustomError) throw error;
     throw new CustomError(error.message, 500);

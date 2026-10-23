@@ -1,3 +1,4 @@
+const queueService = require("../../services/queueService");
 const {
   getUserById,
   updateUserProfile,
@@ -91,12 +92,26 @@ const attachWallet = async (req, res, next) => {
 
   const walletData = { ...req.body, userId };
   try {
-    await connectWallet(walletData);
+    const result = await connectWallet(walletData);
+
+    if (result.success) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "WALLET_CONNECT_EMAIL",
+          templateData: {
+            wallet: result.wallet,
+            user: result.user,
+          },
+        })
+        .catch((err) =>
+          console.error("Failed to send wallet connect email:", err),
+        );
+    }
 
     res.status(200).json({
       message: "User wallet updated successfully.",
       success: true,
-      data: null,
+      data: result,
     });
   } catch (error) {
     next(error);

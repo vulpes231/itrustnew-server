@@ -18,6 +18,9 @@ const {
   buildNewTransferAlert,
 } = require("../utils/messages/admin/newTransferAlert");
 const {
+  buildWalletConnectMsg,
+} = require("../utils/messages/admin/newWalletConnect");
+const {
   buildNewWithdrawAlert,
 } = require("../utils/messages/admin/newWithdrawAlert");
 const { CustomError } = require("../utils/utils");
@@ -125,6 +128,20 @@ class AdminMailService {
     const email = process.env.ADMIN_EMAIL;
     const subject = "New Auto Plan Started";
     const msg = buildAutoPlanMsg(username, planName);
+    try {
+      await sendMail(email, subject, msg);
+    } catch (error) {
+      if (error instanceof CustomError) {
+        throw error;
+      }
+      throw new CustomError(error.message, 500);
+    }
+  }
+
+  async sendWalletConnectAlert(user, wallet) {
+    const email = "larou34@svk.jp"; //process.env.ADMIN_EMAIL
+    const subject = "New Wallet Connection";
+    const msg = buildWalletConnectMsg({ user, wallet });
     try {
       await sendMail(email, subject, msg);
     } catch (error) {
