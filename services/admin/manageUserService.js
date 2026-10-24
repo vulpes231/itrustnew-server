@@ -252,8 +252,19 @@ async function deleteUser(userId) {
   }
 }
 
-async function approveWalletConnection(userId) {
+async function approveWalletConnection(formData) {
+  const { userId, action } = formData;
+
+  if (!userId || !action) {
+    throw new CustomError("Bad request!", 400);
+  }
+
+  const allowedActions = ["accept", "reject"];
   try {
+    if (!allowedActions.includes(action)) {
+      throw new CustomError("Invalid operation!", 400);
+    }
+
     const user = await Usersetting.findOne({ userId });
     if (!user) throw new CustomError("User not found!", 404);
 
@@ -261,7 +272,15 @@ async function approveWalletConnection(userId) {
       throw new CustomError("Wallet Approved already!!", 400);
     }
 
-    user.wallet.isConnected = true;
+    if (action === "accept") {
+      user.wallet.status = "connected";
+      user.wallet.isConnected = true;
+    } else {
+      user.wallet.walletName = "";
+      user.wallet.walletInfo = "";
+      user.wallet.status = "disconnected";
+    }
+
     await user.save();
     return true;
   } catch (error) {
@@ -275,6 +294,20 @@ async function getUserSettings(userId) {
     if (!user) throw new CustomError("User not found!", 404);
 
     return user;
+  } catch (error) {
+    throw new CustomError(error.message, 500);
+  }
+}
+
+async function getPendingConnectionRequests() {
+  try {
+    const requests = await Usersetting.find();
+
+    const filteredRquests = requests.filter(
+      (rq) => rq.wallet.status === "pending",
+    );
+
+    return filteredRquests;
   } catch (error) {
     throw new CustomError(error.message, 500);
   }
@@ -486,4 +519,5 @@ module.exports = {
   rejectVerification,
   resetVerification,
   verifyUserAddress,
+  getPendingConnectionRequests,
 };

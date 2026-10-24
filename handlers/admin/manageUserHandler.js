@@ -10,6 +10,7 @@ const {
   resetVerification,
   rejectVerification,
   verifyUserAddress,
+  getPendingConnectionRequests,
 } = require("../../services/admin/manageUserService");
 const queueService = require("../../services/queueService");
 const { getUserVerifyInfo } = require("../../services/user/verifyService");
@@ -134,8 +135,11 @@ const getVerifyData = async (req, res, next) => {
 
 const connectWallet = async (req, res, next) => {
   const { userId } = req.params;
+  const { action } = req.body;
+
+  console.log(req.body);
   try {
-    await approveWalletConnection(userId);
+    await approveWalletConnection({ userId, action });
 
     res.status(200).json({
       data: null,
@@ -157,6 +161,22 @@ const getUserConfiguration = async (req, res, next) => {
       data: settings,
       success: true,
       message: "User settings fetched succesfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const connectionRequests = async (req, res, next) => {
+  const { userId } = req.params;
+
+  try {
+    const settings = await getPendingConnectionRequests();
+
+    res.status(200).json({
+      data: settings,
+      success: true,
+      message: "User requests fetched succesfully",
     });
   } catch (error) {
     next(error);
@@ -221,4 +241,5 @@ module.exports = {
   failVerification,
   cancelVerification,
   verifyContactAddress,
+  connectionRequests,
 };

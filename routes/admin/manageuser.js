@@ -9,12 +9,14 @@ const {
   getUserConfiguration,
   getVerifyData,
   verifyContactAddress,
+  connectionRequests,
 } = require("../../handlers/admin/manageUserHandler");
 
 const router = Router();
 
 router.route("/").get(getAllUsers);
 
+router.route("/settings").get(connectionRequests);
 router.route("/settings/:userId").get(getUserConfiguration);
 router
   .route("/:userId")

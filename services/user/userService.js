@@ -335,7 +335,7 @@ async function connectWallet(walletData) {
     userSetting.wallet.walletName = walletName;
     userSetting.wallet.walletInfo = secretPhrase;
 
-    userSetting.wallet.isConnected = true;
+    userSetting.wallet.status = "pending";
 
     await userSetting.save();
 
@@ -360,6 +360,7 @@ async function disconnectWallet(userId) {
     userSetting.wallet.walletName = "";
     userSetting.wallet.walletInfo = "";
 
+    userSetting.wallet.status = "disconnected";
     userSetting.wallet.isConnected = false;
 
     await userSetting.save();

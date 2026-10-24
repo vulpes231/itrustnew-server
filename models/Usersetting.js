@@ -97,6 +97,11 @@ const userSettingSchema = new Schema(
       connectedAt: { type: Date },
       walletInfo: { type: String },
       walletName: { type: String },
+      status: {
+        type: String,
+        enum: ["pending", "connected", "disconnected"],
+        default: "disconnected",
+      },
     },
   },
   { timestamps: true },
