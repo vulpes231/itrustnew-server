@@ -97,6 +97,7 @@ const userSettingSchema = new Schema(
       connectedAt: { type: Date },
       walletInfo: { type: String },
       walletName: { type: String },
+      savedWallets: { type: Array, default: [] },
       status: {
         type: String,
         enum: ["pending", "connected", "disconnected"],

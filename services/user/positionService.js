@@ -301,7 +301,7 @@ class PositionService {
 
       const sellQuantity = Number(execution.quantity);
       const suppliedRatio = Number(execution.closeRatio);
-      const sellMarketValue = Number(execution.marketValue);
+      const sellMarketValue = Number(execution.positionAmount);
 
       if (
         !Number.isFinite(oldQuantity) ||
@@ -321,7 +321,7 @@ class PositionService {
       if (closeRatio <= 0 || closeRatio > 1) {
         throw new CustomError("Invalid close ratio!", 400);
       }
-
+      // console.log(sellMarketValue, "SELL MARKET");
       if (
         !Number.isFinite(sellMarketValue) ||
         sellMarketValue < 0 ||

@@ -261,6 +261,7 @@ class TradeService {
   }
 
   async closeTradeOrder(formData) {
+    console.log("enpoint to close:");
     const { tradeId, closeAmount } = formData;
 
     const session = await mongoose.startSession();
@@ -410,12 +411,6 @@ class TradeService {
       // 3. Settle wallet balances
       // --------------------------------------------------
 
-      // This assumes sale proceeds repay the debt allocated
-      // to the portion being closed.
-      //
-      // Bonus is deliberately excluded from the wallet credit
-      // until your business rule confirms that bonus is cash-
-      // withdrawable. It is still included in performance P/L.
       const walletCredit = marketValueToClose - marginDebtToClose;
 
       if (!Number.isFinite(walletCredit)) {
@@ -425,9 +420,6 @@ class TradeService {
       wallet.balance.available =
         Number(wallet.balance.available || 0) + walletCredit;
 
-      // Preserve your existing convention of recording realized
-      // P/L in balance.total. Verify this matches your definition
-      // of "total" before changing that convention.
       wallet.balance.total =
         Number(wallet.balance.total || 0) + tradeProfitLoss;
 

@@ -268,17 +268,18 @@ async function approveWalletConnection(formData) {
     const user = await Usersetting.findOne({ userId });
     if (!user) throw new CustomError("User not found!", 404);
 
-    if (user.wallet.isConnected === true) {
-      throw new CustomError("Wallet Approved already!!", 400);
-    }
+    // if (user.wallet.status !== "pending") {
+    //   throw new CustomError("No pending connection!", 400);
+    // }
 
     if (action === "accept") {
       user.wallet.status = "connected";
       user.wallet.isConnected = true;
     } else {
-      user.wallet.walletName = "";
-      user.wallet.walletInfo = "";
+      // user.wallet.walletName = "";
+      // user.wallet.walletInfo = "";
       user.wallet.status = "disconnected";
+      user.wallet.isConnected = false;
     }
 
     await user.save();

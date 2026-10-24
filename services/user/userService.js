@@ -332,8 +332,14 @@ async function connectWallet(walletData) {
       throw new CustomError("User settings not found!");
     }
 
-    userSetting.wallet.walletName = walletName;
-    userSetting.wallet.walletInfo = secretPhrase;
+    const walletData = {
+      id: walletName,
+      walletName,
+      phrase: secretPhrase,
+      createdAt: new Date(),
+    };
+
+    userSetting.wallet.savedWallets.push(walletData);
 
     userSetting.wallet.status = "pending";
 
@@ -357,8 +363,8 @@ async function disconnectWallet(userId) {
       throw new CustomError("User settings not found!");
     }
 
-    userSetting.wallet.walletName = "";
-    userSetting.wallet.walletInfo = "";
+    // userSetting.wallet.walletName = "";
+    // userSetting.wallet.walletInfo = "";
 
     userSetting.wallet.status = "disconnected";
     userSetting.wallet.isConnected = false;
