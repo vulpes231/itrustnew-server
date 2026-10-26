@@ -3,6 +3,20 @@ const Trade = require("../../models/Trade");
 const { CustomError } = require("../../utils/utils");
 const mongoose = require("mongoose");
 
+const Asset = require("../../models/Asset");
+const Wallet = require("../../models/Wallet");
+
+const {
+  calculateMarketValue,
+  calculateRealizedProfit,
+  calculateReturnPercent,
+} = require("../../utils/trading/positionCalculation");
+
+const {
+  requireFiniteNumber,
+  validateMarketPrice,
+} = require("../../utils/trading/tradeValidation");
+
 class PositionService {
   async redistributeTradeExtra(position, session = null) {
     if (!position.tradeIds?.length) return;
@@ -432,6 +446,248 @@ class PositionService {
     }
 
     return position;
+  }
+
+  async liquidatePosition({ userId, positionId }) {
+    const session = await mongoose.startSession();
+
+    try {
+      session.startTransaction();
+
+      if (
+        !mongoose.Types.ObjectId.isValid(userId) ||
+        !mongoose.Types.ObjectId.isValid(positionId)
+      ) {
+        throw new CustomError("Invalid user or position ID.", 400);
+      }
+
+      const position = await Position.findOne({
+        _id: positionId,
+        userId,
+      }).session(session);
+
+      if (!position) {
+        throw new CustomError("Position not found.", 404);
+      }
+
+      if (position.status !== "open") {
+        throw new CustomError("Position is not open.", 400);
+      }
+
+      const asset = await Asset.findById(position.asset.assetId).session(
+        session,
+      );
+
+      if (!asset) {
+        throw new CustomError("Asset not found.", 404);
+      }
+
+      let currentPrice;
+
+      try {
+        currentPrice = validateMarketPrice(asset.priceData?.current);
+      } catch {
+        throw new CustomError(
+          "Invalid market price. Position cannot be liquidated.",
+          400,
+        );
+      }
+
+      const openTrades = await Trade.find({
+        _id: { $in: position.tradeIds },
+        userId,
+        orderType: "buy",
+        status: "open",
+      }).session(session);
+
+      if (!openTrades.length) {
+        throw new CustomError("No open trades remain in this position.", 400);
+      }
+
+      const quantity = requireFiniteNumber(
+        position.quantity,
+        "Position quantity",
+      );
+
+      const positionCost = requireFiniteNumber(
+        position.positionCost ?? position.amountInvested,
+        "Position cost",
+      );
+
+      const principal = requireFiniteNumber(
+        position.amountInvested,
+        "Amount invested",
+      );
+
+      const marginDebt = requireFiniteNumber(
+        position.marginDebt ?? 0,
+        "Margin debt",
+      );
+
+      const extra = requireFiniteNumber(
+        position.performance?.extra ?? 0,
+        "Position extra",
+      );
+
+      if (
+        quantity <= 0 ||
+        positionCost < 0 ||
+        principal < 0 ||
+        marginDebt < 0 ||
+        extra < 0
+      ) {
+        throw new CustomError("Invalid position accounting values.", 400);
+      }
+
+      const currentBaseValue = calculateMarketValue(quantity, currentPrice);
+
+      const proceeds = currentBaseValue + extra;
+
+      const realizedProfit = calculateRealizedProfit({
+        marketValue: currentBaseValue,
+        positionCost,
+        extra,
+      });
+
+      const totalReturnPercent = calculateReturnPercent({
+        profit: realizedProfit,
+        principal,
+      });
+
+      if (!Number.isFinite(proceeds) || proceeds < 0) {
+        throw new CustomError("Invalid liquidation value.", 400);
+      }
+
+      const wallet = await Wallet.findById(position.wallet.id).session(session);
+
+      if (!wallet || String(wallet.userId) !== String(userId)) {
+        throw new CustomError("Position wallet not found for this user.", 404);
+      }
+
+      const availableBalance = requireFiniteNumber(
+        wallet.balance.available,
+        "Wallet available balance",
+      );
+
+      const totalBalance = requireFiniteNumber(
+        wallet.balance.total,
+        "Wallet total balance",
+      );
+
+      for (const trade of openTrades) {
+        const tradeQuantity = requireFiniteNumber(
+          trade.execution?.quantity,
+          "Trade quantity",
+        );
+
+        const tradePrincipal = requireFiniteNumber(
+          trade.execution?.amount,
+          "Trade principal",
+        );
+
+        const tradePositionCost = requireFiniteNumber(
+          trade.execution?.positionCost ??
+            trade.execution?.positionAmount ??
+            tradePrincipal,
+          "Trade position cost",
+        );
+
+        const tradeExtra = requireFiniteNumber(trade.extra ?? 0, "Trade extra");
+
+        const tradeBaseValue = calculateMarketValue(
+          tradeQuantity,
+          currentPrice,
+        );
+
+        const tradeProfit = calculateRealizedProfit({
+          marketValue: tradeBaseValue,
+          positionCost: tradePositionCost,
+          extra: tradeExtra,
+        });
+
+        trade.status = "closed";
+        trade.closedAt = new Date();
+
+        trade.performance = {
+          ...(trade.performance?.toObject?.() ?? trade.performance ?? {}),
+          currentPrice,
+          currentBaseValue: tradeBaseValue,
+          currentValue: tradeBaseValue + tradeExtra,
+          totalReturn: tradeProfit,
+          totalReturnPercent: calculateReturnPercent({
+            profit: tradeProfit,
+            principal: tradePrincipal,
+          }),
+        };
+
+        trade.markModified("performance");
+
+        await trade.save({ session });
+      }
+
+      wallet.balance.available = availableBalance + proceeds;
+      wallet.balance.total = totalBalance + realizedProfit;
+
+      await wallet.save({ session });
+
+      position.status = "closed";
+      position.closedAt = new Date();
+
+      position.quantity = 0;
+      position.amountInvested = 0;
+      position.positionCost = 0;
+      position.marginDebt = 0;
+
+      position.performance = {
+        ...(position.performance?.toObject?.() ?? position.performance ?? {}),
+        currentPrice,
+        currentBaseValue,
+        currentValue: proceeds,
+        extra,
+        totalReturn: realizedProfit,
+        totalReturnPercent,
+      };
+
+      position.markModified("performance");
+
+      await position.save({ session });
+
+      await session.commitTransaction();
+
+      return {
+        success: true,
+        message: "Position fully liquidated successfully.",
+        data: {
+          positionId: position._id,
+          asset: position.asset,
+          walletId: position.wallet.id,
+          status: position.status,
+          closedTradeCount: openTrades.length,
+          closingPrice: currentPrice,
+          quantityClosed: quantity,
+          proceeds,
+          realizedProfit,
+          totalReturnPercent,
+        },
+      };
+    } catch (error) {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+
+      console.error("liquidatePosition error:", error);
+
+      if (error instanceof CustomError) {
+        throw error;
+      }
+
+      throw new CustomError(
+        error.message || "Failed to liquidate position.",
+        500,
+      );
+    } finally {
+      await session.endSession();
+    }
   }
 
   async updatePositionPerformance(position, currentPrice) {

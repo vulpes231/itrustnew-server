@@ -15,4 +15,20 @@ const getUserPositions = async (req, res, next) => {
   }
 };
 
-module.exports = { getUserPositions };
+const closeFullPosition = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { positionId } = req.body;
+
+    const result = await positionService.liquidatePosition({
+      userId,
+      positionId,
+    });
+
+    return res.status(200).json(result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getUserPositions, closeFullPosition };

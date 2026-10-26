@@ -1,6 +1,9 @@
 const { Router } = require("express");
-const { getUserPositions } = require("../../handlers/user/positionController");
+const {
+  getUserPositions,
+  closeFullPosition,
+} = require("../../handlers/user/positionController");
 
 const router = Router();
-router.route("/").get(getUserPositions);
+router.route("/").get(getUserPositions).patch(closeFullPosition);
 module.exports = router;

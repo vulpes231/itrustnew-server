@@ -5,6 +5,7 @@ const {
   fetchUserTrades,
   getTradedata,
   searchUserTrades,
+  closeTrade,
 } = require("../../services/user/tradeService");
 
 const openPosition = async (req, res, next) => {
@@ -67,6 +68,38 @@ const closePosition = async (req, res, next) => {
   }
 };
 
+const closeSingleTrade = async (req, res, next) => {
+  const userId = req.user.userId;
+  const { tradeId } = req.body;
+
+  console.log(tradeId);
+  try {
+    const result = await closeTrade({
+      userId,
+      tradeId,
+    });
+
+    if (result.success && result.user.mailing.orderNotification) {
+      queueService
+        .sendToQueue("email_queue", {
+          type: "SELL_ORDER_EMAIL",
+          to: result.user.contactInfo.email,
+          templateData: {
+            trade: result.trade,
+            user: result.user,
+          },
+        })
+        .catch((err) => console.error("Failed to send trade email:", err));
+    }
+    res.status(200).json({
+      message: `Trade closed succesfully`,
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 const searchTrades = async (req, res, next) => {
   const query = req.query.query;
   const queryData = { query };
@@ -129,4 +162,5 @@ module.exports = {
   getUserTrades,
   getTradeInsight,
   searchTrades,
+  closeSingleTrade,
 };
