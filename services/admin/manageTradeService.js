@@ -261,7 +261,6 @@ class TradeService {
   }
 
   async closeTradeOrder(formData) {
-    console.log("enpoint to close:");
     const { tradeId, closeAmount } = formData;
 
     const session = await mongoose.startSession();

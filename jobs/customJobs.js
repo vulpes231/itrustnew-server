@@ -590,8 +590,6 @@ const calculateTradeValue = (trade, currentPrice) => {
   const extra = Number(trade.extra) || 0;
   const isBuy = trade.orderType === "buy";
 
-  // The base is the remaining leveraged amount committed to the trade.
-  // It does not fluctuate with market prices.
   const currentBaseValue =
     Number(trade.performance?.currentBaseValue) || positionCost;
 
@@ -646,16 +644,13 @@ const updateTradePerformance = async () => {
       {
         assetType: 1,
         "asset.symbol": 1,
-
         "execution.price": 1,
         "execution.quantity": 1,
         "execution.amount": 1,
-        "execution.leverage": 1,
         "execution.positionAmount": 1,
         "execution.positionCost": 1,
         "execution.marginDebt": 1,
-        "execution.type": 1,
-
+        "execution.leverage": 1,
         "performance.currentBaseValue": 1,
         "performance.currentValue": 1,
         "performance.totalReturn": 1,
@@ -668,10 +663,8 @@ const updateTradePerformance = async () => {
         "performance.todayStartDate": 1,
         "performance.currentPrice": 1,
         "performance.previousClose": 1,
-
         "targets.takeProfit": 1,
         "targets.stopLoss": 1,
-
         orderType: 1,
         extra: 1,
         "wallet.id": 1,
@@ -685,18 +678,9 @@ const updateTradePerformance = async () => {
       return;
     }
 
-    const stockTrades = openTrades.filter(
-      (trade) => trade.assetType === "stock",
-    );
+    console.log(`Found ${openTrades.length} open trades.`);
 
-    if (stockTrades.length && !isMarketOpen()) {
-      console.log("Stock market is closed, using last known prices.");
-    }
-
-    console.log(`Found ${openTrades.length} open trades to update.`);
-
-    // Collect unique symbols.
-    const assetSymbols = [
+    const symbols = [
       ...new Set(
         openTrades
           .map((trade) => trade.asset?.symbol?.toUpperCase())
@@ -704,31 +688,23 @@ const updateTradePerformance = async () => {
       ),
     ];
 
-    if (!assetSymbols.length) {
-      console.log("No assets found in open trades.");
-      return;
-    }
-
-    console.log(`Fetching current prices for ${assetSymbols.length} assets...`);
-
     let currentAssets;
 
     try {
-      currentAssets = await fetchAssetsWithRetry(assetSymbols);
+      currentAssets = await fetchAssetsWithRetry(symbols);
     } catch (error) {
-      console.error("Error fetching assets after retries:", error.message);
+      console.error("Failed to fetch asset prices:", error.message);
       return;
     }
 
-    // Build symbol -> price map.
-    const assetPriceMap = new Map();
+    const priceMap = new Map();
 
     for (const asset of currentAssets || []) {
       if (!asset?.symbol) continue;
 
-      assetPriceMap.set(asset.symbol.toUpperCase(), {
-        current: Number(asset.priceData?.current) || 0,
-        previousClose: Number(asset.priceData?.previousClose) || 0,
+      priceMap.set(asset.symbol.toUpperCase(), {
+        current: Number(asset.priceData?.current),
+        previousClose: Number(asset.priceData?.previousClose),
       });
     }
 
@@ -739,18 +715,31 @@ const updateTradePerformance = async () => {
       missingSymbol: 0,
       missingAssetData: 0,
       invalidPrice: 0,
+      invalidQuantity: 0,
+      invalidEntryCost: 0,
     };
 
     const skippedSymbols = new Set();
 
+    const isSameDay = (dateA, dateB) =>
+      dateA instanceof Date &&
+      !Number.isNaN(dateA.getTime()) &&
+      dateA.getFullYear() === dateB.getFullYear() &&
+      dateA.getMonth() === dateB.getMonth() &&
+      dateA.getDate() === dateB.getDate();
+
+    const round4 = (value) => Number(value.toFixed(4));
+
     for (const trade of openTrades) {
       const symbol = trade.asset?.symbol?.toUpperCase();
+
       if (!symbol) {
         skipped.missingSymbol++;
         continue;
       }
 
-      const assetData = assetPriceMap.get(symbol);
+      const assetData = priceMap.get(symbol);
+
       if (!assetData) {
         skipped.missingAssetData++;
         skippedSymbols.add(symbol);
@@ -766,63 +755,81 @@ const updateTradePerformance = async () => {
         continue;
       }
 
-      const result = calculateTradeValue(trade, currentPrice);
+      const quantity = Number(trade.execution?.quantity);
 
-      const currentBaseValue = Number(result.currentBaseValue) || 0;
-      const currentValue = Number(result.currentValue) || 0;
-      const totalReturn = Number(result.totalReturn) || 0;
-      const totalReturnPercent = Number(result.totalReturnPercent) || 0;
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        skipped.invalidQuantity++;
+        continue;
+      }
 
-      const investedCapital = Number(trade.execution?.amount) || 0;
+      // Prefer the recorded leveraged entry cost.
+      // positionAmount is the gross exposure at entry, not current value.
+      const rawEntryCost =
+        trade.execution?.positionCost ??
+        trade.execution?.positionAmount ??
+        trade.execution?.amount;
 
-      const createdAt = trade.createdAt ? new Date(trade.createdAt) : null;
+      const entryCost = Number(rawEntryCost);
 
-      const openedToday =
-        createdAt &&
-        !Number.isNaN(createdAt.getTime()) &&
-        createdAt.getFullYear() === now.getFullYear() &&
-        createdAt.getMonth() === now.getMonth() &&
-        createdAt.getDate() === now.getDate();
+      if (!Number.isFinite(entryCost) || entryCost < 0) {
+        skipped.invalidEntryCost++;
+        continue;
+      }
+
+      // Current market value, excluding bonus.
+      const currentBaseValue = quantity * currentPrice;
+
+      // Bonus allocated to this trade.
+      const extra = Number(trade.extra ?? 0);
+
+      if (!Number.isFinite(extra) || extra < 0) {
+        console.error(`Invalid bonus on trade ${trade._id}`);
+        continue;
+      }
+
+      const currentValue = currentBaseValue + extra;
+
+      // Market P/L + bonus. Debt is excluded from profit/loss.
+      const totalReturn = currentBaseValue - entryCost + extra;
+
+      // User-funded principal is the return percentage denominator.
+      const investedCapital = Number(trade.execution?.amount ?? 0);
+
+      const totalReturnPercent =
+        investedCapital > 0 ? (totalReturn / investedCapital) * 100 : 0;
+
+      const openedAt = trade.createdAt ? new Date(trade.createdAt) : null;
+
+      const openedToday = openedAt && isSameDay(openedAt, now);
 
       const storedStartDate = trade.performance?.todayStartDate
         ? new Date(trade.performance.todayStartDate)
         : null;
 
-      const hasValidStartDate =
-        storedStartDate && !Number.isNaN(storedStartDate.getTime());
-
       const startDateIsToday =
-        hasValidStartDate &&
-        storedStartDate.getFullYear() === now.getFullYear() &&
-        storedStartDate.getMonth() === now.getMonth() &&
-        storedStartDate.getDate() === now.getDate();
+        storedStartDate && isSameDay(storedStartDate, now);
 
       let todayStartValue = Number(trade.performance?.todayStartValue);
 
-      // Establish a baseline if one doesn't exist or belongs to
-      // a previous day.
       if (!Number.isFinite(todayStartValue) || !startDateIsToday) {
-        if (openedToday) {
-          todayStartValue =
-            Number(trade.execution?.positionCost) ||
-            Number(trade.execution?.positionAmount) ||
-            investedCapital;
-        } else {
-          todayStartValue = currentBaseValue;
-        }
+        // For a trade opened today, use its entry market cost as
+        // the baseline. For an older trade, establish today's
+        // baseline at its current market value.
+        todayStartValue = openedToday ? entryCost : currentBaseValue;
       }
 
       const todayMarketReturn = currentBaseValue - todayStartValue;
 
-      const todayExtra = Number(trade.performance?.todayExtra) || 0;
+      // Maintained by your existing bonus/update logic.
+      const todayExtra = Number(trade.performance?.todayExtra ?? 0);
 
       const todayReturn = todayMarketReturn + todayExtra;
 
       const todayReturnPercent =
         investedCapital > 0 ? (todayReturn / investedCapital) * 100 : 0;
 
-      const takeProfit = Number(trade.targets?.takeProfit) || 0;
-      const stopLoss = Number(trade.targets?.stopLoss) || 0;
+      const takeProfit = Number(trade.targets?.takeProfit ?? 0);
+      const stopLoss = Number(trade.targets?.stopLoss ?? 0);
 
       const shouldCloseByTP =
         takeProfit > 0 && totalReturnPercent >= takeProfit;
@@ -848,35 +855,23 @@ const updateTradePerformance = async () => {
           },
           update: {
             $set: {
-              // Current performance.
-              "performance.currentBaseValue": Number(
-                currentBaseValue.toFixed(4),
-              ),
-              "performance.currentValue": Number(currentValue.toFixed(4)),
-              "performance.totalReturn": Number(totalReturn.toFixed(4)),
-              "performance.totalReturnPercent": Number(
-                totalReturnPercent.toFixed(4),
-              ),
+              "performance.currentBaseValue": round4(currentBaseValue),
+              "performance.currentValue": round4(currentValue),
+              "performance.totalReturn": round4(totalReturn),
+              "performance.totalReturnPercent": round4(totalReturnPercent),
 
-              // Daily performance.
-              "performance.todayStartValue": Number(todayStartValue.toFixed(4)),
+              "performance.todayStartValue": round4(todayStartValue),
               "performance.todayStartDate": todayStart,
-              "performance.todayMarketReturn": Number(
-                todayMarketReturn.toFixed(4),
-              ),
-              "performance.todayExtra": Number(todayExtra.toFixed(4)),
-              "performance.todayReturn": Number(todayReturn.toFixed(4)),
-              "performance.todayReturnPercent": Number(
-                todayReturnPercent.toFixed(4),
-              ),
+              "performance.todayMarketReturn": round4(todayMarketReturn),
+              "performance.todayExtra": round4(todayExtra),
+              "performance.todayReturn": round4(todayReturn),
+              "performance.todayReturnPercent": round4(todayReturnPercent),
 
-              // Latest market data.
-              "performance.currentPrice": Number(currentPrice.toFixed(4)),
+              "performance.currentPrice": round4(currentPrice),
+
               ...(Number.isFinite(previousClose) && previousClose > 0
                 ? {
-                    "performance.previousClose": Number(
-                      previousClose.toFixed(4),
-                    ),
+                    "performance.previousClose": round4(previousClose),
                   }
                 : {}),
 
@@ -887,38 +882,28 @@ const updateTradePerformance = async () => {
       });
     }
 
-    if (tradeUpdates.length) {
-      const BATCH_SIZE = 500;
+    const BATCH_SIZE = 500;
 
-      for (let i = 0; i < tradeUpdates.length; i += BATCH_SIZE) {
-        const batch = tradeUpdates.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < tradeUpdates.length; i += BATCH_SIZE) {
+      const batch = tradeUpdates.slice(i, i + BATCH_SIZE);
 
-        try {
-          const result = await Trade.bulkWrite(batch, {
-            ordered: false,
-          });
+      try {
+        const result = await Trade.bulkWrite(batch, {
+          ordered: false,
+        });
 
-          console.log(
-            `Processed ${result.modifiedCount ?? 0} trade updates ` +
-              `in batch ${Math.floor(i / BATCH_SIZE) + 1}.`,
-          );
-
-          console.log("[Trade performance] Batch result:", {
-            attempted: batch.length,
-            matched: result.matchedCount,
-            modified: result.modifiedCount,
-          });
-        } catch (batchError) {
-          console.error(
-            `Error in trade batch ${Math.floor(i / BATCH_SIZE) + 1}:`,
-            batchError,
-          );
-        }
+        console.log("Trade performance batch:", {
+          attempted: batch.length,
+          matched: result.matchedCount,
+          modified: result.modifiedCount,
+        });
+      } catch (error) {
+        console.error("Trade performance batch failed:", error);
       }
     }
 
     if (tradesToClose.length) {
-      console.log(`Closing ${tradesToClose.length} trades (TP/SL reached).`);
+      console.log(`Closing ${tradesToClose.length} trades due to TP/SL.`);
 
       await closeTradesInBatch(tradesToClose, now);
     }
@@ -926,7 +911,8 @@ const updateTradePerformance = async () => {
     console.log(
       `Trade performance update completed in ${Date.now() - startTime}ms.`,
     );
-    console.log("[Trade performance] Skipped:", {
+
+    console.log("Skipped trade records:", {
       ...skipped,
       skippedSymbols: [...skippedSymbols],
     });
@@ -939,6 +925,19 @@ const updateTradePerformance = async () => {
 const updatePositionsPerformance = async () => {
   try {
     const startTime = Date.now();
+    const now = new Date();
+
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    const round4 = (value) => Number(value.toFixed(4));
+
+    const isSameDay = (dateA, dateB) =>
+      dateA instanceof Date &&
+      !Number.isNaN(dateA.getTime()) &&
+      dateA.getFullYear() === dateB.getFullYear() &&
+      dateA.getMonth() === dateB.getMonth() &&
+      dateA.getDate() === dateB.getDate();
 
     const openPositions = await Position.find(
       {
@@ -947,326 +946,231 @@ const updatePositionsPerformance = async () => {
       },
       {
         userId: 1,
-        "wallet.id": 1,
-        "asset.symbol": 1,
-
+        wallet: 1,
+        asset: 1,
         quantity: 1,
         amountInvested: 1,
-
-        "performance.currentValue": 1,
-        "performance.currentBaseValue": 1,
-        "performance.extra": 1, // ← corrected (was currentExtra)
-
-        "performance.currentPrice": 1,
-        "performance.previousClose": 1,
-
-        "performance.totalReturn": 1,
-        "performance.totalReturnPercent": 1,
-
-        "performance.todayStartValue": 1,
-        "performance.todayStartDate": 1,
-        "performance.todayMarketReturn": 1,
-        "performance.todayExtra": 1,
-        "performance.todayReturn": 1,
-        "performance.todayReturnPercent": 1,
-
+        positionCost: 1,
+        marginDebt: 1,
+        performance: 1,
         createdAt: 1,
-        updatedAt: 1,
       },
     ).lean();
 
-    if (openPositions.length === 0) {
+    if (!openPositions.length) {
       console.log("No open positions found.");
       return;
     }
 
-    /**
-     * UNIQUE SYMBOLS
-     */
-    const assetSymbols = [
+    const symbols = [
       ...new Set(
         openPositions
-          .map((p) => p.asset?.symbol?.toUpperCase())
+          .map((position) => position.asset?.symbol?.toUpperCase())
           .filter(Boolean),
       ),
     ];
 
-    /**
-     * FETCH MARKET DATA
-     */
     let currentAssets;
 
     try {
-      currentAssets = await fetchAssetsWithRetry(assetSymbols);
+      currentAssets = await fetchAssetsWithRetry(symbols);
     } catch (error) {
-      console.error("Error fetching assets:", error.message);
+      console.error("Failed to fetch position prices:", error.message);
       return;
     }
 
-    /**
-     * MAP:
-     * SYMBOL => { current, previousClose }
-     */
-    const assetPriceMap = new Map();
+    const priceMap = new Map();
 
-    for (const asset of currentAssets) {
-      if (asset?.symbol) {
-        assetPriceMap.set(asset.symbol.toUpperCase(), {
-          current: asset?.priceData?.current || 0,
-          previousClose: asset?.priceData?.previousClose || 0,
-        });
-      }
+    for (const asset of currentAssets || []) {
+      if (!asset?.symbol) continue;
+
+      priceMap.set(asset.symbol.toUpperCase(), {
+        current: Number(asset.priceData?.current),
+        previousClose: Number(asset.priceData?.previousClose),
+      });
     }
 
+    const positionUpdates = [];
     const affectedWalletIds = new Set();
     const affectedUserIds = new Set();
-    const positionUpdates = [];
-    const now = new Date();
 
-    /**
-     * START OF CURRENT DAY
-     */
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
+    const skipped = {
+      missingAssetData: 0,
+      invalidPrice: 0,
+      invalidQuantity: 0,
+      invalidPrincipal: 0,
+      invalidEntryCost: 0,
+    };
 
-    /**
-     * UPDATE POSITIONS
-     */
     for (const position of openPositions) {
-      affectedUserIds.add(position.userId.toString());
+      const symbol = position.asset?.symbol?.toUpperCase();
 
-      if (position.wallet?.id) {
-        affectedWalletIds.add(position.wallet.id.toString());
+      if (!symbol) {
+        skipped.missingAssetData++;
+        continue;
       }
 
-      const symbol = position.asset?.symbol?.toUpperCase();
-      if (!symbol) continue;
+      const assetData = priceMap.get(symbol);
 
-      const assetData = assetPriceMap.get(symbol);
       if (!assetData) {
-        console.warn(`No price found for ${symbol}`);
+        skipped.missingAssetData++;
         continue;
       }
 
       const currentPrice = assetData.current;
       const previousClose = assetData.previousClose;
 
-      if (!currentPrice || currentPrice <= 0) {
+      if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
+        skipped.invalidPrice++;
         continue;
       }
 
-      const quantity = Number(position.quantity) || 0;
-      const amountInvested = Number(position.amountInvested) || 0;
+      const quantity = Number(position.quantity);
+      const amountInvested = Number(position.amountInvested);
+      const positionCost = Number(position.positionCost);
 
-      /**
-       * ==========================================
-       * CURRENT MARKET VALUE (pure)
-       * ==========================================
-       *
-       * Value of the actual asset before any bonus/extra.
-       */
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        skipped.invalidQuantity++;
+        continue;
+      }
+
+      if (!Number.isFinite(amountInvested) || amountInvested < 0) {
+        skipped.invalidPrincipal++;
+        continue;
+      }
+
+      // Do not silently treat missing entry cost as zero.
+      // Zero cost with a non-zero position can produce false profits.
+      if (!Number.isFinite(positionCost) || positionCost < 0) {
+        skipped.invalidEntryCost++;
+        console.warn(`Skipping position ${position._id}: invalid positionCost`);
+        continue;
+      }
+
+      // Current market value, excluding bonus.
       const currentBaseValue = quantity * currentPrice;
 
-      /**
-       * ==========================================
-       * CURRENT EXTRA
-       * ==========================================
-       *
-       * This is the accumulated extra/bonus on the position.
-       * Schema field is "extra", NOT "currentExtra".
-       */
-      const currentExtra = Number(position.performance?.extra) || 0;
+      // Preserve the existing position bonus.
+      const extra = Number(position.performance?.extra ?? 0);
 
-      /**
-       * ==========================================
-       * CURRENT TOTAL VALUE
-       * ==========================================
-       */
-      const currentValue = currentBaseValue + currentExtra;
+      if (!Number.isFinite(extra) || extra < 0) {
+        console.warn(`Skipping position ${position._id}: invalid bonus`);
+        continue;
+      }
 
-      /**
-       * ==========================================
-       * TOTAL RETURN
-       * ==========================================
-       */
-      const totalReturn = currentValue - amountInvested;
+      const currentValue = currentBaseValue + extra;
+
+      // Market P/L + bonus. Margin debt is excluded.
+      const totalReturn = currentBaseValue - positionCost + extra;
 
       const totalReturnPercent =
         amountInvested > 0 ? (totalReturn / amountInvested) * 100 : 0;
 
-      /**
-       * ==========================================
-       * TODAY BASELINE
-       * ==========================================
-       *
-       * todayStartValue = market value at the beginning of the day.
-       * It deliberately EXCLUDES extra.
-       */
-      const positionDate = new Date(position.createdAt);
+      const openedAt = position.createdAt ? new Date(position.createdAt) : null;
 
-      const isOpenedToday =
-        positionDate.getFullYear() === now.getFullYear() &&
-        positionDate.getMonth() === now.getMonth() &&
-        positionDate.getDate() === now.getDate();
-
-      let todayStartValue = Number(position.performance?.todayStartValue);
+      const openedToday = openedAt && isSameDay(openedAt, now);
 
       const storedStartDate = position.performance?.todayStartDate
         ? new Date(position.performance.todayStartDate)
         : null;
 
-      const hasValidStartDate =
-        storedStartDate && !Number.isNaN(storedStartDate.getTime());
-
       const startDateIsToday =
-        hasValidStartDate &&
-        storedStartDate.getFullYear() === now.getFullYear() &&
-        storedStartDate.getMonth() === now.getMonth() &&
-        storedStartDate.getDate() === now.getDate();
+        storedStartDate && isSameDay(storedStartDate, now);
 
-      /**
-       * Initialize today's baseline if:
-       * - there is no baseline
-       * - baseline belongs to another day
-       */
+      let todayStartValue = Number(position.performance?.todayStartValue);
+
       if (!Number.isFinite(todayStartValue) || !startDateIsToday) {
-        if (isOpenedToday) {
-          // Position opened today → start from amount invested
-          todayStartValue = amountInvested;
-        } else {
-          // Existing position entering a new day → use current market base
-          todayStartValue = currentBaseValue;
-        }
+        // The position's entry cost is the opening-day baseline.
+        // Existing positions establish a fresh baseline at today's
+        // current market value.
+        todayStartValue = openedToday ? positionCost : currentBaseValue;
       }
 
-      /**
-       * ==========================================
-       * TODAY MARKET RETURN
-       * ==========================================
-       *
-       * ONLY market movement. Extra is excluded.
-       */
       const todayMarketReturn = currentBaseValue - todayStartValue;
 
-      /**
-       * ==========================================
-       * TODAY EXTRA
-       * ==========================================
-       *
-       * Maintained by editPositionData() when extra is added.
-       */
-      const todayExtra = Number(position.performance?.todayExtra) || 0;
+      const todayExtra = Number(position.performance?.todayExtra ?? 0);
 
-      /**
-       * ==========================================
-       * TODAY TOTAL RETURN
-       * ==========================================
-       */
       const todayReturn = todayMarketReturn + todayExtra;
 
       const todayReturnPercent =
         amountInvested > 0 ? (todayReturn / amountInvested) * 100 : 0;
 
-      /**
-       * ==========================================
-       * PREPARE UPDATE
-       * ==========================================
-       */
       positionUpdates.push({
         updateOne: {
           filter: {
             _id: position._id,
+            status: "open",
           },
           update: {
             $set: {
-              // ------------------------------
-              // CURRENT VALUE
-              // ------------------------------
-              "performance.currentBaseValue": Number(
-                currentBaseValue.toFixed(4),
-              ),
-              "performance.extra": Number(currentExtra.toFixed(4)), // ← corrected
-              "performance.currentValue": Number(currentValue.toFixed(4)),
+              "performance.currentBaseValue": round4(currentBaseValue),
+              "performance.currentValue": round4(currentValue),
+              "performance.extra": round4(extra),
 
-              // ------------------------------
-              // TOTAL PERFORMANCE
-              // ------------------------------
-              "performance.totalReturn": Number(totalReturn.toFixed(4)),
-              "performance.totalReturnPercent": Number(
-                totalReturnPercent.toFixed(4),
-              ),
+              "performance.totalReturn": round4(totalReturn),
+              "performance.totalReturnPercent": round4(totalReturnPercent),
 
-              // ------------------------------
-              // TODAY PERFORMANCE
-              // ------------------------------
-              "performance.todayStartValue": Number(todayStartValue.toFixed(4)),
+              "performance.todayStartValue": round4(todayStartValue),
               "performance.todayStartDate": todayStart,
-              "performance.todayMarketReturn": Number(
-                todayMarketReturn.toFixed(4),
-              ),
-              "performance.todayExtra": Number(todayExtra.toFixed(4)),
-              "performance.todayReturn": Number(todayReturn.toFixed(4)),
-              "performance.todayReturnPercent": Number(
-                todayReturnPercent.toFixed(4),
-              ),
+              "performance.todayMarketReturn": round4(todayMarketReturn),
+              "performance.todayExtra": round4(todayExtra),
+              "performance.todayReturn": round4(todayReturn),
+              "performance.todayReturnPercent": round4(todayReturnPercent),
 
-              // ------------------------------
-              // MARKET DATA
-              // ------------------------------
-              "performance.currentPrice": Number(currentPrice.toFixed(4)),
-              "performance.previousClose": Number(previousClose.toFixed(4)),
+              "performance.currentPrice": round4(currentPrice),
+
+              ...(Number.isFinite(previousClose) && previousClose > 0
+                ? {
+                    "performance.previousClose": round4(previousClose),
+                  }
+                : {}),
 
               updatedAt: now,
             },
           },
         },
       });
-    }
 
-    /**
-     * ==========================================
-     * BULK UPDATE
-     * ==========================================
-     */
-    if (positionUpdates.length > 0) {
-      const BATCH_SIZE = 500;
+      if (position.userId) {
+        affectedUserIds.add(position.userId.toString());
+      }
 
-      for (let i = 0; i < positionUpdates.length; i += BATCH_SIZE) {
-        const batch = positionUpdates.slice(i, i + BATCH_SIZE);
-
-        await Position.bulkWrite(batch, {
-          ordered: false,
-        });
-
-        console.log(
-          `Updated ${batch.length} positions in batch ${
-            Math.floor(i / BATCH_SIZE) + 1
-          }`,
-        );
+      if (position.wallet?.id) {
+        affectedWalletIds.add(position.wallet.id.toString());
       }
     }
 
-    /**
-     * ==========================================
-     * SNAPSHOTS
-     * ==========================================
-     */
+    const BATCH_SIZE = 500;
+
+    for (let i = 0; i < positionUpdates.length; i += BATCH_SIZE) {
+      const batch = positionUpdates.slice(i, i + BATCH_SIZE);
+
+      try {
+        const result = await Position.bulkWrite(batch, {
+          ordered: false,
+        });
+
+        console.log("Position performance batch:", {
+          attempted: batch.length,
+          matched: result.matchedCount,
+          modified: result.modifiedCount,
+        });
+      } catch (error) {
+        console.error("Position performance batch failed:", error);
+      }
+    }
+
     const snapshotTime = new Date();
 
-    console.log(affectedUserIds.size, "userIds");
-    console.log(affectedWalletIds.size, "walletIds");
+    const walletIds = [...affectedWalletIds];
+    const userIds = [...affectedUserIds];
 
-    /**
-     * WALLET SNAPSHOTS
-     */
     const walletResults = await Promise.allSettled(
-      [...affectedWalletIds].map((walletId) =>
+      walletIds.map((walletId) =>
         walletSnapshotService.createWalletSnapshot(
           walletId,
           "cron_update",
-          {
-            timestamp: snapshotTime,
-          },
+          { timestamp: snapshotTime },
           null,
         ),
       ),
@@ -1275,25 +1179,18 @@ const updatePositionsPerformance = async () => {
     walletResults.forEach((result, index) => {
       if (result.status === "rejected") {
         console.error(
-          `Failed to create wallet snapshot for ${
-            [...affectedWalletIds][index]
-          }:`,
+          `Wallet snapshot failed for ${walletIds[index]}:`,
           result.reason,
         );
       }
     });
 
-    /**
-     * PORTFOLIO SNAPSHOTS
-     */
     const portfolioResults = await Promise.allSettled(
-      [...affectedUserIds].map((userId) =>
+      userIds.map((userId) =>
         portfolioService.createPortfolioSnapshot(
           userId,
           "cron_update",
-          {
-            timestamp: snapshotTime,
-          },
+          { timestamp: snapshotTime },
           null,
         ),
       ),
@@ -1302,19 +1199,17 @@ const updatePositionsPerformance = async () => {
     portfolioResults.forEach((result, index) => {
       if (result.status === "rejected") {
         console.error(
-          `Failed to create portfolio snapshot for ${
-            [...affectedUserIds][index]
-          }:`,
+          `Portfolio snapshot failed for ${userIds[index]}:`,
           result.reason,
         );
       }
     });
 
-    const duration = Date.now() - startTime;
-
-    console.log(
-      `Position performance update completed in ${duration}ms. Updated ${positionUpdates.length} positions`,
-    );
+    console.log("Position performance update completed:", {
+      durationMs: Date.now() - startTime,
+      updated: positionUpdates.length,
+      skipped,
+    });
   } catch (error) {
     console.error("Error in updatePositionsPerformance:", error);
     throw error;
@@ -1327,77 +1222,140 @@ async function closeTradesInBatch(tradesToClose, closeTime) {
   try {
     session.startTransaction();
 
-    const closePromises = tradesToClose.map(
-      async ({ trade, currentValue, totalReturn, closeReason }) => {
-        try {
-          await Trade.updateOne(
-            { _id: trade._id },
+    const results = [];
+
+    for (const {
+      trade,
+      currentValue,
+      currentBaseValue,
+      totalReturn,
+      totalReturnPercent,
+      closeReason,
+    } of tradesToClose) {
+      try {
+        const marketValue = Number(currentBaseValue);
+        const bonus = Number(trade.extra ?? 0);
+        const entryCost = Number(
+          trade.execution?.positionCost ??
+            trade.execution?.positionAmount ??
+            trade.execution?.amount,
+        );
+        const marginDebt = Number(trade.execution?.marginDebt ?? 0);
+        const quantity = Number(trade.execution?.quantity ?? 0);
+
+        if (
+          !Number.isFinite(marketValue) ||
+          marketValue < 0 ||
+          !Number.isFinite(bonus) ||
+          bonus < 0 ||
+          !Number.isFinite(entryCost) ||
+          entryCost < 0 ||
+          !Number.isFinite(marginDebt) ||
+          marginDebt < 0
+        ) {
+          throw new Error(`Invalid closing values for trade ${trade._id}`);
+        }
+
+        // Amount returned to the available wallet balance.
+        const walletCredit = Number(
+          (marketValue + bonus - marginDebt).toFixed(4),
+        );
+
+        if (walletCredit < 0) {
+          throw new Error(
+            `Closing credit cannot be negative for trade ${trade._id}`,
+          );
+        }
+
+        // Principal was not deducted from totalBalance when buying,
+        // so only realized P&L changes totalBalance on closing.
+        const realizedProfitLoss = Number(
+          (marketValue - entryCost + bonus).toFixed(4),
+        );
+
+        const realizedProfitLossPercent =
+          Number(trade.execution?.amount) > 0
+            ? Number(
+                (
+                  (realizedProfitLoss / Number(trade.execution.amount)) *
+                  100
+                ).toFixed(4),
+              )
+            : 0;
+
+        // Close only if the trade is still open.
+        const closeResult = await Trade.updateOne(
+          { _id: trade._id, status: "open" },
+          {
+            $set: {
+              status: "closed",
+              closedAt: closeTime,
+              closeReason,
+              "targets.exitPoint": quantity > 0 ? marketValue / quantity : 0,
+              "performance.currentBaseValue": marketValue,
+              "performance.currentValue": Number(
+                (marketValue + bonus).toFixed(4),
+              ),
+              "performance.totalReturn": realizedProfitLoss,
+              "performance.totalReturnPercent": realizedProfitLossPercent,
+            },
+          },
+          { session },
+        );
+
+        if (closeResult.modifiedCount === 0) {
+          throw new Error(
+            `Trade ${trade._id} was not closed because it is no longer open`,
+          );
+        }
+
+        if (trade.wallet?.id) {
+          const walletResult = await Wallet.updateOne(
+            { _id: trade.wallet.id },
             {
-              $set: {
-                status: "closed",
-                closedAt: closeTime,
-                closeReason: closeReason,
-                "targets.exitPoint":
-                  trade.performance?.currentValue || currentValue,
+              $inc: {
+                "balance.available": walletCredit,
+                "balance.totalBalance": realizedProfitLoss,
               },
             },
             { session },
           );
 
-          if (trade.wallet?.id) {
-            await Wallet.updateOne(
-              { _id: trade.wallet.id },
-              {
-                $inc: {
-                  availableBalance: currentValue,
-                  totalBalance: totalReturn,
-                },
-              },
-              { session },
-            );
+          if (walletResult.matchedCount === 0) {
+            throw new Error(`Wallet not found for trade ${trade._id}`);
           }
-
-          await recordTradeInPortfolio(
-            trade.userId,
-            totalReturn,
-            `Trade closed (${closeReason}): ${trade.asset.symbol} ${
-              trade.orderType
-            } - ${totalReturn >= 0 ? "Profit" : "Loss"} of $${Math.abs(
-              totalReturn,
-            ).toFixed(2)}`,
-          );
-
-          return { tradeId: trade._id, success: true };
-        } catch (error) {
-          console.error(`Error closing trade ${trade._id}:`, error.message);
-          return { tradeId: trade._id, success: false, error: error.message };
         }
-      },
-    );
 
-    const results = await Promise.all(closePromises);
-    const successful = results.filter((r) => r.success).length;
-    const failed = results.filter((r) => !r.success).length;
+        await recordTradeInPortfolio(
+          trade.userId,
+          realizedProfitLoss,
+          `Trade closed (${closeReason}). Realized P/L: ${realizedProfitLoss}`,
+          // session,
+        );
 
-    console.log(`Closed ${successful} trades successfully, ${failed} failed`);
+        results.push({
+          success: true,
+          tradeId: trade._id,
+          realizedProfitLoss,
+          walletCredit,
+        });
+      } catch (error) {
+        throw new Error(
+          `Failed to close trade ${trade._id}: ${error.message}`,
+          { cause: error },
+        );
+      }
+    }
 
     await session.commitTransaction();
 
-    const failedTrades = results.filter((r) => !r.success);
-    if (failedTrades.length > 0) {
-      console.log(
-        "Failed trades:",
-        failedTrades.map((ft) => ft.tradeId),
-      );
-
-      await queueFailedTradeClosures(failedTrades);
-    }
+    return results;
   } catch (error) {
     await session.abortTransaction();
-    console.error("Error in batch trade closure:", error);
+    console.error("closeTradesInBatch failed:", error);
     throw error;
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 }
 

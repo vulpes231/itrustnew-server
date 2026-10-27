@@ -100,6 +100,7 @@ const closeSingleTrade = async (req, res, next) => {
     next(error);
   }
 };
+
 const searchTrades = async (req, res, next) => {
   const query = req.query.query;
   const queryData = { query };
