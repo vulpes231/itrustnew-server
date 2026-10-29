@@ -89,7 +89,7 @@ class TradeService {
       const marginDebt = positionAmount - marginAmount;
 
       // Bonus is leverage-adjusted exactly once.
-      const positionExtra = parsedExtra * leverageMultiplier;
+      const positionExtra = parsedExtra;
 
       const currentPrice = Number(asset.priceData.current);
 
