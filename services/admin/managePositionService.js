@@ -55,9 +55,7 @@ class ManagePositionService {
     const session = await mongoose.startSession();
     let transactionCommitted = false;
 
-    const AMOUNT_EPSILON = 0.01;
-    const RATIO_EPSILON = 0.000001;
-
+    const EPSILON = 0.000001;
     const round = (value) => Number(Number(value).toFixed(8));
 
     try {
@@ -106,7 +104,6 @@ class ManagePositionService {
         throw new CustomError("Invalid current asset price", 400);
       }
 
-      // Load every open buy trade belonging to this position.
       const trades = await Trade.find({
         _id: { $in: position.tradeIds || [] },
         userId: position.userId,
@@ -123,36 +120,26 @@ class ManagePositionService {
         );
       }
 
-      // Validate the position's accounting values.
-      const quantity = Number(position.quantity);
-      const amountInvested = Number(position.amountInvested);
-      const positionCost = Number(position.positionCost);
-      const marginDebt = Number(position.marginDebt ?? 0);
+      const positionQuantity = Number(position.quantity);
       const positionExtra = Number(position.performance?.extra ?? 0);
 
       if (
-        !Number.isFinite(quantity) ||
-        quantity <= 0 ||
-        !Number.isFinite(amountInvested) ||
-        amountInvested < 0 ||
-        !Number.isFinite(positionCost) ||
-        positionCost < 0 ||
-        !Number.isFinite(marginDebt) ||
-        marginDebt < 0 ||
+        !Number.isFinite(positionQuantity) ||
+        positionQuantity <= 0 ||
         !Number.isFinite(positionExtra) ||
         positionExtra < 0
       ) {
         throw new CustomError("Position has invalid accounting values", 400);
       }
 
-      const positionBaseValue = calculateMarketValue(quantity, currentPrice);
+      const positionBaseValue = positionQuantity * currentPrice;
       const totalPositionValue = positionBaseValue + positionExtra;
 
       if (!Number.isFinite(totalPositionValue) || totalPositionValue <= 0) {
         throw new CustomError("Position has no valid close value", 400);
       }
 
-      if (requestedAmount > totalPositionValue + AMOUNT_EPSILON) {
+      if (requestedAmount > totalPositionValue + 0.01) {
         throw new CustomError(
           `Amount exceeds the current position value of ${totalPositionValue.toFixed(2)}`,
           400,
@@ -161,12 +148,13 @@ class ManagePositionService {
 
       const effectiveAmount = Math.min(requestedAmount, totalPositionValue);
 
+      // The requested amount is a percentage of market value + bonus.
       let closeRatio =
-        effectiveAmount >= totalPositionValue - AMOUNT_EPSILON
+        effectiveAmount >= totalPositionValue - 0.01
           ? 1
           : effectiveAmount / totalPositionValue;
 
-      if (closeRatio >= 1 - RATIO_EPSILON) {
+      if (closeRatio >= 1 - EPSILON) {
         closeRatio = 1;
       }
 
@@ -174,13 +162,6 @@ class ManagePositionService {
       const remainingRatio = 1 - closeRatio;
       const now = new Date();
 
-      /*
-       * Allocate the close across each open buy trade.
-       *
-       * Wallet cash returned and realized P&L are calculated from the
-       * individual trade close results, avoiding double-crediting the
-       * position-level and trade-level values.
-       */
       let quantityClosed = 0;
       let principalClosed = 0;
       let positionCostClosed = 0;
@@ -197,7 +178,7 @@ class ManagePositionService {
       let remainingBaseValue = 0;
       let remainingExtra = 0;
 
-      const closedTrades = [];
+      const closedTradesIds = [];
 
       for (const trade of trades) {
         const tradeQuantity = Number(trade.execution?.quantity);
@@ -209,6 +190,9 @@ class ManagePositionService {
         );
         const tradeDebt = Number(trade.execution?.marginDebt ?? 0);
         const tradeBonus = Number(trade.extra ?? 0);
+        const originalPositionAmount = Number(
+          trade.execution?.positionAmount ?? tradeCost,
+        );
 
         if (
           !Number.isFinite(tradeQuantity) ||
@@ -228,78 +212,55 @@ class ManagePositionService {
           );
         }
 
-        const tradeBaseValue = calculateMarketValue(
-          tradeQuantity,
-          currentPrice,
+        const tradeBaseValue = tradeQuantity * currentPrice;
+
+        // Apply the same close percentage to every accounting component.
+        const actualQuantityRemaining = isFullClose
+          ? 0
+          : round(tradeQuantity * remainingRatio);
+
+        const actualPrincipalRemaining = isFullClose
+          ? 0
+          : round(tradePrincipal * remainingRatio);
+
+        const actualCostRemaining = isFullClose
+          ? 0
+          : round(tradeCost * remainingRatio);
+
+        const actualDebtRemaining = isFullClose
+          ? 0
+          : round(tradeDebt * remainingRatio);
+
+        const actualBaseRemaining = isFullClose
+          ? 0
+          : round(tradeBaseValue * remainingRatio);
+
+        const actualExtraRemaining = isFullClose
+          ? 0
+          : round(tradeBonus * remainingRatio);
+
+        const tradeQuantityClosed = round(
+          tradeQuantity - actualQuantityRemaining,
+        );
+        const tradePrincipalClosed = round(
+          tradePrincipal - actualPrincipalRemaining,
+        );
+        const tradeCostClosed = round(tradeCost - actualCostRemaining);
+        const tradeDebtClosed = round(tradeDebt - actualDebtRemaining);
+        const tradeBaseClosed = round(tradeBaseValue - actualBaseRemaining);
+        const tradeExtraClosed = round(tradeBonus - actualExtraRemaining);
+
+        const tradeCashReturned = round(
+          tradeBaseClosed - tradeDebtClosed + tradeExtraClosed,
         );
 
-        const closing = calculatePartialClose({
-          quantity: tradeQuantity,
-          principal: tradePrincipal,
-          positionCost: tradeCost,
-          marginDebt: tradeDebt,
-          baseValue: tradeBaseValue,
-          extra: tradeBonus,
-          closeRatio,
-        });
-
-        const {
-          quantityRemaining,
-          principalRemaining,
-          positionCostRemaining,
-          marginDebtRemaining,
-          baseValueRemaining,
-          extraRemaining,
-          totalProceeds,
-          realizedProfit,
-        } = closing;
-
-        const tradeIsFullyClosed =
-          isFullClose ||
-          hasNoRemainingExposure({
-            quantity: quantityRemaining,
-            principal: principalRemaining,
-            positionCost: positionCostRemaining,
-            marginDebt: marginDebtRemaining,
-            currentBaseValue: baseValueRemaining,
-            extra: extraRemaining,
-          });
-
-        const actualQuantityRemaining = tradeIsFullyClosed
-          ? 0
-          : quantityRemaining;
-        const actualPrincipalRemaining = tradeIsFullyClosed
-          ? 0
-          : principalRemaining;
-        const actualCostRemaining = tradeIsFullyClosed
-          ? 0
-          : positionCostRemaining;
-        const actualDebtRemaining = tradeIsFullyClosed
-          ? 0
-          : marginDebtRemaining;
-        const actualBaseRemaining = tradeIsFullyClosed ? 0 : baseValueRemaining;
-        const actualExtraRemaining = tradeIsFullyClosed ? 0 : extraRemaining;
-
-        const tradeQuantityClosed = tradeQuantity - actualQuantityRemaining;
-        const tradePrincipalClosed = tradePrincipal - actualPrincipalRemaining;
-        const tradeCostClosed = tradeCost - actualCostRemaining;
-        const tradeDebtClosed = tradeDebt - actualDebtRemaining;
-        const tradeBaseClosed = tradeBaseValue - actualBaseRemaining;
-        const tradeExtraClosed = tradeBonus - actualExtraRemaining;
-
-        /*
-         * Calculate cash returned using the actual amounts removed from
-         * the trade, so rounding and dust cleanup do not create a mismatch.
-         */
-        const tradeCashReturned =
-          tradeBaseClosed - tradeDebtClosed + tradeExtraClosed;
-
-        const tradeRealizedProfit =
-          tradeBaseClosed - tradeCostClosed + tradeExtraClosed;
+        const tradeRealizedProfit = round(
+          tradeBaseClosed - tradeCostClosed + tradeExtraClosed,
+        );
 
         if (
           !Number.isFinite(tradeCashReturned) ||
-          tradeCashReturned < -AMOUNT_EPSILON ||
+          tradeCashReturned < -0.01 ||
           !Number.isFinite(tradeRealizedProfit)
         ) {
           throw new CustomError(
@@ -310,35 +271,39 @@ class ManagePositionService {
 
         trade.performance = trade.performance ?? {};
 
-        if (tradeIsFullyClosed) {
+        if (isFullClose) {
           trade.status = "closed";
           trade.closedAt = now;
           trade.closeReason = "admin_close";
 
           trade.execution.quantity = 0;
           trade.execution.amount = 0;
-          trade.execution.positionAmount = 0;
           trade.execution.positionCost = 0;
           trade.execution.marginDebt = 0;
+
+          // Keep positionAmount as historical entry exposure.
+          trade.execution.positionAmount = originalPositionAmount;
 
           trade.extra = 0;
 
           trade.performance.currentPrice = currentPrice;
           trade.performance.currentBaseValue = 0;
           trade.performance.currentValue = 0;
-          trade.performance.totalReturn = round(tradeRealizedProfit);
+          trade.performance.totalReturn = tradeRealizedProfit;
           trade.performance.totalReturnPercent =
             tradePrincipal > 0
               ? round((tradeRealizedProfit / tradePrincipal) * 100)
               : 0;
 
-          closedTrades.push(trade);
+          closedTradesIds.push(trade._id);
         } else {
           trade.execution.quantity = actualQuantityRemaining;
           trade.execution.amount = actualPrincipalRemaining;
-          trade.execution.positionAmount = actualCostRemaining;
           trade.execution.positionCost = actualCostRemaining;
           trade.execution.marginDebt = actualDebtRemaining;
+
+          // Do not replace original entry exposure with remaining cost basis.
+          trade.execution.positionAmount = originalPositionAmount;
 
           trade.extra = actualExtraRemaining;
 
@@ -378,10 +343,10 @@ class ManagePositionService {
 
           trade.partialCloses.push({
             percentClosed: closeRatio * 100,
-            principalClosed: round(tradePrincipalClosed),
-            profitLossClosed: round(tradeRealizedProfit),
+            principalClosed: tradePrincipalClosed,
+            profitLossClosed: tradeRealizedProfit,
             closedAt: now,
-            remainingPrincipal: round(actualPrincipalRemaining),
+            remainingPrincipal: actualPrincipalRemaining,
             remainingProfitLoss: round(remainingProfit),
           });
         }
@@ -405,54 +370,91 @@ class ManagePositionService {
         remainingExtra += actualExtraRemaining;
       }
 
-      /*
-       * Apply wallet accounting once.
-       *
-       * available: credit the actual net cash returned.
-       * total:     credit realized P&L only, because buy only deducted
-       *            the principal from available, not from total.
-       */
+      quantityClosed = round(quantityClosed);
+      principalClosed = round(principalClosed);
+      positionCostClosed = round(positionCostClosed);
+      marginDebtRepaid = round(marginDebtRepaid);
+      baseValueClosed = round(baseValueClosed);
+      extraClosed = round(extraClosed);
+      cashReturned = round(cashReturned);
+      realizedProfitLoss = round(realizedProfitLoss);
+
+      remainingQuantity = round(remainingQuantity);
+      remainingPrincipal = round(remainingPrincipal);
+      remainingPositionCost = round(remainingPositionCost);
+      remainingMarginDebt = round(remainingMarginDebt);
+      remainingBaseValue = round(remainingBaseValue);
+      remainingExtra = round(remainingExtra);
+
       const settledCash = round(Math.max(0, cashReturned));
-      const settledProfitLoss = round(realizedProfitLoss);
+      const settledProfitLoss = realizedProfitLoss;
 
-      wallet.balance = wallet.balance ?? {};
+      const isAutoPlan = position.wallet?.slug === "auto";
 
-      wallet.balance.available =
-        (Number(wallet.balance.available) || 0) + settledCash;
+      if (isAutoPlan) {
+        const user = await User.findById(position.userId).session(session);
 
-      wallet.balance.total =
-        (Number(wallet.balance.total) || 0) + settledProfitLoss;
+        if (!user) {
+          throw new CustomError("User not found for auto-plan settlement", 404);
+        }
 
-      // Reduce the wallet's outstanding debt if this wallet tracks it.
-      if (wallet.marginDebt !== undefined) {
-        wallet.marginDebt = Math.max(
-          0,
-          (Number(wallet.marginDebt) || 0) + 0 - round(marginDebtRepaid),
+        const activePlan = user.activePlans?.find(
+          (plan) =>
+            String(plan.planId) === String(position.planId) &&
+            plan.status === "active",
         );
+
+        if (!activePlan) {
+          throw new CustomError("Active plan not found for this position", 409);
+        }
+
+        activePlan.balance = activePlan.balance ?? {};
+        activePlan.balance.available =
+          (Number(activePlan.balance.available) || 0) + settledCash;
+
+        activePlan.balance.total =
+          (Number(activePlan.balance.total) || 0) + settledProfitLoss;
+
+        if (activePlan.balance.available < -0.01) {
+          throw new CustomError(
+            "Auto-plan does not have sufficient funds to settle this close",
+            409,
+          );
+        }
+
+        await user.save({ session });
+      } else {
+        wallet.balance = wallet.balance ?? {};
+
+        wallet.balance.available =
+          (Number(wallet.balance.available) || 0) + settledCash;
+
+        wallet.balance.total =
+          (Number(wallet.balance.total) || 0) + settledProfitLoss;
+
+        if (wallet.marginDebt !== undefined) {
+          wallet.marginDebt = Math.max(
+            0,
+            (Number(wallet.marginDebt) || 0) - marginDebtRepaid,
+          );
+        }
+
+        await wallet.save({ session });
       }
 
-      await wallet.save({ session });
-
-      /*
-       * Update the position from the remaining open buy trades' accounting
-       * totals. Do not call updatePosition() here as well; the trades and
-       * wallet have already been updated in this transaction.
-       */
-      position.quantity = round(remainingQuantity);
-      position.amountInvested = round(remainingPrincipal);
-      position.positionCost = round(remainingPositionCost);
-      position.marginDebt = round(remainingMarginDebt);
+      // Rebuild the aggregate position from its remaining open trades.
+      position.quantity = remainingQuantity;
+      position.amountInvested = remainingPrincipal;
+      position.positionCost = remainingPositionCost;
+      position.marginDebt = remainingMarginDebt;
 
       position.performance = position.performance ?? {};
       position.performance.currentPrice = currentPrice;
-      position.performance.currentBaseValue = round(remainingBaseValue);
-      position.performance.extra = round(remainingExtra);
-      position.performance.currentValue = round(
-        remainingBaseValue + remainingExtra,
-      );
-      position.performance.totalReturn = round(
-        remainingBaseValue - remainingPositionCost + remainingExtra,
-      );
+      position.performance.currentBaseValue = remainingBaseValue;
+      position.performance.extra = remainingExtra;
+      position.performance.currentValue = remainingBaseValue + remainingExtra;
+      position.performance.totalReturn =
+        remainingBaseValue - remainingPositionCost + remainingExtra;
       position.performance.totalReturnPercent =
         remainingPrincipal > 0
           ? round((position.performance.totalReturn / remainingPrincipal) * 100)
@@ -486,6 +488,9 @@ class ManagePositionService {
 
       if (noRemainingExposure) {
         position.status = "closed";
+        position.closedAt = now;
+        position.closeReason = "admin_close";
+
         position.quantity = 0;
         position.amountInvested = 0;
         position.positionCost = 0;
@@ -500,10 +505,10 @@ class ManagePositionService {
         }
 
         position.partialCloses.push({
-          quantityClosed: round(quantityClosed),
-          principalClosed: round(principalClosed),
-          positionCostClosed: round(positionCostClosed),
-          marginDebtRepaid: round(marginDebtRepaid),
+          quantityClosed,
+          principalClosed,
+          positionCostClosed,
+          marginDebtRepaid,
           profitLossClosed: settledProfitLoss,
           closedAt: now,
         });
@@ -511,11 +516,6 @@ class ManagePositionService {
 
       await position.save({ session });
 
-      /*
-       * Create a closed sell record for this close operation.
-       * The sell record is a historical record; it does not trigger another
-       * wallet credit or another position update.
-       */
       const sellTradeRecord = {
         userId: position.userId,
         asset: position.asset,
@@ -526,11 +526,11 @@ class ManagePositionService {
 
         execution: {
           price: currentPrice,
-          quantity: round(quantityClosed),
-          amount: round(principalClosed),
-          positionAmount: round(baseValueClosed),
-          positionCost: round(positionCostClosed),
-          marginDebt: round(marginDebtRepaid),
+          quantity: quantityClosed,
+          amount: principalClosed,
+          positionAmount: baseValueClosed,
+          positionCost: positionCostClosed,
+          marginDebt: marginDebtRepaid,
           leverage: Number(position.leverage) || 1,
         },
 
@@ -542,8 +542,8 @@ class ManagePositionService {
         },
 
         performance: {
-          currentBaseValue: round(baseValueClosed),
-          currentValue: round(baseValueClosed + extraClosed),
+          currentBaseValue: baseValueClosed,
+          currentValue: baseValueClosed + extraClosed,
           currentPrice,
           totalReturn: settledProfitLoss,
           totalReturnPercent:
@@ -557,21 +557,18 @@ class ManagePositionService {
         status: "closed",
         closedAt: now,
         closeReason: "admin_close",
-        extra: round(extraClosed),
+        extra: extraClosed,
         fullname: position.fullname,
         positionId: position._id,
-        closedTradesIds: closedTrades.map((trade) => trade._id),
+        closedTradesIds,
       };
 
       const [sellTrade] = await Trade.create([sellTradeRecord], { session });
 
-      const updatedPosition =
-        await Position.findById(positionId).session(session);
-
       await session.commitTransaction();
       transactionCommitted = true;
 
-      // Secondary snapshots must not invalidate a committed financial close.
+      // Snapshot failures must not invalidate the committed close.
       try {
         await portfolioService.createPortfolioSnapshot(
           position.userId,
@@ -582,7 +579,7 @@ class ManagePositionService {
             assetSymbol: position.asset.symbol,
             closeRatio,
             grossValueClosed: round(baseValueClosed + extraClosed),
-            marginDebtRepaid: round(marginDebtRepaid),
+            marginDebtRepaid,
             cashReturned: settledCash,
             realizedProfitLoss: settledProfitLoss,
           },
@@ -601,7 +598,7 @@ class ManagePositionService {
             assetSymbol: position.asset.symbol,
             closeRatio,
             grossValueClosed: round(baseValueClosed + extraClosed),
-            marginDebtRepaid: round(marginDebtRepaid),
+            marginDebtRepaid,
             cashReturned: settledCash,
             realizedProfitLoss: settledProfitLoss,
           },
@@ -609,6 +606,8 @@ class ManagePositionService {
       } catch (error) {
         console.error("Wallet snapshot failed after close:", error);
       }
+
+      const updatedPosition = await Position.findById(positionId);
 
       return {
         success: true,
@@ -620,12 +619,12 @@ class ManagePositionService {
         close: {
           closeRatio,
           closePercentage: closeRatio * 100,
-          baseValueClosed: round(baseValueClosed),
-          extraClosed: round(extraClosed),
+          baseValueClosed,
+          extraClosed,
           grossValueClosed: round(baseValueClosed + extraClosed),
-          principalClosed: round(principalClosed),
-          positionCostClosed: round(positionCostClosed),
-          marginDebtRepaid: round(marginDebtRepaid),
+          principalClosed,
+          positionCostClosed,
+          marginDebtRepaid,
           profitLoss: settledProfitLoss,
           cashReturned: settledCash,
         },
@@ -670,6 +669,8 @@ class ManagePositionService {
     let userId;
     let walletId;
 
+    const round = (value) => Number(Number(value).toFixed(8));
+
     try {
       session.startTransaction();
 
@@ -679,31 +680,27 @@ class ManagePositionService {
         throw new CustomError("Position not found", 404);
       }
 
-      if (!position.performance) {
-        position.performance = {};
-      }
-
-      // --------------------------------------------------
-      // 1. CUSTOM DATE
-      // --------------------------------------------------
+      position.performance = position.performance ?? {};
 
       if (customDate !== undefined) {
         position.customDate = customDate;
       }
 
-      // --------------------------------------------------
-      // 2. EDIT BONUS / EXTRA
-      // --------------------------------------------------
-
       if (extra !== undefined && extra !== null && extra !== "") {
-        const parsedExtra = Number(extra);
-
-        if (!Number.isFinite(parsedExtra)) {
-          throw new CustomError("Extra must be a valid number", 400);
+        if (position.status !== "open") {
+          throw new CustomError(
+            "Bonus can only be edited on an open position",
+            400,
+          );
         }
 
-        if (parsedExtra < 0) {
-          throw new CustomError("Extra cannot be negative", 400);
+        const parsedExtra = Number(extra);
+
+        if (!Number.isFinite(parsedExtra) || parsedExtra < 0) {
+          throw new CustomError(
+            "Extra must be a valid non-negative number",
+            400,
+          );
         }
 
         const currentExtra = Number(position.performance.extra) || 0;
@@ -711,8 +708,6 @@ class ManagePositionService {
         extraDifference = parsedExtra - currentExtra;
 
         if (extraDifference !== 0) {
-          shouldCreateSnapshots = true;
-
           const quantity = Number(position.quantity) || 0;
 
           let currentPrice = Number(position.performance.currentPrice) || 0;
@@ -732,13 +727,8 @@ class ManagePositionService {
             );
           }
 
-          // --------------------------------------------------
-          // 3. RECOMPUTE POSITION VALUES
-          // --------------------------------------------------
-
           const currentBaseValue = quantity * currentPrice;
           const amountInvested = Number(position.amountInvested) || 0;
-
           const positionCost =
             Number(position.positionCost) ||
             quantity * (Number(position.averageEntryPrice) || 0);
@@ -756,10 +746,6 @@ class ManagePositionService {
               ? (position.performance.totalReturn / amountInvested) * 100
               : 0;
 
-          // --------------------------------------------------
-          // 4. UPDATE TODAY'S RETURN
-          // --------------------------------------------------
-
           position.performance.todayExtra =
             (Number(position.performance.todayExtra) || 0) + extraDifference;
 
@@ -775,100 +761,110 @@ class ManagePositionService {
               ? (position.performance.todayReturn / amountInvested) * 100
               : 0;
 
-          // --------------------------------------------------
-          // 5. DISTRIBUTE BONUS TO OPEN TRADES
-          // --------------------------------------------------
-
           const trades = await Trade.find({
             _id: { $in: position.tradeIds || [] },
+            userId: position.userId,
+            "asset.assetId": position.asset.assetId,
+            "wallet.id": position.wallet.id,
+            orderType: "buy",
             status: "open",
           }).session(session);
 
-          if (trades.length > 0) {
-            const totalInvested = trades.reduce(
-              (sum, trade) => sum + (Number(trade.execution?.amount) || 0),
+          if (trades.length === 0) {
+            throw new CustomError(
+              "No open buy trades found to allocate the position bonus",
+              409,
+            );
+          }
+
+          const totalInvested = trades.reduce(
+            (sum, trade) =>
+              sum + Math.max(0, Number(trade.execution?.amount) || 0),
+            0,
+          );
+
+          let allocatedExtra = 0;
+
+          for (let index = 0; index < trades.length; index++) {
+            const trade = trades[index];
+
+            trade.performance = trade.performance ?? {};
+
+            const tradeAmount = Math.max(
               0,
+              Number(trade.execution?.amount) || 0,
             );
 
-            let allocatedExtra = 0;
+            let newTradeExtra;
 
-            for (let index = 0; index < trades.length; index++) {
-              const trade = trades[index];
+            if (index === trades.length - 1) {
+              // Assign the remainder to avoid cumulative allocation drift.
+              newTradeExtra = round(parsedExtra - allocatedExtra);
+            } else if (totalInvested > 0) {
+              newTradeExtra = round(
+                parsedExtra * (tradeAmount / totalInvested),
+              );
 
-              if (!trade.performance) {
-                trade.performance = {};
-              }
-
-              const tradeAmount = Number(trade.execution?.amount) || 0;
-
-              // Allocate according to user-funded capital.
-              // The last trade receives the rounding remainder.
-              let newTradeExtra;
-
-              if (index === trades.length - 1) {
-                newTradeExtra = parsedExtra - allocatedExtra;
-              } else if (totalInvested > 0) {
-                newTradeExtra = parsedExtra * (tradeAmount / totalInvested);
-
-                allocatedExtra += newTradeExtra;
-              } else {
-                newTradeExtra = parsedExtra / trades.length;
-                allocatedExtra += newTradeExtra;
-              }
-
-              const tradeQuantity = Number(trade.execution?.quantity) || 0;
-
-              const tradePrice =
-                Number(trade.performance.currentPrice) ||
-                Number(trade.execution?.price) ||
-                currentPrice;
-
-              const tradeBaseValue = tradeQuantity * tradePrice;
-
-              const tradePositionCost =
-                Number(trade.execution?.positionCost) ||
-                Number(trade.execution?.positionAmount) ||
-                tradeQuantity * (Number(trade.execution?.price) || 0);
-
-              const oldTradeExtra = Number(trade.extra) || 0;
-
-              const tradeExtraDifference = newTradeExtra - oldTradeExtra;
-
-              // Bonus is stored at the root of the Trade.
-              trade.extra = newTradeExtra;
-
-              trade.performance.currentPrice = tradePrice;
-              trade.performance.currentBaseValue = tradeBaseValue;
-              trade.performance.currentValue = tradeBaseValue + newTradeExtra;
-
-              trade.performance.totalReturn =
-                tradeBaseValue - tradePositionCost + newTradeExtra;
-
-              trade.performance.totalReturnPercent =
-                tradeAmount > 0
-                  ? (trade.performance.totalReturn / tradeAmount) * 100
-                  : 0;
-
-              // Apply only the change in bonus to today's bonus return.
-              trade.performance.todayExtra =
-                (Number(trade.performance.todayExtra) || 0) +
-                tradeExtraDifference;
-
-              trade.performance.todayMarketReturn =
-                Number(trade.performance.todayMarketReturn) || 0;
-
-              trade.performance.todayReturn =
-                trade.performance.todayMarketReturn +
-                trade.performance.todayExtra;
-
-              trade.performance.todayReturnPercent =
-                tradeAmount > 0
-                  ? (trade.performance.todayReturn / tradeAmount) * 100
-                  : 0;
-
-              await trade.save({ session });
+              allocatedExtra += newTradeExtra;
+            } else {
+              newTradeExtra = round(parsedExtra / trades.length);
+              allocatedExtra += newTradeExtra;
             }
+
+            const tradeQuantity = Number(trade.execution?.quantity) || 0;
+
+            const tradePrice =
+              Number(trade.performance.currentPrice) ||
+              Number(trade.execution?.price) ||
+              currentPrice;
+
+            const tradeBaseValue = tradeQuantity * tradePrice;
+
+            const tradePositionCost =
+              Number(trade.execution?.positionCost) ||
+              Number(trade.execution?.amount) *
+                (Number(trade.execution?.leverage) || 1);
+
+            const oldTradeExtra = Number(trade.extra) || 0;
+            const tradeExtraDifference = newTradeExtra - oldTradeExtra;
+
+            // Bonus is independent of leverage.
+            trade.extra = newTradeExtra;
+
+            trade.performance.currentPrice = tradePrice;
+            trade.performance.currentBaseValue = tradeBaseValue;
+            trade.performance.currentValue = tradeBaseValue + newTradeExtra;
+
+            trade.performance.totalReturn =
+              tradeBaseValue - tradePositionCost + newTradeExtra;
+
+            trade.performance.totalReturnPercent =
+              tradeAmount > 0
+                ? (trade.performance.totalReturn / tradeAmount) * 100
+                : 0;
+
+            trade.performance.todayExtra =
+              (Number(trade.performance.todayExtra) || 0) +
+              tradeExtraDifference;
+
+            trade.performance.todayMarketReturn =
+              Number(trade.performance.todayMarketReturn) || 0;
+
+            trade.performance.todayReturn =
+              trade.performance.todayMarketReturn +
+              trade.performance.todayExtra;
+
+            trade.performance.todayReturnPercent =
+              tradeAmount > 0
+                ? (trade.performance.todayReturn / tradeAmount) * 100
+                : 0;
+
+            // Do not change quantity, leverage, positionAmount, positionCost,
+            // marginDebt, or user-funded principal when editing bonus.
+            await trade.save({ session });
           }
+
+          shouldCreateSnapshots = true;
 
           snapshotMetadata = {
             positionId: position._id,
@@ -882,23 +878,17 @@ class ManagePositionService {
         }
       }
 
-      // --------------------------------------------------
-      // 6. SAVE POSITION
-      // --------------------------------------------------
-
       await position.save({ session });
-
-      // Keep a reference to the committed result.
       updatedPosition = position;
-
-      // --------------------------------------------------
-      // 7. COMMIT FINANCIAL CHANGES FIRST
-      // --------------------------------------------------
 
       await session.commitTransaction();
     } catch (error) {
       if (session.inTransaction()) {
-        await session.abortTransaction();
+        try {
+          await session.abortTransaction();
+        } catch (abortError) {
+          console.error("Failed to abort position edit:", abortError);
+        }
       }
 
       if (error instanceof CustomError) {
@@ -912,11 +902,7 @@ class ManagePositionService {
       await session.endSession();
     }
 
-    // --------------------------------------------------
-    // 8. CREATE SNAPSHOTS AFTER COMMIT
-    // Snapshot failures must not fail the position edit.
-    // --------------------------------------------------
-
+    // Snapshots are secondary and run after the transaction commits.
     if (shouldCreateSnapshots && snapshotMetadata) {
       const snapshotTasks = [
         {
@@ -939,11 +925,11 @@ class ManagePositionService {
         },
       ];
 
-      const snapshotResults = await Promise.allSettled(
+      const results = await Promise.allSettled(
         snapshotTasks.map((task) => task.run()),
       );
 
-      snapshotResults.forEach((result, index) => {
+      results.forEach((result, index) => {
         if (result.status === "rejected") {
           console.error(
             `editPositionData ${snapshotTasks[index].name} failed:`,

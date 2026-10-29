@@ -23,6 +23,8 @@ class PositionService {
 
     let query = Trade.find({
       _id: { $in: position.tradeIds },
+      orderType: "buy",
+      status: "open",
     });
 
     if (session) query = query.session(session);
@@ -34,14 +36,20 @@ class PositionService {
     const positionExtra = Number(position.performance?.extra ?? 0);
 
     if (!Number.isFinite(positionExtra) || positionExtra < 0) {
-      throw new Error("Position bonus must be a valid non-negative number");
+      throw new CustomError(
+        "Position bonus must be a valid non-negative number!",
+        400,
+      );
     }
 
     const tradeAmounts = trades.map((trade) => {
       const amount = Number(trade.execution?.amount);
 
       if (!Number.isFinite(amount) || amount < 0) {
-        throw new Error(`Invalid execution amount for trade ${trade._id}`);
+        throw new CustomError(
+          `Invalid execution amount for trade ${trade._id}`,
+          400,
+        );
       }
 
       return amount;
@@ -54,8 +62,8 @@ class PositionService {
     for (let i = 0; i < trades.length; i++) {
       const trade = trades[i];
 
-      // Allocate proportionally to the original user-funded trade amount.
-      // The last trade receives the rounding remainder.
+      // Allocate the remaining bonus by each trade's remaining
+      // user-funded principal. The last trade gets the rounding remainder.
       const tradeExtra =
         i === trades.length - 1
           ? Number((positionExtra - distributedExtra).toFixed(4))
@@ -65,6 +73,10 @@ class PositionService {
                 : positionExtra / trades.length
               ).toFixed(4),
             );
+
+      if (tradeExtra < 0 || !Number.isFinite(tradeExtra)) {
+        throw new CustomError("Invalid bonus allocation!", 400);
+      }
 
       if (!trade.performance) trade.performance = {};
 
@@ -78,8 +90,9 @@ class PositionService {
         !Number.isFinite(entryCost) ||
         entryCost < 0
       ) {
-        throw new Error(
+        throw new CustomError(
           `Missing or invalid market value or entry cost for trade ${trade._id}`,
+          400,
         );
       }
 
@@ -89,20 +102,17 @@ class PositionService {
         (currentBaseValue + tradeExtra).toFixed(4),
       );
 
-      // Unrealized market P/L + allocated bonus.
-      // Margin debt is not deducted from profit.
       const totalReturn = currentBaseValue - entryCost + tradeExtra;
 
       trade.performance.totalReturn = Number(totalReturn.toFixed(4));
 
-      const investedAmount = tradeAmounts[i];
-
       trade.performance.totalReturnPercent =
-        investedAmount > 0
-          ? Number(((totalReturn / investedAmount) * 100).toFixed(4))
+        tradeAmounts[i] > 0
+          ? Number(((totalReturn / tradeAmounts[i]) * 100).toFixed(4))
           : 0;
 
       await trade.save(session ? { session } : {});
+
       distributedExtra += tradeExtra;
     }
   }
@@ -385,8 +395,9 @@ class PositionService {
       return Number.isFinite(number) ? number : fallback;
     };
 
-    // Recover entry cost for legacy positions that lack positionCost
-    // and averageEntryPrice.
+    const round = (value) => Number(value.toFixed(4));
+
+    // Recover remaining cost basis if a legacy position lacks it.
     const getEntryCost = async (pos, fallbackPrice) => {
       const quantity = toNumber(pos.quantity, 0);
       const storedCost = toNumber(pos.positionCost, 0);
@@ -404,6 +415,7 @@ class PositionService {
         let tradesQuery = Trade.find({
           _id: { $in: tradeIds },
           orderType: "buy",
+          status: "open",
         });
 
         if (session) tradesQuery = tradesQuery.session(session);
@@ -416,6 +428,8 @@ class PositionService {
         for (const originalTrade of originalTrades) {
           const tradeQty = toNumber(originalTrade.execution?.quantity, 0);
 
+          if (tradeQty <= 0) continue;
+
           const savedCost = toNumber(originalTrade.execution?.positionCost, 0);
 
           const savedExposure = toNumber(
@@ -425,10 +439,6 @@ class PositionService {
 
           const entryPrice = toNumber(originalTrade.execution?.price, 0);
 
-          const principal = toNumber(originalTrade.execution?.amount, 0);
-
-          if (tradeQty <= 0) continue;
-
           const tradeCost =
             savedCost > 0
               ? savedCost
@@ -436,7 +446,7 @@ class PositionService {
                 ? savedExposure
                 : entryPrice > 0
                   ? tradeQty * entryPrice
-                  : principal;
+                  : 0;
 
           if (!Number.isFinite(tradeCost) || tradeCost <= 0) {
             continue;
@@ -447,13 +457,12 @@ class PositionService {
         }
 
         if (costTotal > 0 && quantityTotal > 0 && quantity > 0) {
-          // Scale original weighted cost to the quantity currently held.
           return (costTotal / quantityTotal) * quantity;
         }
       }
 
-      // Last resort for legacy data with no recoverable entry basis.
-      // This assumes zero market P/L for the existing quantity.
+      // Last resort for legacy records only.
+      // This assumes the current market price approximates entry cost.
       if (quantity > 0 && fallbackPrice > 0) {
         return quantity * fallbackPrice;
       }
@@ -467,15 +476,14 @@ class PositionService {
       const tradePrice = toNumber(execution.price);
       const tradeExtra = toNumber(extra, 0);
 
-      const storedPositionCost = toNumber(execution.positionCost, 0);
-
-      const storedPositionAmount = toNumber(execution.positionAmount, 0);
+      const storedCost = toNumber(execution.positionCost, 0);
+      const storedExposure = toNumber(execution.positionAmount, 0);
 
       const tradeEntryCost =
-        storedPositionCost > 0
-          ? storedPositionCost
-          : storedPositionAmount > 0
-            ? storedPositionAmount
+        storedCost > 0
+          ? storedCost
+          : storedExposure > 0
+            ? storedExposure
             : tradeQuantity * tradePrice;
 
       const tradeMarginDebt = toNumber(
@@ -502,11 +510,8 @@ class PositionService {
 
       if (position) {
         const existingAmount = toNumber(position.amountInvested, 0);
-
         const existingQuantity = toNumber(position.quantity, 0);
-
         const existingDebt = toNumber(position.marginDebt, 0);
-
         const existingExtra = toNumber(position.performance?.extra, 0);
 
         if (
@@ -523,15 +528,21 @@ class PositionService {
 
         const existingCost = await getEntryCost(position, tradePrice);
 
+        if (existingQuantity > 0 && existingCost <= 0) {
+          throw new CustomError(
+            "Unable to determine existing position cost basis!",
+            400,
+          );
+        }
+
         const newTotalAmount = existingAmount + tradeAmount;
         const newTotalQuantity = existingQuantity + tradeQuantity;
         const newPositionCost = existingCost + tradeEntryCost;
         const newMarginDebt = existingDebt + tradeMarginDebt;
         const newExtra = existingExtra + tradeExtra;
 
-        // Revalue the entire position at the latest buy execution price.
+        // The latest execution price is used for this immediate valuation.
         const newBaseValue = newTotalQuantity * tradePrice;
-        const newCurrentValue = newBaseValue + newExtra;
 
         position.amountInvested = newTotalAmount;
         position.quantity = newTotalQuantity;
@@ -541,16 +552,13 @@ class PositionService {
         position.averageEntryPrice =
           newTotalQuantity > 0 ? newPositionCost / newTotalQuantity : 0;
 
-        if (!position.performance) {
-          position.performance = {};
-        }
+        if (!position.performance) position.performance = {};
 
         position.performance.currentBaseValue = newBaseValue;
-        position.performance.currentValue = newCurrentValue;
+        position.performance.currentValue = newBaseValue + newExtra;
         position.performance.currentPrice = tradePrice;
         position.performance.extra = newExtra;
 
-        // P/L is based on entry cost, not principal or debt.
         position.performance.totalReturn =
           newBaseValue - newPositionCost + newExtra;
 
@@ -615,8 +623,7 @@ class PositionService {
           marginDebt: tradeMarginDebt,
           quantity: tradeQuantity,
 
-          averageEntryPrice:
-            tradeQuantity > 0 ? tradeEntryCost / tradeQuantity : tradePrice,
+          averageEntryPrice: tradeEntryCost / tradeQuantity,
 
           performance: {
             currentBaseValue,
@@ -668,6 +675,8 @@ class PositionService {
         );
 
         position = createdPosition;
+
+        await this.redistributeTradeExtra(position, session);
       }
     } else if (orderType === "sell") {
       if (!position) {
@@ -704,92 +713,111 @@ class PositionService {
         throw new CustomError("Unable to determine position entry cost!", 400);
       }
 
-      const oldBaseValue = oldQuantity * sellPrice;
+      const quantityRatio = Math.min(sellQuantity / oldQuantity, 1);
+      const isFullClose = quantityRatio >= 1 - 0.000001;
+
+      const actualSellQuantity = isFullClose ? oldQuantity : sellQuantity;
+
+      const sellMarketValue = actualSellQuantity * sellPrice;
 
       const suppliedMarketValue = toNumber(execution.positionAmount, NaN);
 
-      const sellMarketValue = Number.isFinite(suppliedMarketValue)
-        ? suppliedMarketValue
-        : sellQuantity * sellPrice;
-
-      if (sellMarketValue < 0 || sellMarketValue > oldBaseValue + 0.000001) {
-        throw new CustomError("Invalid market value to close!", 400);
+      // positionAmount on a sell record means market value closed,
+      // not original buy-side exposure.
+      if (
+        Number.isFinite(suppliedMarketValue) &&
+        Math.abs(suppliedMarketValue - sellMarketValue) >
+          Math.max(0.01, sellMarketValue * 0.000001)
+      ) {
+        throw new CustomError(
+          "Sell market value does not match quantity and price!",
+          400,
+        );
       }
 
-      const suppliedRatio = toNumber(execution.closeRatio, NaN);
+      // Prefer the exact amounts recorded by closeTradeOrder.
+      // Use quantity-based proportions only for legacy sell records.
+      const principalClosed = toNumber(
+        execution.amount,
+        oldPrincipal * quantityRatio,
+      );
 
-      const closeRatio = Number.isFinite(suppliedRatio)
-        ? suppliedRatio
-        : sellQuantity / oldQuantity;
+      const costClosed = toNumber(
+        execution.positionCost,
+        oldCost * quantityRatio,
+      );
+
+      const debtClosed = toNumber(
+        execution.marginDebt,
+        oldDebt * quantityRatio,
+      );
+
+      const extraClosed = toNumber(extra, oldExtra * quantityRatio);
+
+      const tolerance = 0.0001;
 
       if (
-        closeRatio <= 0 ||
-        closeRatio > 1 ||
-        Math.abs(sellQuantity - oldQuantity * closeRatio) >
-          Math.max(0.000001, oldQuantity * 0.000001)
+        principalClosed < 0 ||
+        costClosed < 0 ||
+        debtClosed < 0 ||
+        extraClosed < 0 ||
+        principalClosed > oldPrincipal + tolerance ||
+        costClosed > oldCost + tolerance ||
+        debtClosed > oldDebt + tolerance ||
+        extraClosed > oldExtra + tolerance
       ) {
-        throw new CustomError("Invalid close ratio!", 400);
+        throw new CustomError(
+          "Closed accounting amounts exceed the remaining position!",
+          400,
+        );
       }
 
-      const isFullClose = closeRatio >= 1 - 0.000001;
-      const ratio = isFullClose ? 1 : closeRatio;
-      const remainingRatio = 1 - ratio;
-
-      const quantityClosed = oldQuantity * ratio;
-      const principalClosed = oldPrincipal * ratio;
-      const costClosed = oldCost * ratio;
-      const debtClosed = oldDebt * ratio;
-      const extraClosed = oldExtra * ratio;
-
-      const realizedMarketProfit = sellMarketValue - costClosed;
-      const realizedProfit = realizedMarketProfit + extraClosed;
-
-      const remainingQuantity = isFullClose ? 0 : oldQuantity * remainingRatio;
+      const remainingQuantity = isFullClose
+        ? 0
+        : Math.max(0, oldQuantity - actualSellQuantity);
 
       const remainingPrincipal = isFullClose
         ? 0
-        : oldPrincipal * remainingRatio;
+        : Math.max(0, oldPrincipal - principalClosed);
 
-      const remainingCost = isFullClose ? 0 : oldCost - costClosed;
+      const remainingCost = isFullClose ? 0 : Math.max(0, oldCost - costClosed);
 
-      const remainingDebt = isFullClose ? 0 : oldDebt - debtClosed;
+      const remainingDebt = isFullClose ? 0 : Math.max(0, oldDebt - debtClosed);
 
-      const remainingBaseValue = isFullClose
+      const remainingExtra = isFullClose
         ? 0
-        : remainingQuantity * sellPrice;
+        : Math.max(0, oldExtra - extraClosed);
 
-      const remainingExtra = isFullClose ? 0 : oldExtra - extraClosed;
+      const remainingBaseValue = remainingQuantity * sellPrice;
+
+      const realizedProfit = sellMarketValue - costClosed + extraClosed;
+
+      const closedAt = new Date();
+
+      position.quantity = remainingQuantity;
+      position.amountInvested = remainingPrincipal;
+      position.positionCost = remainingCost;
+      position.marginDebt = remainingDebt;
+
+      position.averageEntryPrice =
+        remainingQuantity > 0 ? remainingCost / remainingQuantity : 0;
+
+      position.performance.currentPrice = sellPrice;
+      position.performance.currentBaseValue = remainingBaseValue;
+      position.performance.currentValue = remainingBaseValue + remainingExtra;
+
+      position.performance.extra = remainingExtra;
 
       if (isFullClose) {
         position.status = "closed";
-        position.closedAt = new Date();
+        position.closedAt = closedAt;
 
-        position.quantity = 0;
-        position.amountInvested = 0;
-        position.positionCost = 0;
-        position.marginDebt = 0;
-        position.averageEntryPrice = 0;
-
-        position.performance.currentBaseValue = 0;
-        position.performance.currentValue = 0;
-        position.performance.extra = 0;
-
+        // Preserve the realized P/L on the closed position.
         position.performance.totalReturn = realizedProfit;
+
         position.performance.totalReturnPercent =
-          oldPrincipal > 0 ? (realizedProfit / oldPrincipal) * 100 : 0;
+          principalClosed > 0 ? (realizedProfit / principalClosed) * 100 : 0;
       } else {
-        position.quantity = remainingQuantity;
-        position.amountInvested = remainingPrincipal;
-        position.positionCost = remainingCost;
-        position.marginDebt = remainingDebt;
-
-        position.averageEntryPrice =
-          remainingQuantity > 0 ? remainingCost / remainingQuantity : 0;
-
-        position.performance.currentBaseValue = remainingBaseValue;
-        position.performance.currentValue = remainingBaseValue + remainingExtra;
-        position.performance.extra = remainingExtra;
-
         position.performance.totalReturn =
           remainingBaseValue - remainingCost + remainingExtra;
 
@@ -797,15 +825,15 @@ class PositionService {
           remainingPrincipal > 0
             ? (position.performance.totalReturn / remainingPrincipal) * 100
             : 0;
-
-        position.performance.currentPrice = sellPrice;
       }
 
       if (!position.partialCloses) position.partialCloses = [];
 
       position.partialCloses.push({
-        percentClosed: Number((ratio * 100).toFixed(4)),
-        quantityClosed,
+        percentClosed: Number(
+          ((actualSellQuantity / oldQuantity) * 100).toFixed(4),
+        ),
+        quantityClosed: actualSellQuantity,
         principalClosed,
         positionCostClosed: costClosed,
         marginDebtClosed: debtClosed,
@@ -816,9 +844,9 @@ class PositionService {
         marginDebtRepaid: debtClosed,
         netWalletCredit: sellMarketValue + extraClosed - debtClosed,
 
-        marketProfitClosed: realizedMarketProfit,
+        marketProfitClosed: sellMarketValue - costClosed,
         profitLossClosed: realizedProfit,
-        closedAt: new Date(),
+        closedAt,
 
         remainingQuantity,
         remainingPrincipal,
@@ -838,17 +866,24 @@ class PositionService {
       position.history.push({
         action: isFullClose ? "close" : "remove",
         tradeId: trade._id,
-        quantity: quantityClosed,
+        quantity: actualSellQuantity,
         amount: principalClosed,
         positionAmount: sellMarketValue,
         marginDebt: debtClosed,
         price: sellPrice,
         extra: extraClosed,
         profitLoss: realizedProfit,
-        timestamp: new Date(),
+        timestamp: closedAt,
       });
 
       await position.save(session ? { session } : {});
+
+      // Redistribute only the remaining bonus among open buy trades.
+      if (!isFullClose) {
+        await this.redistributeTradeExtra(position, session);
+      }
+    } else {
+      throw new CustomError("Unsupported position order type!", 400);
     }
 
     return position;

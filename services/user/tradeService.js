@@ -136,9 +136,7 @@ async function buyAsset(userId, assetData) {
 
     const marginDebt = Math.max(0, positionAmount - principal);
 
-    const leveragedExtra = Number(
-      (parsedExtra * leverageMultiplier).toFixed(4),
-    );
+    const leveragedExtra = Number(parsedExtra.toFixed(4));
 
     if (Number(userWallet.balance.available) < principal) {
       throw new CustomError("Insufficient funds!", 400);
@@ -387,6 +385,7 @@ async function sellAsset(formData) {
     const trades = await Trade.find({
       _id: { $in: position.tradeIds || [] },
       orderType: "buy",
+      status: "open",
     }).session(session);
 
     if (!trades.length) {

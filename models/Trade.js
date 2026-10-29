@@ -75,7 +75,10 @@ const tradeSchema = new Schema(
 
     performance: {
       currentBaseValue: { type: Number, default: 0 },
-
+      currentPrice: {
+        type: Number,
+        default: 0,
+      },
       currentValue: { type: Number, default: 0 },
 
       totalReturn: { type: Number, default: 0 },

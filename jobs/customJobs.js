@@ -18,20 +18,27 @@ async function updateAssetsData() {
   console.log("Starting asset data update...");
   const startTime = Date.now();
 
-  try {
-    console.log("Updating CRYPTO assets...");
-    await updateCryptoAssets();
+  const results = {};
 
-    console.log("Updating STOCK assets...");
-    await updateStockAssets();
-
-    const endTime = Date.now();
-    const duration = ((endTime - startTime) / 1000).toFixed(2);
-    console.log(`Asset update completed in ${duration}s`);
-  } catch (error) {
-    console.error("Asset data update failed:", error.message);
-    throw error;
+  for (const [type, updater] of [
+    ["crypto", updateCryptoAssets],
+    ["stock", updateStockAssets],
+    ["etf", updateEtfAssets],
+  ]) {
+    try {
+      results[type] = await updater();
+    } catch (error) {
+      console.error(`[ASSET] ${type} updater failed:`, error.message);
+      results[type] = { updatedCount: 0, errorCount: -1 };
+    }
   }
+
+  console.log("[ASSET] Update summary:", results);
+  console.log(
+    `[ASSET] Finished in ${((Date.now() - startTime) / 1000).toFixed(2)}s`,
+  );
+
+  return results;
 }
 
 async function updateCryptoAssets() {
@@ -42,73 +49,115 @@ async function updateCryptoAssets() {
     const assets = await Asset.find({
       type: "crypto",
       isActive: true,
-    }).limit(250);
+    });
 
     if (assets.length === 0) {
       console.log("No active crypto assets found to update");
-      return;
+      return {
+        updatedCount: 0,
+        errorCount: 0,
+        missingApiIdCount: 0,
+      };
     }
 
-    console.log(`Updating ${assets.length} crypto assets...`);
+    const assetsByApiId = new Map();
+    const missingApiIdAssets = [];
+    const duplicateApiIdAssets = [];
 
-    const assetsByApiId = {};
-    assets.forEach((asset) => {
-      if (asset.apiId) {
-        assetsByApiId[asset.apiId] = asset;
+    for (const asset of assets) {
+      const apiId = asset.apiId?.trim().toLowerCase();
+
+      if (!apiId) {
+        missingApiIdAssets.push(asset.symbol);
+        continue;
       }
-    });
 
-    const apiIds = Object.keys(assetsByApiId);
+      if (assetsByApiId.has(apiId)) {
+        console.warn(
+          `[CRYPTO] Duplicate API ID "${apiId}" for ${asset.symbol}`,
+        );
 
-    if (apiIds.length === 0) {
-      console.log("No assets with valid API IDs found");
-      return;
+        duplicateApiIdAssets.push(asset.symbol);
+        continue;
+      }
+
+      assetsByApiId.set(apiId, asset);
     }
 
-    console.log(`Found ${apiIds.length} assets with API IDs`);
+    const apiIds = [...assetsByApiId.keys()];
 
-    const BATCH_SIZE = 30;
-    const batches = [];
-    for (let i = 0; i < apiIds.length; i += BATCH_SIZE) {
-      batches.push(apiIds.slice(i, i + BATCH_SIZE));
+    console.log(
+      `[CRYPTO] Found ${assets.length} active assets, ` +
+        `${apiIds.length} unique API IDs, ` +
+        `${missingApiIdAssets.length} without API IDs, ` +
+        `${duplicateApiIdAssets.length} duplicate API IDs`,
+    );
+
+    if (missingApiIdAssets.length > 0) {
+      console.warn("[CRYPTO] Missing API IDs:", missingApiIdAssets.join(", "));
     }
 
     let updatedCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
+    const BATCH_SIZE = 30;
+
+    for (let i = 0; i < apiIds.length; i += BATCH_SIZE) {
+      const batch = apiIds.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(apiIds.length / BATCH_SIZE);
+
       console.log(
-        `Processing crypto batch ${i + 1}/${batches.length} (${
-          batch.length
-        } assets)...`,
+        `[CRYPTO] Processing batch ${batchNumber}/${totalBatches} ` +
+          `(${batch.length} assets)`,
       );
 
       try {
-        const batchResults = await processCryptoBatch(batch, assetsByApiId);
-        updatedCount += batchResults.updatedCount;
-        errorCount += batchResults.errorCount;
+        const assetsByBatchApiId = Object.fromEntries(
+          batch.map((id) => [id, assetsByApiId.get(id)]),
+        );
 
-        if (i < batches.length - 1) {
-          console.log(
-            `Waiting ${REQUEST_DELAY / 1000} seconds before next batch...`,
-          );
-          await delay(REQUEST_DELAY);
-        }
-      } catch (batchError) {
-        console.error(`Crypto batch ${i + 1} failed:`, batchError.message);
+        const result = await processCryptoBatch(batch, assetsByBatchApiId);
+
+        updatedCount += result.updatedCount;
+        errorCount += result.errorCount;
+
+        console.log(
+          `[CRYPTO] Batch ${batchNumber} result: ` +
+            `${result.updatedCount} updated, ${result.errorCount} errors`,
+        );
+      } catch (error) {
+        console.error(
+          `[CRYPTO] Batch ${batchNumber} failed:`,
+          error.stack || error,
+        );
+
         errorCount += batch.length;
+      }
+
+      if (i + BATCH_SIZE < apiIds.length) {
+        await delay(REQUEST_DELAY);
       }
     }
 
-    const endTime = Date.now();
-    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
     console.log(
-      `Crypto update completed in ${duration}s: ${updatedCount} updated, ${errorCount} errors`,
+      `[CRYPTO] Update finished in ${duration}s: ` +
+        `${updatedCount} updated, ${errorCount} quote/update errors, ` +
+        `${missingApiIdAssets.length} missing API IDs, ` +
+        `${duplicateApiIdAssets.length} duplicate API IDs`,
     );
+
+    return {
+      updatedCount,
+      errorCount,
+      missingApiIdCount: missingApiIdAssets.length,
+      duplicateApiIdCount: duplicateApiIdAssets.length,
+    };
   } catch (error) {
-    console.error("Crypto asset data update failed:", error.message);
+    console.error("[CRYPTO] Asset update failed:", error.stack || error);
+
     throw error;
   }
 }
@@ -118,75 +167,305 @@ async function updateStockAssets() {
   const startTime = Date.now();
 
   try {
+    // Fetch ALL active stocks; don't limit to 250.
     const assets = await Asset.find({
       type: "stock",
       isActive: true,
-    }).limit(250);
+    });
 
     if (assets.length === 0) {
       console.log("No active stock assets found to update");
-      return;
+      return { updatedCount: 0, errorCount: 0 };
     }
 
-    console.log(`Updating ${assets.length} stock assets...`);
+    const stocksBySymbol = new Map();
+    const missingSymbols = [];
 
-    const stocksBySymbol = {};
-    assets.forEach((asset) => {
-      if (asset.symbol) {
-        stocksBySymbol[asset.symbol] = asset;
+    for (const asset of assets) {
+      const symbol = asset.symbol?.trim().toUpperCase();
+
+      if (!symbol) {
+        missingSymbols.push(String(asset._id));
+        continue;
       }
-    });
 
-    const symbols = Object.keys(stocksBySymbol);
+      stocksBySymbol.set(symbol, asset);
+    }
+
+    const symbols = [...stocksBySymbol.keys()];
+
+    console.log(
+      `[STOCK] Found ${assets.length} active assets, ` +
+        `${symbols.length} valid symbols, ` +
+        `${missingSymbols.length} missing symbols`,
+    );
+
+    if (missingSymbols.length > 0) {
+      console.warn("[STOCK] Assets missing symbols:", missingSymbols);
+    }
 
     if (symbols.length === 0) {
-      console.log("No stocks with valid symbols found");
-      return;
+      return {
+        updatedCount: 0,
+        errorCount: assets.length,
+      };
     }
-
-    console.log(`Found ${symbols.length} stocks to update`);
 
     const STOCK_BATCH_SIZE = 10;
-    const batches = [];
-    for (let i = 0; i < symbols.length; i += STOCK_BATCH_SIZE) {
-      batches.push(symbols.slice(i, i + STOCK_BATCH_SIZE));
-    }
+    const totalBatches = Math.ceil(symbols.length / STOCK_BATCH_SIZE);
 
     let updatedCount = 0;
-    let errorCount = 0;
+    let errorCount = missingSymbols.length;
 
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
+    for (let i = 0; i < symbols.length; i += STOCK_BATCH_SIZE) {
+      const batch = symbols.slice(i, i + STOCK_BATCH_SIZE);
+      const batchNumber = Math.floor(i / STOCK_BATCH_SIZE) + 1;
+
       console.log(
-        `Processing stock batch ${i + 1}/${batches.length} (${
-          batch.length
-        } stocks)...`,
+        `[STOCK] Processing batch ${batchNumber}/${totalBatches} ` +
+          `(${batch.length} symbols)`,
       );
 
       try {
-        const batchResults = await processStockBatch(batch, stocksBySymbol);
-        updatedCount += batchResults.updatedCount;
-        errorCount += batchResults.errorCount;
+        const result = await processStockBatch(
+          batch,
+          Object.fromEntries(
+            batch.map((symbol) => [symbol, stocksBySymbol.get(symbol)]),
+          ),
+        );
 
-        if (i < batches.length - 1) {
-          await delay(2000);
-        }
-      } catch (batchError) {
-        console.error(`Stock batch ${i + 1} failed:`, batchError.message);
+        updatedCount += result.updatedCount;
+        errorCount += result.errorCount;
+
+        console.log(
+          `[STOCK] Batch ${batchNumber}: ` +
+            `${result.updatedCount} updated, ${result.errorCount} errors`,
+        );
+      } catch (error) {
+        console.error(
+          `[STOCK] Batch ${batchNumber} failed:`,
+          error.stack || error,
+        );
+
         errorCount += batch.length;
+      }
+
+      if (i + STOCK_BATCH_SIZE < symbols.length) {
+        await delay(2000);
       }
     }
 
-    const endTime = Date.now();
-    const duration = ((endTime - startTime) / 1000).toFixed(2);
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
     console.log(
-      `Stock update completed in ${duration}s: ${updatedCount} updated, ${errorCount} errors`,
+      `[STOCK] Update finished in ${duration}s: ` +
+        `${updatedCount} updated, ${errorCount} errors`,
     );
+
+    return { updatedCount, errorCount };
   } catch (error) {
-    console.error("Stock asset data update failed:", error.message);
+    console.error("[STOCK] Asset update failed:", error.stack || error);
+
     throw error;
   }
+}
+
+async function updateEtfAssets() {
+  console.log("Starting ETF asset update...");
+  const startTime = Date.now();
+
+  try {
+    // Fetch ALL active ETFs. No .limit(250).
+    const assets = await Asset.find({
+      type: "etf",
+      isActive: true,
+    });
+
+    if (assets.length === 0) {
+      console.log("[ETF] No active ETFs found");
+      return { updatedCount: 0, errorCount: 0 };
+    }
+
+    const etfsBySymbol = {};
+
+    for (const asset of assets) {
+      const symbol = asset.symbol?.trim().toUpperCase();
+
+      if (symbol) {
+        etfsBySymbol[symbol] = asset;
+      }
+    }
+
+    const symbols = Object.keys(etfsBySymbol);
+    const missingSymbols = assets.length - symbols.length;
+
+    console.log(
+      `[ETF] Found ${assets.length} active ETFs; ` +
+        `${symbols.length} valid symbols; ` +
+        `${missingSymbols} missing symbols`,
+    );
+
+    const BATCH_SIZE = 10;
+    let updatedCount = 0;
+    let errorCount = missingSymbols;
+
+    for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+      const batch = symbols.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(symbols.length / BATCH_SIZE);
+
+      console.log(`[ETF] Processing batch ${batchNumber}/${totalBatches}`);
+
+      try {
+        const result = await processEtfBatch(batch, etfsBySymbol);
+
+        updatedCount += result.updatedCount;
+        errorCount += result.errorCount;
+
+        console.log(
+          `[ETF] Batch ${batchNumber}: ` +
+            `${result.updatedCount} updated, ${result.errorCount} errors`,
+        );
+      } catch (error) {
+        console.error(
+          `[ETF] Batch ${batchNumber} failed:`,
+          error.stack || error,
+        );
+
+        errorCount += batch.length;
+      }
+
+      if (i + BATCH_SIZE < symbols.length) {
+        await delay(2000);
+      }
+    }
+
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+
+    console.log(
+      `[ETF] Update finished in ${duration}s: ` +
+        `${updatedCount} updated, ${errorCount} errors`,
+    );
+
+    return { updatedCount, errorCount };
+  } catch (error) {
+    console.error("[ETF] Asset update failed:", error.stack || error);
+    throw error;
+  }
+}
+
+async function processEtfBatch(symbols, etfsBySymbol) {
+  let updatedCount = 0;
+  let errorCount = 0;
+
+  const FMP_API_KEY = process.env.FMP_API_KEY;
+  const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
+
+  if (!FMP_API_KEY) {
+    throw new Error("FMP_API_KEY is missing");
+  }
+
+  try {
+    const response = await axios.get(
+      `${FMP_BASE_URL}/quote/${symbols.join(",")}`,
+      {
+        params: { apikey: FMP_API_KEY },
+        timeout: 15000,
+      },
+    );
+
+    if (!Array.isArray(response.data)) {
+      throw new Error("FMP returned an invalid ETF quote response");
+    }
+
+    const quotesBySymbol = new Map(
+      response.data.map((quote) => [quote.symbol?.toUpperCase(), quote]),
+    );
+
+    for (const symbol of symbols) {
+      const asset = etfsBySymbol[symbol];
+      const quote = quotesBySymbol.get(symbol);
+
+      if (!asset) {
+        console.warn(`[ETF] Local asset not found: ${symbol}`);
+        errorCount++;
+        continue;
+      }
+
+      if (
+        !quote ||
+        typeof quote.price !== "number" ||
+        !Number.isFinite(quote.price) ||
+        quote.price < 0
+      ) {
+        console.warn(`[ETF] Missing or invalid quote: ${symbol}`);
+        errorCount++;
+        continue;
+      }
+
+      try {
+        const updateData = {
+          "priceData.current": quote.price,
+          lastUpdated: new Date(),
+        };
+
+        const optionalFields = {
+          "priceData.open": quote.open,
+          "priceData.previousClose": quote.previousClose,
+          "priceData.dayLow": quote.dayLow,
+          "priceData.dayHigh": quote.dayHigh,
+          "priceData.change": quote.change,
+          "priceData.changePercent": quote.changesPercentage,
+          "priceData.volume": quote.volume,
+          "priceData.avgVolume": quote.avgVolume,
+          "historical.yearLow": quote.yearLow,
+          "historical.yearHigh": quote.yearHigh,
+          "fundamentals.marketCap": quote.marketCap,
+          "fundamentals.pe": quote.pe,
+          "fundamentals.dividendYield": quote.dividendYield,
+          "fundamentals.eps": quote.eps,
+        };
+
+        for (const [key, value] of Object.entries(optionalFields)) {
+          if (value !== null && value !== undefined && Number.isFinite(value)) {
+            updateData[key] = value;
+          }
+        }
+
+        const result = await Asset.updateOne(
+          { _id: asset._id, type: "etf" },
+          { $set: updateData },
+        );
+
+        if (result.matchedCount === 0) {
+          console.error(`[ETF] Asset not found in DB: ${symbol}`);
+          errorCount++;
+          continue;
+        }
+
+        updatedCount++;
+
+        console.log(`[ETF] Updated ${symbol}: $${quote.price}`);
+      } catch (error) {
+        console.error(
+          `[ETF] Database update failed for ${symbol}:`,
+          error.message,
+        );
+
+        errorCount++;
+      }
+    }
+  } catch (error) {
+    console.error(
+      "[ETF] Batch API request failed:",
+      error.response?.status,
+      error.message,
+    );
+
+    throw error;
+  }
+
+  return { updatedCount, errorCount };
 }
 
 async function processStockBatch(symbols, stocksBySymbol) {
@@ -196,76 +475,119 @@ async function processStockBatch(symbols, stocksBySymbol) {
   const FMP_API_KEY = process.env.FMP_API_KEY;
   const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
 
+  if (!FMP_API_KEY) {
+    throw new Error("FMP_API_KEY is missing");
+  }
+
   try {
-    const symbolsParam = symbols.join(",");
-    const quoteUrl = `${FMP_BASE_URL}/quote/${symbolsParam}`;
+    const quoteUrl = `${FMP_BASE_URL}/quote/${symbols.join(",")}`;
 
     const response = await axios.get(quoteUrl, {
-      params: {
-        apikey: FMP_API_KEY,
-      },
+      params: { apikey: FMP_API_KEY },
       timeout: 15000,
     });
 
-    if (response.data && Array.isArray(response.data)) {
-      for (const quote of response.data) {
-        const asset = stocksBySymbol[quote.symbol];
-
-        if (asset && quote) {
-          try {
-            const updateData = {
-              "priceData.current": quote.price || asset.priceData.current,
-              "priceData.open": quote.open,
-              "priceData.previousClose": quote.previousClose,
-              "priceData.dayLow": quote.dayLow,
-              "priceData.dayHigh": quote.dayHigh,
-              "priceData.change": quote.change,
-              "priceData.changePercent": quote.changesPercentage,
-              "priceData.volume": quote.volume,
-              "priceData.avgVolume": quote.avgVolume,
-              "historical.yearLow": quote.yearLow,
-              "historical.yearHigh": quote.yearHigh,
-              "fundamentals.marketCap":
-                quote.marketCap || asset.fundamentals.marketCap,
-              "fundamentals.pe": quote.pe || asset.fundamentals.pe,
-              lastUpdated: new Date(),
-            };
-
-            await Asset.findByIdAndUpdate(asset._id, updateData);
-            updatedCount++;
-            console.log(`✅ Updated stock: ${quote.symbol} - $${quote.price}`);
-          } catch (err) {
-            console.error(`Error updating stock ${quote.symbol}:`, err.message);
-            errorCount++;
-          }
-        }
-      }
+    if (!Array.isArray(response.data)) {
+      throw new Error("FMP returned an invalid quote response");
     }
 
+    const quotesBySymbol = new Map(
+      response.data.map((quote) => [quote.symbol?.toUpperCase(), quote]),
+    );
+
     for (const symbol of symbols) {
-      const asset = stocksBySymbol[symbol];
-      if (asset && !response.data.find((q) => q.symbol === symbol)) {
-        console.log(`⚠️ No data found for stock: ${symbol}`);
+      const normalizedSymbol = symbol.toUpperCase();
+      const asset = stocksBySymbol[normalizedSymbol];
+      const quote = quotesBySymbol.get(normalizedSymbol);
+
+      if (!asset) {
+        console.warn(`[STOCK] Asset not found locally: ${symbol}`);
+        errorCount++;
+        continue;
+      }
+
+      if (
+        !quote ||
+        typeof quote.price !== "number" ||
+        !Number.isFinite(quote.price) ||
+        quote.price < 0
+      ) {
+        console.warn(`[STOCK] Missing or invalid quote: ${symbol}`);
+        errorCount++;
+        continue;
+      }
+
+      try {
+        const updateData = {
+          "priceData.current": quote.price,
+          lastUpdated: new Date(),
+        };
+
+        const optionalFields = {
+          "priceData.open": quote.open,
+          "priceData.previousClose": quote.previousClose,
+          "priceData.dayLow": quote.dayLow,
+          "priceData.dayHigh": quote.dayHigh,
+          "priceData.change": quote.change,
+          "priceData.changePercent": quote.changesPercentage,
+          "priceData.volume": quote.volume,
+          "priceData.avgVolume": quote.avgVolume,
+          "historical.yearLow": quote.yearLow,
+          "historical.yearHigh": quote.yearHigh,
+          "fundamentals.marketCap": quote.marketCap,
+          "fundamentals.pe": quote.pe,
+        };
+
+        for (const [key, value] of Object.entries(optionalFields)) {
+          if (value !== null && value !== undefined && Number.isFinite(value)) {
+            updateData[key] = value;
+          }
+        }
+
+        const result = await Asset.updateOne(
+          { _id: asset._id },
+          { $set: updateData },
+        );
+
+        if (result.matchedCount === 0) {
+          console.error(`[STOCK] Asset disappeared from DB: ${symbol}`);
+          errorCount++;
+          continue;
+        }
+
+        // lastUpdated changes on each successful write.
+        updatedCount++;
+
+        console.log(`[STOCK] Updated ${symbol}: $${quote.price}`);
+      } catch (error) {
+        console.error(`[STOCK] DB update failed for ${symbol}:`, error.message);
         errorCount++;
       }
     }
   } catch (error) {
-    console.error("Error fetching stock data:", error.message);
-    errorCount += symbols.length;
+    console.error(
+      "[STOCK] Batch request failed:",
+      error.response?.status,
+      error.message,
+    );
+
+    throw error;
   }
 
   return { updatedCount, errorCount };
 }
 
-async function processCryptoBatch(apiIds, assetsByApiId) {
+async function processCryptoBatch(apiIds, assetsByApiId, attempt = 0) {
   let updatedCount = 0;
   let errorCount = 0;
+
+  const MAX_RETRIES = 3;
 
   try {
     const response = await axios.get(`${COIN_GECKO_API_URL}/coins/markets`, {
       params: {
         vs_currency: VS_CURRENCY,
-        ids: apiIds.join(","), // Use CoinGecko IDs, not symbols
+        ids: apiIds.join(","),
         order: "market_cap_desc",
         price_change_percentage: "24h,7d,30d,1y",
         sparkline: false,
@@ -273,32 +595,40 @@ async function processCryptoBatch(apiIds, assetsByApiId) {
       timeout: 30000,
     });
 
-    const marketData = response.data;
+    if (!Array.isArray(response.data)) {
+      throw new Error("CoinGecko returned an invalid market response");
+    }
 
-    // Create a map for quick lookup
-    const marketDataMap = {};
-    marketData.forEach((item) => {
-      marketDataMap[item.id] = item;
-    });
+    const marketDataMap = new Map(response.data.map((item) => [item.id, item]));
 
-    // Process each asset in the batch
     for (const apiId of apiIds) {
+      const asset = assetsByApiId[apiId];
+      const cryptoData = marketDataMap.get(apiId);
+
+      if (!asset) {
+        console.warn(`[CRYPTO] Local asset not found: ${apiId}`);
+        errorCount++;
+        continue;
+      }
+
+      if (
+        !cryptoData ||
+        typeof cryptoData.current_price !== "number" ||
+        !Number.isFinite(cryptoData.current_price) ||
+        cryptoData.current_price < 0
+      ) {
+        console.warn(`[CRYPTO] Missing or invalid quote: ${apiId}`);
+        errorCount++;
+        continue;
+      }
+
       try {
-        const asset = assetsByApiId[apiId];
-        const cryptoData = marketDataMap[apiId];
-
-        if (!cryptoData) {
-          console.warn(
-            `No market data found for ${apiId} (${asset?.symbol || "unknown"})`,
-          );
-          errorCount++;
-          continue;
-        }
-
         const updateFields = {
           "priceData.current": cryptoData.current_price,
-          "priceData.open": cryptoData.low_24h,
-          "priceData.previousClose": cryptoData.ath || cryptoData.current_price,
+          lastUpdated: new Date(),
+        };
+
+        const optionalFields = {
           "priceData.dayLow": cryptoData.low_24h,
           "priceData.dayHigh": cryptoData.high_24h,
           "priceData.change": cryptoData.price_change_24h,
@@ -306,71 +636,59 @@ async function processCryptoBatch(apiIds, assetsByApiId) {
           "priceData.volume": cryptoData.total_volume,
           "priceData.avgVolume": cryptoData.total_volume,
           "fundamentals.marketCap": cryptoData.market_cap,
-          lastUpdated: new Date(),
+          "historical.yearLow": cryptoData.atl,
+          "historical.yearHigh": cryptoData.ath,
         };
 
-        // Only update historical data if we have meaningful values
-        if (cryptoData.atl) {
-          updateFields["historical.yearLow"] = cryptoData.atl;
-        }
-        if (cryptoData.ath) {
-          updateFields["historical.yearHigh"] = cryptoData.ath;
-        }
-
-        // Clean null/undefined values
-        Object.keys(updateFields).forEach((key) => {
-          if (updateFields[key] === null || updateFields[key] === undefined) {
-            delete updateFields[key];
+        for (const [key, value] of Object.entries(optionalFields)) {
+          if (value !== null && value !== undefined && Number.isFinite(value)) {
+            updateFields[key] = value;
           }
-        });
+        }
 
         const result = await Asset.updateOne(
-          { _id: asset._id }, // Use _id for more reliable updates
+          { _id: asset._id },
           { $set: updateFields },
         );
 
-        if (result.modifiedCount > 0) {
-          updatedCount++;
-          console.log(
-            `Updated ${asset.symbol} - $${
-              cryptoData.current_price?.toFixed(2) || "N/A"
-            }`,
-          );
-        } else {
-          console.log(`No changes for ${asset.symbol}`);
+        if (result.matchedCount === 0) {
+          console.error(`[CRYPTO] Asset disappeared from DB: ${apiId}`);
+          errorCount++;
+          continue;
         }
-      } catch (assetError) {
-        console.error(`Error updating ${apiId}:`, assetError.message);
+
+        // modifiedCount can be zero when the values are unchanged.
+        // lastUpdated is set on every successful matched update.
+        updatedCount++;
+
+        console.log(
+          `[CRYPTO] Updated ${asset.symbol}: $${cryptoData.current_price}`,
+        );
+      } catch (error) {
+        console.error(`[CRYPTO] DB update failed for ${apiId}:`, error.message);
         errorCount++;
       }
     }
+  } catch (error) {
+    if (error.response?.status === 429 && attempt < MAX_RETRIES) {
+      const waitMs = 15000 * (attempt + 1);
 
-    // Log missing assets that were in the batch but not returned
-    const returnedApiIds = marketData.map((item) => item.id);
-    const missingApiIds = apiIds.filter(
-      (apiId) => !returnedApiIds.includes(apiId),
+      console.warn(
+        `[CRYPTO] Rate limited. Retry ${attempt + 1}/${MAX_RETRIES} ` +
+          `in ${waitMs / 1000}s`,
+      );
+
+      await delay(waitMs);
+
+      return processCryptoBatch(apiIds, assetsByApiId, attempt + 1);
+    }
+
+    console.error(
+      "[CRYPTO] Batch request failed:",
+      error.response?.status,
+      error.message,
     );
 
-    for (const missingApiId of missingApiIds) {
-      const asset = assetsByApiId[missingApiId];
-      console.warn(
-        `No market data returned for ${missingApiId} (${
-          asset?.symbol || "unknown"
-        })`,
-      );
-      errorCount++;
-    }
-  } catch (error) {
-    console.error("Batch API call failed:", error.message);
-
-    if (error.response?.status === 429) {
-      console.log("Rate limited, waiting 30 seconds before retry...");
-      await delay(30000);
-      // Optionally retry this batch
-      return processAssetBatch(apiIds, assetsByApiId);
-    }
-
-    errorCount += apiIds.length;
     throw error;
   }
 
@@ -702,9 +1020,16 @@ const updateTradePerformance = async () => {
     for (const asset of currentAssets || []) {
       if (!asset?.symbol) continue;
 
+      const current = Number(asset.priceData?.current);
+      const previousClose = Number(asset.priceData?.previousClose);
+
       priceMap.set(asset.symbol.toUpperCase(), {
-        current: Number(asset.priceData?.current),
-        previousClose: Number(asset.priceData?.previousClose),
+        current: Number.isFinite(current) && current > 0 ? current : null,
+
+        previousClose:
+          Number.isFinite(previousClose) && previousClose > 0
+            ? previousClose
+            : null,
       });
     }
 
@@ -743,6 +1068,21 @@ const updateTradePerformance = async () => {
       if (!assetData) {
         skipped.missingAssetData++;
         skippedSymbols.add(symbol);
+        continue;
+      }
+
+      if (
+        !assetData ||
+        !Number.isFinite(assetData.current) ||
+        assetData.current <= 0
+      ) {
+        console.warn("[INVALID ASSET PRICE]", {
+          tradeId: trade._id,
+          symbol,
+          assetData,
+        });
+
+        skipped.invalidPrice++;
         continue;
       }
 
@@ -984,9 +1324,16 @@ const updatePositionsPerformance = async () => {
     for (const asset of currentAssets || []) {
       if (!asset?.symbol) continue;
 
+      const current = Number(asset.priceData?.current);
+      const previousClose = Number(asset.priceData?.previousClose);
+
       priceMap.set(asset.symbol.toUpperCase(), {
-        current: Number(asset.priceData?.current),
-        previousClose: Number(asset.priceData?.previousClose),
+        current: Number.isFinite(current) && current > 0 ? current : null,
+
+        previousClose:
+          Number.isFinite(previousClose) && previousClose > 0
+            ? previousClose
+            : null,
       });
     }
 
@@ -1012,8 +1359,18 @@ const updatePositionsPerformance = async () => {
 
       const assetData = priceMap.get(symbol);
 
-      if (!assetData) {
-        skipped.missingAssetData++;
+      if (
+        !assetData ||
+        !Number.isFinite(assetData.current) ||
+        assetData.current <= 0
+      ) {
+        console.warn("[INVALID ASSET PRICE]", {
+          positionId: position._id,
+          symbol,
+          assetData,
+        });
+
+        skipped.invalidPrice++;
         continue;
       }
 
