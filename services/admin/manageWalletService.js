@@ -14,6 +14,8 @@ class ManageWalletService {
   async editWalletBalance(formData) {
     const { walletId, amount, action, account } = formData;
 
+    console.log(formData);
+
     if (!walletId || amount == null || !action) {
       throw new CustomError("Incomplete data!", 400);
     }
@@ -24,7 +26,7 @@ class ManageWalletService {
 
     const amt = Number(amount);
 
-    if (!Number.isFinite(amt) || amt <= 0) {
+    if (!Number.isFinite(amt)) {
       throw new CustomError("Amount must be a valid positive number!", 400);
     }
 
