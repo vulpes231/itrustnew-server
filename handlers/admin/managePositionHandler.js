@@ -1,6 +1,7 @@
 const User = require("../../models/User");
 const managePositionService = require("../../services/admin/managePositionService");
 const queueService = require("../../services/queueService");
+const positionService = require("../../services/user/positionService");
 
 const getAllPositions = async (req, res, next) => {
   const { sortBy } = req.query;
@@ -104,10 +105,25 @@ const exitTrade = async (req, res, next) => {
   }
 };
 
+const closeFullPosition = async (req, res, next) => {
+  const { positionId } = req.params;
+  try {
+    const pos = await managePositionService.exitPosition({
+      positionId,
+    });
+    res
+      .status(200)
+      .json({ message: "Position closed", data: null, success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllPositions,
   exitTrade,
   getPositionInfo,
   editPositionInfo,
   removePositionInfo,
+  closeFullPosition,
 };

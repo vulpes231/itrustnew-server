@@ -14,8 +14,6 @@ class ManageWalletService {
   async editWalletBalance(formData) {
     const { walletId, amount, action, account } = formData;
 
-    console.log(formData);
-
     if (!walletId || amount == null || !action) {
       throw new CustomError("Incomplete data!", 400);
     }

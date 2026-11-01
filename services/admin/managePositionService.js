@@ -16,6 +16,10 @@ const {
   calculateReturnPercent,
   hasNoRemainingExposure,
 } = require("../../utils/trading/positionCalculation");
+const {
+  validateMarketPrice,
+  requireFiniteNumber,
+} = require("../../utils/trading/tradeValidation");
 
 class ManagePositionService {
   async fetchAllPositions(queryData) {
@@ -37,6 +41,281 @@ class ManagePositionService {
     const position = await Position.findById(positionId);
     if (!position) throw new CustomError("Position not found!", 404);
     return position;
+  }
+
+  async exitPosition({ positionId }) {
+    const session = await mongoose.startSession();
+
+    try {
+      session.startTransaction();
+
+      if (!mongoose.Types.ObjectId.isValid(positionId)) {
+        throw new CustomError("Invalid position ID.", 400);
+      }
+
+      const position = await Position.findById(positionId).session(session);
+
+      if (!position) {
+        throw new CustomError("Position not found.", 404);
+      }
+
+      const userId = position.userId;
+
+      if (position.status !== "open") {
+        throw new CustomError("Position is not open.", 400);
+      }
+
+      const asset = await Asset.findById(position.asset.assetId).session(
+        session,
+      );
+
+      if (!asset) {
+        throw new CustomError("Asset not found.", 404);
+      }
+
+      let currentPrice;
+
+      try {
+        currentPrice = validateMarketPrice(asset.priceData?.current);
+      } catch {
+        throw new CustomError(
+          "Invalid market price. Position cannot be liquidated.",
+          400,
+        );
+      }
+
+      const openTrades = await Trade.find({
+        _id: { $in: position.tradeIds },
+        userId,
+        orderType: "buy",
+        status: "open",
+      }).session(session);
+
+      // No open trades: close position without wallet credit.
+      if (!openTrades.length) {
+        position.status = "closed";
+        position.closedAt = new Date();
+
+        await position.save({ session });
+        await session.commitTransaction();
+
+        return {
+          success: true,
+          message: "Position closed successfully. No open trades to liquidate.",
+          data: {
+            positionId: position._id,
+            asset: position.asset,
+            walletId: position.wallet.id,
+            status: position.status,
+            closedTradeCount: 0,
+            closingPrice: currentPrice,
+            quantityClosed: 0,
+            proceeds: 0,
+            realizedProfit: 0,
+            totalReturnPercent: 0,
+          },
+        };
+      }
+
+      const quantity = requireFiniteNumber(
+        position.quantity,
+        "Position quantity",
+      );
+
+      // Fallback for positions without positionCost.
+      const positionCost = requireFiniteNumber(
+        position.positionCost ??
+          position.amountInvested ??
+          position.performance?.currentBaseValue,
+        "Position cost",
+      );
+
+      const principal = requireFiniteNumber(
+        position.amountInvested,
+        "Amount invested",
+      );
+
+      const marginDebt = requireFiniteNumber(
+        position.marginDebt ?? 0,
+        "Margin debt",
+      );
+
+      const extra = requireFiniteNumber(
+        position.performance?.extra ?? 0,
+        "Position extra",
+      );
+
+      if (
+        quantity <= 0 ||
+        positionCost < 0 ||
+        principal < 0 ||
+        marginDebt < 0 ||
+        extra < 0
+      ) {
+        throw new CustomError("Invalid position accounting values.", 400);
+      }
+
+      const currentBaseValue = calculateMarketValue(quantity, currentPrice);
+
+      // Gross liquidation value includes extra.
+      const proceeds = currentBaseValue + extra;
+
+      // Deduct outstanding margin debt before wallet credit.
+      const netProceeds = proceeds - marginDebt;
+
+      if (
+        !Number.isFinite(proceeds) ||
+        proceeds < 0 ||
+        !Number.isFinite(netProceeds) ||
+        netProceeds < 0
+      ) {
+        throw new CustomError(
+          "Invalid liquidation value after margin debt.",
+          400,
+        );
+      }
+
+      const realizedProfit = calculateRealizedProfit({
+        marketValue: currentBaseValue,
+        positionCost,
+        extra,
+      });
+
+      const totalReturnPercent = calculateReturnPercent({
+        profit: realizedProfit,
+        principal,
+      });
+
+      const wallet = await Wallet.findById(position.wallet.id).session(session);
+
+      if (!wallet || String(wallet.userId) !== String(userId)) {
+        throw new CustomError("Position wallet not found for this user.", 404);
+      }
+
+      const availableBalance = requireFiniteNumber(
+        wallet.balance.available,
+        "Wallet available balance",
+      );
+
+      const totalBalance = requireFiniteNumber(
+        wallet.balance.total,
+        "Wallet total balance",
+      );
+
+      // Close every open buy trade.
+      for (const trade of openTrades) {
+        const tradeQuantity = requireFiniteNumber(
+          trade.execution?.quantity,
+          "Trade quantity",
+        );
+
+        const tradePrincipal = requireFiniteNumber(
+          trade.execution?.amount,
+          "Trade principal",
+        );
+
+        const tradePositionCost = requireFiniteNumber(
+          trade.execution?.positionCost ??
+            trade.execution?.positionAmount ??
+            trade.execution?.amount,
+          "Trade position cost",
+        );
+
+        const tradeExtra = requireFiniteNumber(trade.extra ?? 0, "Trade extra");
+
+        const tradeBaseValue = calculateMarketValue(
+          tradeQuantity,
+          currentPrice,
+        );
+
+        const tradeProfit = calculateRealizedProfit({
+          marketValue: tradeBaseValue,
+          positionCost: tradePositionCost,
+          extra: tradeExtra,
+        });
+
+        trade.status = "closed";
+        trade.closedAt = new Date();
+
+        trade.performance = {
+          ...(trade.performance?.toObject?.() ?? trade.performance ?? {}),
+          currentPrice,
+          currentBaseValue: tradeBaseValue,
+          currentValue: tradeBaseValue + tradeExtra,
+          totalReturn: tradeProfit,
+          totalReturnPercent: calculateReturnPercent({
+            profit: tradeProfit,
+            principal: tradePrincipal,
+          }),
+        };
+
+        trade.markModified("performance");
+
+        await trade.save({ session });
+      }
+
+      wallet.balance.available = availableBalance + netProceeds;
+      wallet.balance.total = totalBalance + realizedProfit;
+
+      wallet.markModified("balance");
+
+      await wallet.save({ session });
+
+      // Update and close the position.
+      position.status = "closed";
+      position.closedAt = new Date();
+
+      position.performance = {
+        ...(position.performance?.toObject?.() ?? position.performance ?? {}),
+        currentPrice,
+        currentBaseValue,
+        currentValue: currentBaseValue + extra,
+        totalReturn: realizedProfit,
+        totalReturnPercent,
+      };
+
+      position.markModified("performance");
+
+      await position.save({ session });
+
+      await session.commitTransaction();
+
+      return {
+        success: true,
+        message: "Position fully liquidated successfully.",
+        data: {
+          positionId: position._id,
+          asset: position.asset,
+          walletId: position.wallet.id,
+          status: position.status,
+          closedTradeCount: openTrades.length,
+          closingPrice: currentPrice,
+          quantityClosed: quantity,
+          proceeds,
+          marginDebt,
+          netProceeds,
+          realizedProfit,
+          totalReturnPercent,
+        },
+      };
+    } catch (error) {
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+
+      console.error("exitPosition error:", error);
+
+      if (error instanceof CustomError) {
+        throw error;
+      }
+
+      throw new CustomError(
+        error.message || "Failed to liquidate position.",
+        500,
+      );
+    } finally {
+      await session.endSession();
+    }
   }
 
   async closePosition(formData) {
