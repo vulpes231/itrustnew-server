@@ -393,11 +393,11 @@ async function getUserTrnxAnalytics(userId) {
         totalWithdrawal += amount;
       }
 
-      // Pending transactions
-      if (type === "deposit" && status === "pending") {
+      if (type === "deposit" && ["pending", "in process"].includes(status)) {
         pendingDeposit += amount;
       }
-      if (type === "withdraw" && status === "pending") {
+
+      if (type === "withdraw" && ["pending", "in process"].includes(status)) {
         pendingWithdrawal += amount;
       }
 
