@@ -193,7 +193,7 @@ class UserTierService {
       throw new CustomError("Withdrawal code required!", 400);
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(userId).select("personalInfo");
 
     if (!user) {
       throw new CustomError("User not found!", 404);
@@ -220,6 +220,7 @@ class UserTierService {
 
     return {
       success: true,
+      user,
     };
   }
 }

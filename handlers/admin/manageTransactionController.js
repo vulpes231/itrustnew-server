@@ -26,9 +26,14 @@ const getTransactionData = async (req, res, next) => {
 const setTransactionStatus = async (req, res, next) => {
   const { transactionId } = req.params;
   const { status } = req.body;
+
+  console.log(req.params);
   try {
-    const data = { transactionId, status };
-    const transaction = await updateTransactionStatus(data);
+    // const data = ;
+    const transaction = await updateTransactionStatus({
+      transactionId,
+      status,
+    });
     res.status(200).json({
       data: transaction,
       success: true,

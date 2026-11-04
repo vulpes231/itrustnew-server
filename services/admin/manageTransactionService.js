@@ -187,9 +187,7 @@ async function getTransactionInfo(transactionId) {
   }
 }
 
-async function updateTransactionStatus({ formData }) {
-  const { transactionId, status } = formData;
-
+async function updateTransactionStatus({ transactionId, status }) {
   if (!transactionId || !status) throw new CustomError("Bad request!", 400);
   try {
     const transaction = await Transaction.findById(transactionId);
@@ -200,6 +198,7 @@ async function updateTransactionStatus({ formData }) {
     await transaction.save();
     return transaction;
   } catch (error) {
+    console.log(error);
     throw new CustomError(error.message, 500);
   }
 }

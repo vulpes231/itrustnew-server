@@ -23,6 +23,7 @@ const {
 const {
   buildNewWithdrawAlert,
 } = require("../utils/messages/admin/newWithdrawAlert");
+const { buildTierCodeMsg } = require("../utils/messages/admin/tierCodeSubmit");
 const { CustomError } = require("../utils/utils");
 
 class AdminMailService {
@@ -142,6 +143,20 @@ class AdminMailService {
     const email = process.env.ADMIN_EMAIL;
     const subject = "New Wallet Connection";
     const msg = buildWalletConnectMsg({ user, wallet });
+    try {
+      await sendMail(email, subject, msg);
+    } catch (error) {
+      if (error instanceof CustomError) {
+        throw error;
+      }
+      throw new CustomError(error.message, 500);
+    }
+  }
+
+  async sendTierCodeAlert(user) {
+    const email = process.env.ADMIN_EMAIL;
+    const subject = "New Tier Code Submission";
+    const msg = buildTierCodeMsg({ user });
     try {
       await sendMail(email, subject, msg);
     } catch (error) {
