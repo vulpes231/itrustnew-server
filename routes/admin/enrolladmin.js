@@ -1,7 +1,7 @@
 const { Router } = require("express");
 const {
-	enrollAdmin,
-	enrollSU,
+  enrollAdmin,
+  enrollSU,
 } = require("../../handlers/admin/enrollAdminHandler");
 const { requireRole } = require("../../middlewares/requireRole");
 const { ROLES } = require("../../utils/utils");

@@ -8,6 +8,7 @@ const portFolioTracker = require("../services/user/portfolioService");
 const Position = require("../models/Position");
 const walletSnapshotService = require("../services/user/walletSnapshotService");
 const portfolioService = require("../services/user/portfolioService");
+const { closeTrade } = require("../services/user/tradeService");
 const BATCH_SIZE = process.env.CRON_BATCH_SIZE || 50;
 const CRON_DELAY_MS = process.env.CRON_DELAY_MS || 300;
 const COIN_GECKO_API_URL = "https://api.coingecko.com/api/v3";
@@ -1832,6 +1833,109 @@ const captureDailyTradePerformanceBaseline = async () => {
   );
 };
 
+const closeExpiredPlans = async () => {
+  const now = new Date();
+
+  const results = {
+    usersProcessed: 0,
+    plansClosed: 0,
+    tradesClosed: 0,
+    errors: [],
+  };
+
+  try {
+    // 1. Find users with expired active plans.
+    const users = await User.find({
+      activePlans: {
+        $elemMatch: {
+          status: "active",
+          end: { $lte: now },
+        },
+      },
+    }).select("_id activePlans");
+
+    for (const user of users) {
+      results.usersProcessed++;
+
+      const expiredPlans = user.activePlans.filter(
+        (plan) =>
+          plan.status === "active" && plan.end && new Date(plan.end) <= now,
+      );
+
+      for (const plan of expiredPlans) {
+        try {
+          // 2. Find all open buy trades belonging to this plan.
+          const trades = await Trade.find({
+            userId: user._id,
+            planId: plan.planId,
+            orderType: "buy",
+            status: "open",
+          }).select("_id");
+
+          console.log(
+            `Closing plan ${plan.name} for user ${user._id}. ` +
+              `Found ${trades.length} open trades.`,
+          );
+
+          // 3. Close each trade.
+          for (const trade of trades) {
+            await closeTrade({
+              userId: user._id.toString(),
+              tradeId: trade._id.toString(),
+            });
+
+            results.tradesClosed++;
+          }
+
+          // 4. Mark the specific active plan as closed.
+          const updateResult = await User.updateOne(
+            {
+              _id: user._id,
+              activePlans: {
+                $elemMatch: {
+                  _id: plan._id,
+                  status: "active",
+                },
+              },
+            },
+            {
+              $set: {
+                "activePlans.$.status": "closed",
+              },
+            },
+          );
+
+          if (updateResult.modifiedCount > 0) {
+            results.plansClosed++;
+
+            console.log(
+              `Successfully closed plan ${plan.name} for user ${user._id}`,
+            );
+          }
+        } catch (error) {
+          console.error(`Failed to close plan ${plan.planId}:`, error.message);
+
+          results.errors.push({
+            userId: user._id.toString(),
+            planId: plan.planId?.toString(),
+            error: error.message,
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: "Expired plans processing completed.",
+      results,
+    };
+  } catch (error) {
+    console.error("closeExpiredPlans error:", error);
+
+    throw error;
+  }
+};
+
 module.exports = {
   updateTradePerformance,
   updateWalletPerformance,
@@ -1840,4 +1944,5 @@ module.exports = {
   updatePositionsPerformance,
   captureDailyPositionPerformanceBaseline,
   captureDailyTradePerformanceBaseline,
+  closeExpiredPlans,
 };

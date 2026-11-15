@@ -6,6 +6,7 @@ const {
   updatePositionsPerformance,
   captureDailyPositionPerformanceBaseline,
   captureDailyTradePerformanceBaseline,
+  closeExpiredPlans,
 } = require("./customJobs");
 require("dotenv").config();
 
@@ -57,6 +58,7 @@ function initCronJobs() {
     positionPerformance:
       process.env.CRON_POSITION_PERFORMANCE || "*/30 * * * *",
     positionBaseline: process.env.CRON_POSITION_BASELINE || "0 0 * * *",
+    expiredPlans: process.env.CRON_EXPIRED_PLANS || "*/5 * * * *",
   };
 
   const positionBaselineJob = cron.schedule(
@@ -87,6 +89,27 @@ function initCronJobs() {
       scheduled: enableCrons,
     },
   );
+
+  const expiredPlansJob = cron.schedule(
+    schedules.expiredPlans,
+    () =>
+      runWithLock("expiredPlans", async () => {
+        try {
+          console.log(
+            `Starting expired plans check at ${new Date().toISOString()}`,
+          );
+
+          const result = await closeExpiredPlans();
+
+          console.log("Expired plans check completed:", result);
+        } catch (error) {
+          console.error("Expired plans job failed:", error);
+        }
+      }),
+    { scheduled: enableCrons },
+  );
+
+  activeJobs.add(expiredPlansJob);
 
   activeJobs.add(positionBaselineJob);
 
