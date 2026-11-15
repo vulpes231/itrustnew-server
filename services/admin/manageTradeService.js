@@ -98,7 +98,7 @@ class TradeService {
 
       const quantity = positionAmount / currentPrice;
 
-      if (wallet.balance.available < marginAmount) {
+      if (wallet.slug !== "auto" && wallet.balance.available < marginAmount) {
         throw new CustomError("Insufficient funds!", 400);
       }
 
