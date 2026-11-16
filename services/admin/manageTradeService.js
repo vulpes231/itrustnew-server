@@ -958,11 +958,14 @@ class TradeService {
     if (status) query.status = status;
     if (assetType) query.assetType = assetType;
 
-    const trades = await Trade.find(query).sort({ createdAt: -1 });
+    const trades = await Trade.find(query)
+      .select("-__v") // exclude unnecessary fields
+      .sort({ createdAt: -1 })
+      .lean() // critical for performance
+      .exec();
 
-    return {
-      trades,
-    };
+    console.log("trades returned");
+    return { trades };
   }
 
   async getUserTrades(userId, filters = {}) {

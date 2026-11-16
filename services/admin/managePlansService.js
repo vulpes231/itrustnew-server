@@ -285,19 +285,6 @@ async function editUserPlan(form) {
 
       const now = new Date();
 
-      // const now = new Date();
-
-      // console.log({
-      //   submittedEnd: end,
-      //   savedEnd: userPlan.end,
-      //   now,
-      //   endTimestamp: userPlan.end?.getTime(),
-      //   nowTimestamp: now.getTime(),
-      //   status: userPlan.status,
-      //   shouldClose:
-      //     userPlan.status !== "closed" && !!userPlan.end && userPlan.end <= now,
-      // });
-
       if (userPlan.status !== "closed" && userPlan.end && userPlan.end <= now) {
         const autoAccount = await Wallet.findOne({
           userId: user._id,
@@ -359,6 +346,39 @@ async function editUserPlan(form) {
     throw new CustomError(error.message, 500);
   } finally {
     session.endSession();
+  }
+}
+
+async function manageUserPlan({ planId, userId, balanceType, amount }) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new CustomError("Cannot find user", 404);
+    }
+    const userPlans = user.activePlans;
+
+    const planToUpdate = userPlans.find(
+      (plan) => plan._id.toString() === planId.toString(),
+    );
+
+    if (balanceType === "total") {
+      planToUpdate.balance.total = parseFloat(amount);
+    } else if (balanceType === "available") {
+      planToUpdate.balance.available = parseFloat(amount);
+    } else {
+      planToUpdate.balance.total = parseFloat(amount);
+      planToUpdate.balance.available = parseFloat(amount);
+    }
+
+    await user.save();
+
+    return { success: true };
+  } catch (error) {
+    if (error instanceof CustomError) {
+      throw error;
+    }
+
+    throw new CustomError(error.message, 500);
   }
 }
 

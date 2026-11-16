@@ -131,11 +131,12 @@ const tradeSchema = new Schema(
   },
 );
 
-tradeSchema.index({
-  userId: 1,
-  status: 1,
-  createdAt: -1,
-  "asset.assetId": 1,
-});
+// Best for your current query pattern
+tradeSchema.index({ status: 1, assetType: 1, createdAt: -1 });
+
+// Also useful
+tradeSchema.index({ createdAt: -1 });
+tradeSchema.index({ assetType: 1, createdAt: -1 });
+tradeSchema.index({ status: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Trade", tradeSchema);
