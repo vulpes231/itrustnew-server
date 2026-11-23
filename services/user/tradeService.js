@@ -136,7 +136,7 @@ async function buyAsset(userId, assetData) {
 
     const marginDebt = Math.max(0, positionAmount - principal);
 
-    const leveragedExtra = Number(parsedExtra.toFixed(4));
+    const leveragedExtra = Number(parsedExtra.toFixed(4) * leverageMultiplier);
 
     if (Number(userWallet.balance.available) < principal) {
       throw new CustomError("Insufficient funds!", 400);
@@ -202,6 +202,7 @@ async function buyAsset(userId, assetData) {
       },
 
       extra: leveragedExtra,
+      // unleveragedExtra: parsedExtra,
 
       targets: {
         takeProfit: tp || null,

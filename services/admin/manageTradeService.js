@@ -88,7 +88,7 @@ class TradeService {
       const marginAmount = parsedAmt;
       const marginDebt = positionAmount - marginAmount;
 
-      const positionExtra = parsedExtra;
+      const positionExtra = parsedExtra * leverageMultiplier;
 
       const currentPrice = Number(asset.priceData.current);
 
@@ -189,6 +189,7 @@ class TradeService {
         },
 
         extra: positionExtra || 0,
+        // unleveragedExtra: parsedExtra,
         status: "open",
         fullname: user.fullName,
       };
@@ -808,7 +809,7 @@ class TradeService {
         const newQuantity = newPositionCost / entryPrice;
 
         // Assumes the existing bonus was already leverage-adjusted.
-        const newExtra = oldExtra;
+        const newExtra = (oldExtra / oldLeverage) * newLeverage;
 
         // Calculate how much this specific trade changes.
         const quantityDelta = newQuantity - oldQuantity;

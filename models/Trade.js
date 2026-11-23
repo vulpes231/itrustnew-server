@@ -104,6 +104,10 @@ const tradeSchema = new Schema(
       type: Number,
       default: 0,
     },
+    extraLeverageBackfilled: {
+      type: Boolean,
+      default: false,
+    },
 
     fullname: {
       type: String,
