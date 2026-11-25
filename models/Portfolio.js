@@ -43,6 +43,8 @@ const portfolioSchema = new mongoose.Schema(
       assetSymbol: { type: String },
       tradeAmount: { type: Number },
       pnlAmount: { type: Number },
+      // Actual effective date of the transaction
+      effectiveAt: Date,
     },
   },
   {

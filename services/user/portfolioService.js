@@ -45,7 +45,7 @@ class PortfolioService {
     const currentNetWorth =
       totalCashValue + totalPositionValue + savingsAccountValue;
 
-    const snapshotTimestamp = metadata.timestamp || new Date();
+    const snapshotTimestamp = metadata.snapshotAt || new Date();
 
     const [snapshot] = await PortfolioSnapshot.create(
       [
@@ -61,6 +61,51 @@ class PortfolioService {
     );
 
     return snapshot;
+  }
+
+  async adjustHistoricalSnapshots(
+    userId,
+    effectiveAt,
+    recordedAt,
+    amount,
+    type,
+    session = null,
+  ) {
+    const adjustment =
+      type === "deposit"
+        ? Math.abs(Number(amount))
+        : type === "withdraw"
+          ? -Math.abs(Number(amount))
+          : null;
+
+    if (adjustment === null) {
+      throw new Error("Unsupported transaction type");
+    }
+
+    if (!Number.isFinite(adjustment) || adjustment === 0) {
+      throw new Error("Invalid transaction amount");
+    }
+
+    const result = await PortfolioSnapshot.updateMany(
+      {
+        userId,
+        timestamp: {
+          $gte: new Date(effectiveAt),
+          $lt: new Date(recordedAt),
+        },
+      },
+      {
+        $inc: {
+          currentNetWorth: adjustment,
+        },
+      },
+      { session },
+    );
+
+    return {
+      adjustment,
+      modifiedCount: result.modifiedCount,
+    };
   }
 
   getStartDate(timeframe) {

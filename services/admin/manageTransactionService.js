@@ -229,17 +229,41 @@ async function createTransaction(transactionData) {
     throw new CustomError("Invalid transaction type!", 400);
   }
 
+  const value = Number(amount);
+
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new CustomError("Invalid amount.", 400);
+  }
+
+  const recordedAt = new Date();
+
+  let effectiveAt = recordedAt;
+
+  if (customDate) {
+    effectiveAt = new Date(customDate);
+
+    if (Number.isNaN(effectiveAt.getTime())) {
+      throw new CustomError("Invalid custom date.", 400);
+    }
+
+    if (effectiveAt > recordedAt) {
+      throw new CustomError("Transaction date cannot be in the future.", 400);
+    }
+  }
+
   const session = await mongoose.startSession();
 
   try {
     session.startTransaction();
 
     const user = await User.findById(userId).session(session);
+
     if (!user) {
       throw new CustomError("User not found!", 404);
     }
 
     const wallets = await Wallet.find({ userId }).session(session);
+
     if (wallets.length === 0) {
       throw new CustomError("No wallets found for this user!", 404);
     }
@@ -249,6 +273,7 @@ async function createTransaction(transactionData) {
     const receiver = wallets.find(
       (wallet) => wallet._id.toString() === accountId,
     );
+
     if (!receiver) {
       throw new CustomError("Invalid wallet!", 400);
     }
@@ -269,12 +294,6 @@ async function createTransaction(transactionData) {
       if (receiver._id.equals(transferToAccount._id)) {
         throw new CustomError("Cannot transfer to the same wallet.", 400);
       }
-    }
-
-    const value = Number(amount);
-
-    if (!Number.isFinite(value) || value <= 0) {
-      throw new CustomError("Invalid amount.", 400);
     }
 
     if (
@@ -312,29 +331,21 @@ async function createTransaction(transactionData) {
       }),
     };
 
-    let bankInfo;
-
     if (type === "withdraw") {
-      bankInfo = `${`${bankName}-acc:${accountNumber}-rou:${routing}-owner:${accountName}`}`;
+      const bankInfo = `${bankName}-acc:${accountNumber}-rou:${routing}-owner:${accountName}`;
+
+      transactionPayload.meta = {
+        type: "withdraw",
+        to: receiver.name,
+        method,
+        network,
+        info: method === "bank" ? bankInfo : address,
+      };
     }
 
-    transactionPayload.meta = {
-      type: "withdraw",
-      to: receiver.name,
-      method: method,
-      network: network,
-      info: method === "bank" ? bankInfo : address,
-    };
-
     if (customDate) {
-      const date = new Date(customDate);
-
-      if (Number.isNaN(date.getTime())) {
-        throw new CustomError("Invalid custom date.", 400);
-      }
-
-      transactionPayload.createdAt = date;
-      transactionPayload.updatedAt = date;
+      transactionPayload.createdAt = effectiveAt;
+      transactionPayload.updatedAt = recordedAt;
     }
 
     const [transaction] = await Transaction.create([transactionPayload], {
@@ -348,6 +359,7 @@ async function createTransaction(transactionData) {
     } else if (type === "transfer") {
       receiver.balance.total -= value;
       receiver.balance.available -= value;
+
       transferToAccount.balance.total += value;
       transferToAccount.balance.available += value;
     } else {
@@ -361,19 +373,33 @@ async function createTransaction(transactionData) {
       await transferToAccount.save({ session });
     }
 
-    if (type === "deposit") {
+    if (["deposit", "withdraw"].includes(type)) {
+      if (effectiveAt < recordedAt) {
+        await portfolioService.adjustHistoricalSnapshots(
+          userId,
+          effectiveAt,
+          recordedAt,
+          value,
+          type,
+          session,
+        );
+      }
+
       await portfolioService.createPortfolioSnapshot(
         transaction.userId,
-        "deposit",
+        type,
         {
           transactionId: transaction._id,
-          timestamp: transaction.createdAt,
+          effectiveAt,
+          snapshotAt: recordedAt,
+          tradeAmount: value,
         },
         session,
       );
+
       await walletSnapshotService.createWalletSnapshot(
         receiver._id,
-        "deposit",
+        type,
         {
           transactionId: transaction._id,
           timestamp: transaction.createdAt,
@@ -381,33 +407,16 @@ async function createTransaction(transactionData) {
         session,
       );
 
-      await userTierService.updateTierProgress(user._id);
-    } else if (type === "withdraw") {
-      await portfolioService.createPortfolioSnapshot(
-        transaction.userId,
-        "withdraw",
-        {
-          transactionId: transaction._id,
-          timestamp: transaction.createdAt,
-        },
-        session,
-      );
-      await walletSnapshotService.createWalletSnapshot(
-        receiver._id,
-        "withdraw",
-        {
-          transactionId: transaction._id,
-          timestamp: transaction.createdAt,
-        },
-        session,
-      );
+      if (type === "deposit") {
+        await userTierService.updateTierProgress(user._id);
+      }
     } else {
       await walletSnapshotService.createWalletSnapshot(
         receiver._id,
         "transfer_out",
         {
           transactionId: transaction._id,
-          timestamp: transaction.createdAt,
+          timestamp: recordedAt,
         },
         session,
       );
@@ -417,7 +426,7 @@ async function createTransaction(transactionData) {
         "transfer_in",
         {
           transactionId: transaction._id,
-          timestamp: transaction.createdAt,
+          timestamp: recordedAt,
         },
         session,
       );
@@ -434,14 +443,17 @@ async function createTransaction(transactionData) {
       },
     };
   } catch (error) {
-    await session.abortTransaction();
+    if (session.inTransaction()) {
+      await session.abortTransaction();
+    }
 
     if (error instanceof CustomError) {
       throw error;
     }
+
     throw new CustomError(error.message || "Transaction failed!", 500);
   } finally {
-    session.endSession();
+    await session.endSession();
   }
 }
 
