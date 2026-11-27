@@ -51,13 +51,7 @@ function buildDepositEmail({ user, transaction, settings }) {
           To proceed, please make a payment to the following
           ${transaction?.method?.mode === "bank" ? "bank details" : "crypto address"}.
         </p>
-    
-      
-    
-      
-    
-      
-    
+
         <p>
           Once your payment is received, we will process your deposit
           promptly and notify you of further updates.

